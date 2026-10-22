@@ -1,0 +1,19 @@
+Use case: style-transfer / precise concept edit.
+Input image 1 is the existing Pulse on Paper landscape target. Preserve its warm textured watercolor paper, visible softly edged but well-defined PPG pulse curves, transparent pigment, cobalt blue / iris / teal palette with restrained sage accents, and peaceful artful quality. This is a concept illustration, not a measured-data rendering.
+
+Create one beautiful comparison board containing eight separate miniature watercolor landscapes in a clean 4-column by 2-row gallery, all on the same warm ivory paper. Render at high resolution, wide landscape. Generous thin paper gutters; no UI cards, shadows or frames.
+Four clean understated sans serif column labels at the top, exactly: "Meadow", "Ocean", "Mountains", "Lake".
+Each column shows the same scene family in both rows, keeping its basic composition recognizable between rows.
+A small clear row label at the left of the upper row reads exactly "Short recording". Lower row label exactly "Longer recording". Include only those labels, no other words, logos or numbers.
+
+UPPER ROW: intentionally sparse but complete beautiful scenes. Far fewer pulse-wave contour strokes, clearly wider gaps BETWEEN the strokes, lots of open paper. Keep each individual pulse curve flowing and recognizable; do not flatten it away. Approx 5–9 principal contour bands per miniature plus sparse accents.
+LOWER ROW: richly layered versions with approx 20–30 principal contour bands, much closer spacing BETWEEN strokes, intricate accumulated detail. Every individual pulse still visibly separate; keep readable negative space and restrained ink coverage. More data produces more real strokes, not simply bigger or darker lines. Keep color, pulse scale and pigment quality comparable across rows.
+
+Scene compositions must be genuinely different across columns:
+Meadow: sweeping foreground grasses and rolling field contours, sage-to-teal pulse strokes fanning in gently changing directions, airy sky. No literal blades drawn separately: the pulse curves themselves form the grass.
+Ocean: a spacious horizon and flowing bands of sea swells, blue/teal PPG ripple paths, pale pulse clouds, no mountains or trees.
+Mountains: dramatic overlapping cobalt/iris ridge lines and distant valley, contours made visibly from PPG-shaped strokes, no lake required.
+Lake: asymmetrical distant shore and quiet broad teal water with delicate pulse-shaped reflections, softly layered low hills, generous central light.
+
+Absolutely every illustrated landscape contour and mark is formed from flowing organic PPG waveform shapes: rounded systolic upstroke/peak, curved descending shoulder and small dicrotic notch, then a lower baseline. NOT ECG spikes, sine waves, straight hatching, generic mountain sketches, filled cartoon shapes or a conventional watercolor landscape with a waveform pasted over it.
+Visible within-stroke cobalt-to-iris-to-teal gradients and watercolor pigment pooling at edges; authentic pulse-shaped brush lines. Short and long versions must be equally polished, balanced, calm, and beautiful. Vary scene composition across columns while retaining one coherent project identity. No conventional trees, buildings, rocks, animals or sun disk. Preserve the strongest qualities of the input image, but make density differences and independent scene variety unmistakable.

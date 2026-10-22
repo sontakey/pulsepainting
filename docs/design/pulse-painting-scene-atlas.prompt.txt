@@ -1,0 +1,28 @@
+Use case: style-transfer.
+Input image is the Pulse on Paper watercolor landscape style reference. Create a refined art-direction atlas of 16 genuinely distinct possible landscapes, ALL formed from visibly recognizable PPG pulse waveform strokes. This is an illustrative concept board, not actual measured data.
+One large high-resolution square gallery sheet, 4 columns by 4 rows, warm ivory watercolor paper, thin generous paper gutters, no card borders or shadows, no top headline. A clean small legible sans-serif label beneath each miniature. Use these labels exactly, left-to-right row-by-row:
+"Meadow", "Open ocean", "Alpine peaks", "Quiet lake";
+"Coastal cliffs", "River valley", "Rolling hills", "Sand dunes";
+"Desert mesas", "Island archipelago", "Waterfall gorge", "Glacial fjord";
+"Reed wetland", "Forest canopy", "Sea of clouds", "Aurora night".
+
+Every scene must have an immediately distinct composition, silhouette, horizon, direction of flow, foreground arrangement. Never repeat the same mountain/lake composition across tiles.
+1 Meadow: close foreground fans of sage pulse curves, open field.
+2 Open ocean: broad cobalt/teal parallel wave swells and a low straight-seeming horizon built from tiny pulse marks, no land.
+3 Alpine peaks: tall layered iris/cobalt ridges made of continuous pulse-shaped contours, no water.
+4 Quiet lake: bright open water between asymmetrical low shores with softly reflected pulse contours.
+5 Coastal cliffs: high steep side cliff formed from tightly stacked pulse contours dropping into open cobalt sea.
+6 River valley: elegant S-shaped river corridor of small teal waveform paths between gently rolling land.
+7 Rolling hills: wide sweeping staggered low hills in sage and cobalt without sharp mountain peaks.
+8 Sand dunes: luminous soft ochre and pale teal ridges built from long gently arching PPG stroke rows.
+9 Desert mesas: sculptural separated flat-topped plateaus made from layered terracotta/iris PPG curves with lots of paper sky.
+10 Island archipelago: several small distinct islands made from nested waveform rings in an open teal sea.
+11 Waterfall gorge: long vertical falling waveform strokes framed by dark teal/iris layered gorge contours.
+12 Glacial fjord: very narrow luminous blue water corridor flanked by tall pale blue pulse ridges.
+13 Reed wetland: clusters of nearly upright sage/teal pulse strands amid open patches of pale water.
+14 Forest canopy: recognizable layered treetop masses formed entirely from overlapping curved PPG strokes, moss/sage/teal, NO conventional trunks/leaves or tiny tree icons.
+15 Sea of clouds: airy layers of very pale lavender/cobalt pulse contours, broad open sky, a few distant summits.
+16 Aurora night: elegant sweeping vertical/curved teal-iris pulse ribbons across a deep indigo watercolor sky with a very low quiet horizon; no stars or conventional light effects.
+
+Keep the input's clear organic pulse curve language throughout: rounded systolic upstroke and peak, descending shoulder with small dicrotic notch and lower baseline, never ECG zigzags or generic sine waves. The pulse curves are the scenery, not a medical chart pasted onto scenery. Confident pigmented edges, gentle wet watercolor bloom, within-stroke color gradients, visible warm paper grain, generous negative space and atmospheric depth. Use cobalt, iris, teal consistently across the set, with restrained natural sage/ochre/copper accents appropriate to scene; no neon or muddy colors.
+Medium stroke density in all16 examples so this board isolates SCENE VARIETY; density comparison is a separate board. Vary orientation, depth and arrangement rather than changing only palette. No people, buildings, animals, decorative icons, generic landscape painting, or conventional filled silhouettes. Each miniature must be beautiful as its own shareable artwork. Labels outside art, only the16 exact labels listed.

@@ -1,0 +1,13 @@
+{
+  "package": "@sontakey/ppg-js",
+  "version": "0.3.1",
+  "publicationStatus": "Unpublished; npm latest remains 0.3.0 and publication was intentionally left pending.",
+  "repository": "https://github.com/sontakey/ppg-js",
+  "sourceCommit": "732e1ef51f76bce9145bb7f666f92a30be5e0181",
+  "sourcePath": "examples/demo/dist/ppg.global.js",
+  "artifact": "ppg.global.js",
+  "sha256": "b7fdadb68fa32a1e3e36c1d792b5a3cabac9565c6182368d78589406c52374be",
+  "bytes": 79727,
+  "reason": "Preserves verified camera start/cancel/recovery, wake-lock and motion lifecycle fixes not present in npm 0.3.0. This is a pinned built artifact, not a fork of the scientific source.",
+  "migration": "When npm 0.3.1 or a later tested version is actually published, replace this artifact through a reviewed dependency update, rerun capture/recovery/export checks, and remove the temporary vendor artifact."
+}
