@@ -140,17 +140,19 @@ try {
       const intervals = [], activeIntervals = [], renderCPU = [], engineCPU = [];
       const started = performance.now(), initialFrames = window.__pulseLandscapeStats.frames;
       const initialSegments = manuscript.segments.length, initialSamples = monitor.i;
-      let previous = 0, previousDraw = 0, previousFrames = initialFrames;
+      let previous = 0, previousDraw = 0, previousFrames = initialFrames, previousDrawWasActive = false;
       function frame(now) {
         if (previous) intervals.push(now - previous);
         previous = now;
         const began = performance.now(); monitor.feedUntil(preload + (now - started) / 1000); engineCPU.push(performance.now() - began);
         const surface = window.__pulseLandscapeStats;
         if (surface.frames > previousFrames) {
-          // >100ms is an intentional idle period between validated windows.
-          if (previousDraw && now - previousDraw < 100) activeIntervals.push(now - previousDraw);
+          // Use actual renderer state to exclude idle windows. Keep long active
+          // intervals: a main-thread stall must remain visible in the results.
+          if (previousDraw && previousDrawWasActive) activeIntervals.push(now - previousDraw);
           previousDraw = now; previousFrames = surface.frames; renderCPU.push(surface.frameMs);
         }
+        previousDrawWasActive = surface.active;
         if (now - started >= seconds * 1000) resolve({ intervals, activeIntervals, renderCPU, engineCPU, frames: surface.frames - initialFrames, elapsedMs: now - started, initialSegments, finalSegments: manuscript.segments.length, samplesFed: monitor.i - initialSamples, surface: { ...surface }, stats: JSON.parse(JSON.stringify(window.__paintGpuStats)) });
         else requestAnimationFrame(frame);
       }
@@ -159,6 +161,7 @@ try {
     assert.ok(replay.frames > duration * 10, `${name}: cached landscape renders actual live reveal`);
     assert.ok(replay.finalSegments > replay.initialSegments && replay.samplesFed > duration * 20, `${name}: real engine keeps accepting waveform during measurement`);
     assert.ok(replay.surface.cachedPixels <= replay.surface.pixelBudget, `${name}: live landscape raster is bounded independently of session length`);
+    assert.ok(replay.surface.materialPixels <= replay.surface.materialPixelBudget, `${name}: pigment canvases and immutable patterns stay bounded`);
     assert.equal(replay.stats.ready, true, `${name}: GPU remains available`);
     for (const [surfaceName, surface] of Object.entries(replay.stats.surfaces)) {
       assert.equal(surface.backend, test.backend, `${name}/${surfaceName}: backend remains active`);

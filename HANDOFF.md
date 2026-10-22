@@ -1,49 +1,85 @@
 # Pulse Painting handoff
 
-## Scope
+## Current candidate and release status
 
-Pulse Painting has been extracted from the ppg-js camera application at source commit `732e1ef51f76bce9145bb7f666f92a30be5e0181`. The app owns capture presentation, painting, reports, and exports; ppg-js retains scientific and camera-acquisition source.
+Pulse Painting is the art application extracted from ppg-js source commit
+`732e1ef51f76bce9145bb7f666f92a30be5e0181`. The scientific library and its simple
+ChatPPG demo remain separate. The landscape candidate has not replaced the
+verified manuscript release on production.
 
-The landscape release candidate implements sixteen source-mapped scene families,
-usable-time density, a close-up artwork camera and a continuous same-scene reveal.
-Local visual and regression validation is in progress. It has not yet replaced
-the verified manuscript release on production.
+The retained candidate uses all sixteen scene families, usable-time density,
+organic terrain mapping of the actual accepted samples, a close-up artwork
+camera, and a continuous zoom-out to the same scene used for sharing. The
+original waveform manuscript and computed report remain available. Original
+samples are unchanged; pigment texture and terrain placement are artistic.
 
-The user explicitly approved curving real traces along terrain and adding
-organic curves within the pulse strokes. Those curves are implemented; the
-original manuscript and computed report remain unchanged. Connected channels,
-perspective and source-derived land fills are also implemented. The latest
-independent visual reviews scored 5.5 and 5.3/10. Terrain continuity improved,
-but smooth stacked fills still look artificial, several scene families remain
-too similar, and sparse/dense compositions need stronger art direction.
+Desktop now has a full-viewport painted hero, QR phone handoff, explanatory
+copy, sixteen actual public-fixture examples, filters, a keyboard-accessible
+viewer, image sharing and canonical example links. Default mobile capture
+fetches no gallery imagery. The gallery never uploads visitor recordings.
+See `docs/design/desktop-gallery.md` for the Mobbin references and provenance.
 
-The dream-loop workflow reached its stalled criterion again after this major
-revision. The user has been shown the actual current atlas and asked whether to
-pursue natural watercolor texture/distinct scenery (recommended) or retain the
-abstract contour style and finish deployment. Await that direction before a
-further renderer rewrite or release. Draft source PR 1 is open at
-https://github.com/sontakey/pulsepainting/pull/1; its first checkpoint is
-`7d4b42b`. Vercel preview `dpl_ChGLMjcdfhecNVooYbatvteiyEDt` is READY at
-https://pulsepainting-eo0kdeo0a-sontakeys-projects.vercel.app. This is a preview,
-not a landscape production release. Hosted acceptance passed: all 21 assets
-match the tested snapshot, WebKit replay/report/export checks passed, the same
-scene zooms from 2.8× to 1×, and the painted QR passed ten decode variants. The
-goal remains active awaiting the user's visual direction.
+The user approved further natural-watercolor work on October 22. The retained
+renderer reached 7.0/10 in independent visual review, up from 6.6 for round9 and
+6.7 for the first broad underpainting. It fixes the river gutter, curves the
+fjord, gives short forest recordings a complete background, and adds a natural
+pigment material. The subsequent absorption experiment regressed to 6.5 and
+was discarded; it exists only in ignored `.dream-loop/absorption-study/`.
+The best candidate is tracked, renderer SHA-256:
+`878928ede818f9866dca9994506df2802570f2c6673c961310d9988a10866b1a`.
 
-The current curve/volume candidate passes the Node source model and browser view
-suite, including all sixteen families, retained source knots, no interpolated
-amplitude overshoot, fragmentation density, pause/resume, reduced motion, bounded
-cache storage, and exact live/direct raster parity. Chromium and accelerated
-WebKit app/report/export checks pass. A full three-minute interrupted WebKit
-session passed with 59.68 fps active painting, and four 20-second performance
-cases measured 60 fps at 1×/4× CPU throttling. These used an immutable snapshot
-of `7d4b42b`. The portrait parity test now compares identical destination
-coordinates; Chromium, WebKit and Linux CI all report zero difference with its
-original tolerance. GitHub Actions run `39726258318` passed on `91ef060`, including
-build, model/view, app/report/export and GPU fallback checks. The style choice
-remains pending. See
-`docs/validation/landscape-candidate-2026-10-21.md` for scoped results and retained
-intermediate failures. Tests do not imply visual acceptance.
+The dream-loop workflow reached its stalled criterion after that major
+experiment. A user question is pending: release the current illustrative
+watercolor style, or perfect one scene first before carrying the treatment
+across all sixteen. Prior authorization to deploy still stands; the pending
+question concerns visual direction, not deployment permission. Do not silently
+resume broad visual iterations or promote the candidate before that answer.
+Independent validation, a source checkpoint and a reviewable preview can proceed.
+
+## Current verification
+
+The retained candidate passed `npm test`: model and source preservation,
+all-family live/direct parity, partial rendering, capture/report/export,
+GPU fallback, and Chromium/WebKit desktop-gallery checks. Live/direct artwork
+compositing differs by at most one channel level with mean error below 0.001;
+repeat rendering is exact. Pigment canvases and immutable pattern snapshots
+have a fixed 4,489,216-pixel budget; the live raster layers use 2,560,000 pixels.
+A gallery hash guard checks the renderer, engine, acceptance adapter, fixture
+and every published image.
+
+The mobile deep-link race was reproduced and fixed: a delayed gallery manifest
+cannot open a modal after the visitor has started capture. Focus, sharing,
+cancellation, mobile asset avoidance and failure recovery are tested in both
+engines. Round9 desktop screenshots remain historical evidence; current assets
+use the retained renderer hash above.
+
+The latest interrupted WebKit replay completed 180.387 seconds of active
+measurement in 209.833 wall seconds. Camera-frame pause, main-thread stall and
+hidden-page interruption recovered without recording credit for stale time.
+Active painting averaged 59.76 fps, p95 18 ms, with a 201 ms maximum interval.
+Report, artwork, same-scene parity and export retries passed. Browser evidence
+uses replayed public camera data and does not establish physical iPhone camera,
+thermal or native-share performance. The corrected cadence measurement retains
+long active intervals; it no longer discards every gap over 100 ms.
+
+The source/build snapshot and latest timing outputs are in ignored
+`.dream-loop/landscape-round11-functional/`. All four 20-second Chrome cases
+(WebGPU/WebGL2 entry backends, 1×/4× CPU) passed at 60 fps active painting,
+p95 16.7–16.8 ms and maximum 16.8 ms. This is desktop Chrome on Apple M4 with
+a mobile viewport, not a physical-phone guarantee. Painted QR decoding passed
+66/66 rendered/perturbed cases across Chromium and WebKit; byte-identical QR
+evidence is preserved in that snapshot's `qr/` directory. See the
+[current validation record](docs/validation/landscape-desktop-candidate-2026-10-22.md)
+for scope, exact measurements and evidence paths. Older evidence is retained
+separately, including round9's 266.6 ms WebGL2 outlier; it is not validation of
+the current build.
+
+Draft source PR1 is https://github.com/sontakey/pulsepainting/pull/1; the last
+pushed head remains `029c8c0` at this checkpoint. The old round5 protected Vercel
+preview is https://pulsepainting-eo0kdeo0a-sontakeys-projects.vercel.app and does
+not contain the current desktop or materials. Production still serves the
+manuscript app. The goal is active and incomplete. Source and preview publication
+status must be updated after verification; neither implies production release.
 
 ## Runtime and build
 

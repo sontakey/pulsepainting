@@ -90,7 +90,7 @@ try {
         this.options.onReady({ torchSupported: true });
         this.started = performance.now();
         const metrics = window.__sessionMetrics;
-        let previous = 0, previousPaint = 0, previousPaintFrames = 0;
+        let previous = 0, previousPaint = 0, previousPaintFrames = 0, previousPaintWasActive = false;
         let previousCamera = null;
         let framePauseDone = false, stalled = false, hidden = false;
         let activeFeedPause = null, activeHidden = null, pendingResume = null, restoreVisibility = null;
@@ -146,9 +146,10 @@ try {
             previousCamera = {...camera};
           }
           if (surface.frames > previousPaintFrames) {
-            if (previousPaint && now - previousPaint < 100 && !activeHidden && !returningFromStall) metrics.paintIntervals.push(now - previousPaint);
+            if (previousPaint && previousPaintWasActive && !activeHidden && !returningFromStall) metrics.paintIntervals.push(now - previousPaint);
             previousPaint = now; previousPaintFrames = surface.frames;
           }
+          previousPaintWasActive = surface.active;
           for (const interruption of metrics.interruptions) {
             if (interruption.recoveryCreditMs === undefined && now - interruption.resumedAt >= 1200) {
               interruption.recoveryWallMs = now - interruption.resumedAt;

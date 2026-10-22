@@ -48,6 +48,7 @@ try {
  assert.ok(finished.samples.length>30&&finished.samples.some(s=>s.scale>1.1),'normal motion contains a real continuous reveal');
  assert.ok(finished.elapsed>=3400&&finished.elapsed<6000,'normal reveal remains near its intended 3.5 second duration');
  assert.ok(finished.stats.cachedPixels<=finished.stats.pixelBudget,'raster storage stays bounded');
+ assert.ok(finished.stats.materialPixels<=finished.stats.materialPixelBudget,'pigment canvases and pattern snapshots stay bounded');
  const raster=await page.evaluate(()=>{const c=document.createElement('canvas');c.width=c.height=view.canvas.width;PulseLandscape.render(scene,c);const a=view.canvas.getContext('2d').getImageData(0,0,c.width,c.height).data,b=c.getContext('2d').getImageData(0,0,c.width,c.height).data;let different=0,max=0,sum=0;for(let i=0;i<a.length;i++){const delta=Math.abs(a[i]-b[i]);different+=delta>0?1:0;max=Math.max(max,delta);sum+=delta;}return{live:view.canvas.toDataURL(),direct:c.toDataURL(),different,max,mean:sum/a.length};});
  console.log('LANDSCAPE_RASTER_PARITY',JSON.stringify({different:raster.different,max:raster.max,mean:raster.mean}));
  assert.ok(raster.max<=1&&raster.mean<.001,'completed cache matches direct scene render within one-level Canvas2D drawImage rounding');
@@ -87,6 +88,39 @@ try {
  assert.equal(await page.evaluate(()=>__pulseLandscapeStats.frames),fragmentedFinish.stats.frames,'a completed fragmented scene leaves no pending animation queue');
  const all=await page.evaluate(()=>PulseLandscape.FAMILIES.map(family=>{const s=PulseLandscape.create({seed:77,family:family.id});PulseLandscape.append(s,testSegment(0,20));const c=document.createElement('canvas');c.width=c.height=400;PulseLandscape.render(s,c);return{family:family.id,png:c.toDataURL(),strokes:s.strokes.length,usableSeconds:s.usableSeconds};}));
  assert.equal(all.length,16);assert.equal(new Set(all.map(s=>s.png)).size,16,'all sixteen families produce distinct actual renderings from the same source');
+ // Every material path must finish identically after a partial live reveal,
+ // repeated direct rendering and brush-atlas cache reuse across scene families.
+ const materialParity=await page.evaluate(async()=>{
+   const results=[];
+   for(const family of PulseLandscape.FAMILIES){
+     view.dispose();window.scene=PulseLandscape.create({seed:189,family:family.id});
+     PulseLandscape.append(scene,testSegment(0,25));
+     window.view=PulseLandscape.createView(document.getElementById('view'),scene,{reducedMotion:false});
+     await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));
+     const partial=__pulseLandscapeStats.painted<scene.strokes.length;
+     view.pause(true);PulseLandscape.append(scene,testSegment(30,15));view.sync();
+     const source=JSON.stringify(scene),finish=view.finish();view.cancelFinish();await finish;
+     const a=document.createElement('canvas'),b=document.createElement('canvas');
+     a.width=a.height=b.width=b.height=view.canvas.width;
+     PulseLandscape.render(scene,a);PulseLandscape.render(scene,b);
+     const live=view.canvas.getContext('2d').getImageData(0,0,a.width,a.height).data;
+     const direct=a.getContext('2d').getImageData(0,0,a.width,a.height).data;
+     const repeated=b.getContext('2d').getImageData(0,0,a.width,a.height).data;
+     let max=0,sum=0,repeatMax=0;
+     for(let i=0;i<live.length;i++){const d=Math.abs(live[i]-direct[i]);max=Math.max(max,d);sum+=d;repeatMax=Math.max(repeatMax,Math.abs(direct[i]-repeated[i]));}
+     results.push({family:family.id,materialPixels:__pulseLandscapeStats.materialPixels,materialPixelBudget:__pulseLandscapeStats.materialPixelBudget,partial,sourceStable:source===JSON.stringify(scene),max,mean:sum/live.length,repeatMax});
+     a.width=a.height=b.width=b.height=1;
+   }
+   return results;
+ });
+ for(const result of materialParity){
+   assert.ok(result.partial&&result.sourceStable,`${result.family} exercises partial painting without source mutation`);
+   assert.ok(result.max<=1&&result.mean<.001,`${result.family} live/direct material parity`);
+   assert.equal(result.repeatMax,0,`${result.family} repeat rendering is deterministic`);
+   assert.ok(result.materialPixelBudget<=4489216,`${result.family} retains the mobile pigment memory ceiling`);
+   assert.ok(result.materialPixels<=result.materialPixelBudget,`${result.family} bounds pigment surfaces after multiple families and LRU eviction`);
+ }
+ console.log('LANDSCAPE_ALL_MATERIAL_PARITY',JSON.stringify(materialParity));
  await page.evaluate(()=>view.dispose());
  assert.equal(await page.evaluate(()=>document.querySelectorAll('.landscape-canvas').length),0,'dispose removes the live view');
  assert.ok(await page.evaluate(()=>__pulseLandscapeStats.cachedPixels)<=4,'dispose releases all layer raster storage');

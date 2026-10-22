@@ -2,8 +2,10 @@
 
 Your pulse, made into a place.
 
-> Landscape release candidate: implementation and browser validation are in progress.
-> The public site and screenshots below currently show the earlier manuscript app.
+> Landscape release candidate: implemented and browser-tested; the visual target is not yet met.
+> The latest browser replay, performance and QR checks pass; physical-device validation remains separate.
+> The public site and phone screenshots below currently show the earlier manuscript app.
+> The landscape gallery images are actual renders from the current candidate, not a deployed release.
 > See [HANDOFF.md](HANDOFF.md) for the visual review and deployment status.
 
 Pulse Painting is a three-minute phone-camera capture experience by [ChatPPG](https://chatppg.com), powered by [ppg-js](https://github.com/sontakey/ppg-js). Accepted pulse waveforms paint one of sixteen landscapes, with organic cobalt, iris, and teal gradients. A close-up follows the brush during capture, then pulls back to reveal the same painting, ready to share alongside an expandable HRV report.
@@ -18,6 +20,40 @@ The screenshots use browser replay with mocked camera input; see [capture proven
 
 The primary destination is [pulsepainting.com](https://www.pulsepainting.com/), a separate Vercel project connected to this repository. The apex domain redirects to www. The simple library demo remains at [ChatPPG](https://chatppg.com/ppg-js-demo). Release and public verification status are tracked in [HANDOFF.md](HANDOFF.md).
 
+## Desktop gallery · release candidate
+
+The desktop experience opens with a full-screen landscape, a painted invitation
+to begin on your phone, and a gallery of all sixteen scene families. Browse
+water, land and sky, open an artwork at full size, then share its labeled example
+image or copy a link. Keyboard navigation, reduced motion and a stationary QR
+keep the gallery and phone handoff accessible.
+
+![Current desktop candidate with the Quiet lake background and phone QR invitation](docs/media/pulse-painting-desktop-candidate.jpg)
+
+**Current candidate desktop.** Direct browser capture of the local build, not
+the deployed site. See [image provenance](docs/media/README.md).
+
+<p align="center">
+  <img src="app/assets/gallery/alpine-peaks-640.webp" width="230" alt="Alpine peaks landscape generated from the public pulse fixture by the current candidate renderer">
+  <img src="app/assets/gallery/quiet-lake-640.webp" width="230" alt="Quiet lake landscape generated from the public pulse fixture by the current candidate renderer">
+  <img src="app/assets/gallery/rolling-hills-640.webp" width="230" alt="Rolling hills landscape generated from the public pulse fixture by the current candidate renderer">
+</p>
+
+**Alpine peaks · Quiet lake · Rolling hills.** These examples are made by the
+actual app renderer from one already-public pulse recording. They show the
+current candidate, combining natural pigment texture with revised landscape
+shapes. The desktop gallery's browser checks pass; the landscape visual target
+remains unmet. They are not visitor submissions. Your recording stays in your
+browser, and sharing happens only when you choose it.
+
+The [desktop design note](docs/design/desktop-gallery.md) records the inspected
+Mobbin references, gallery behavior and validation scope. The
+[gallery manifest](app/assets/gallery/manifest.json) records renderer, fixture,
+signal-engine, accepted-window adapter and image hashes. Its current renderer
+SHA-256 is `878928ede818f9866dca9994506df2802570f2c6673c961310d9988a10866b1a`.
+All sixteen examples were regenerated from that source. Default mobile capture
+does not download gallery imagery.
+
 ## Run locally
 
 Use Node.js 24 or later:
@@ -27,7 +63,7 @@ npm ci
 npm run dev
 ```
 
-Open `http://127.0.0.1:5173`. `npm run build` creates a complete static site in `dist/`. Actual capture needs a compatible phone, camera and flash permissions, and HTTPS or another secure context. Desktop visitors see a painted QR invitation to open the hosted app on their phone.
+Open `http://127.0.0.1:5173`. `npm run build` creates a complete static site in `dist/`. Actual capture needs a compatible phone, camera and flash permissions, and HTTPS or another secure context. Desktop visitors can browse the example gallery and use the painted QR invitation to open the hosted app on their phone.
 
 ## What is implemented
 
@@ -37,6 +73,7 @@ Open `http://127.0.0.1:5173`. `npm run build` creates a complete static site in 
 - Optional WebGPU/WebGL2 painted entry transitions and an independent Canvas2D landscape compositor.
 - Placement coaching, a small live finger preview, real-time pulse/RMSSD/SDNN, and floating mobile controls.
 - Report charts, a 1080 × 1350 shareable artwork, native file sharing with download fallback, and optional metrics on the artwork.
+- A full-screen desktop introduction and sixteen public-fixture examples, with filters, a keyboard-accessible viewer, user-initiated image sharing and phone deep links.
 - Accessible supporting typography, one brush heading per screen, reduced motion, interruption recovery, and no recording credit for stale frames.
 
 The [landscape design contract](docs/design/pulse-painting-design.md) covers the sixteen families, data fidelity, density and recovery. Scene choice is random within an art-directed plan, not a health classification. The [mapping brief](docs/design/biometric-scene-mapping.md) distinguishes implemented source/quality/density mappings from future optional self-report ideas. The original manuscript remains available in the report menu.
@@ -56,9 +93,10 @@ npm test
 npm run test:safari-session
 npm run test:paint-performance
 npm run test:qr
+npm run test:gallery
 ```
 
-`npm test` covers actual app callbacks, accepted-data attribution, metrics, report glyph bounds, mobile layouts, export/share behavior, and compositor fallback. The full session test runs real-time public-recording replay in WebKit with three interruptions and automatic completion. These checks mock camera input and do not establish physical iPhone camera, thermal, or native-share performance.
+`npm test` covers actual app callbacks, accepted-data attribution, metrics, report glyph bounds, mobile layouts, export/share behavior, compositor fallback, and the desktop gallery. Gallery checks require current renderer/image provenance and exercise all sixteen scenes, keyboard focus, sharing fallbacks, mobile deep links and failure recovery in Chromium and WebKit. The full session test runs real-time public-recording replay in WebKit with three interruptions and automatic completion. These checks mock camera input and sharing APIs; they do not establish physical iPhone camera, thermal, or native-share performance.
 
 The QR suite uses Python OpenCV, Pillow, and NumPy for bounded image perturbations; the static QR itself ships no encoder dependency. Optional `PPG_PYTHON` selects a prepared Python environment. Test artifacts stay in ignored `.dream-loop/`.
 
@@ -67,8 +105,11 @@ The QR suite uses Python OpenCV, Pillow, and NumPy for bounded image perturbatio
 - `app/`: ready, placement, capture, report, export, local fonts, and static QR assets.
 - `app/landscape.js`: scene planning, accepted-source coverage, pigment rendering and the live artwork camera.
 - `app/portrait.js`: same-scene export and native sharing with download fallback.
+- `app/gallery.js` and `app/gallery.css`: desktop introduction, public-example browsing and sharing; separate from phone capture.
+- `app/assets/gallery/`: generated example thumbnails, full artworks, labeled share images and their provenance manifest.
 - `src/paint-gpu.js`: optional Three.js entry compositor source.
 - `tools/prepare-dist.mjs`: verify the pinned library and assemble the static app.
+- `tools/generate-gallery.mjs`: regenerate the sixteen examples from the actual renderer and public fixture after a renderer change.
 - `tools/serve.mjs`: local static preview.
 - `test/e2e/`: browser replay, graph, accessibility, export, interruption, and QR checks.
 - `docs/capture-and-artwork.md`: capture, rendering, and report behavior.
