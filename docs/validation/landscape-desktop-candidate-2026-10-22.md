@@ -122,7 +122,10 @@ Both local Chromium and WebKit app suites passed. Fault injection confirms a
 valid 5.5-second encoder callback succeeds, a null callback fails immediately,
 and a missing callback times out with sharing disabled. No runtime or animation
 performance assertion changed. Evidence: ignored `.dream-loop/ci-recovery/`.
-The next Linux run is pending; local results do not imply its success.
+Linux run [39832035805](https://github.com/sontakey/pulsepainting/actions/runs/39832035805)
+passed the complete `npm test` suite on `cad0f47` at 18:33 UTC. This validates
+the unchanged tracked runtime and corrected test harness, not the separate
+Quiet Lake design study.
 
 ## Remaining scope
 

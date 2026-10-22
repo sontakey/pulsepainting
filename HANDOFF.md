@@ -37,6 +37,17 @@ Study code stays in ignored `.dream-loop/quiet-lake-study/`, with a generated
 visual target and prompt in `.dream-loop/quiet-lake-target/`. These are design
 studies; tracked runtime and the hosted preview retain the verified round11 build.
 
+Focused Quiet Lake review progressed from 4.0 through 5.9, 6.2, 6.6 and 7.1.
+The finer-ripple redesign then regressed to 7.0, triggering the dream-loop stall
+rule. The user has been shown the strongest v4 study and asked to choose fuller
+rounded paint, crisper target-like ripples, or the current direction. That answer
+is pending. V4 and v5 are archived under the study directory. The best v4 renderer
+hash is `314503a9d4f108fbd41d7e36812200c56ca7f0fd1eeabf1e6bbfaff89524de68`.
+Both preserve exact source data and leave the other fifteen families pixel-identical.
+Visual iteration is held; only two behavior-preserving cache/diagnostic fixes and
+timing verification of the retained study continue independently. No study is in
+the tracked runtime or hosted preview yet.
+
 ## Current verification
 
 The retained candidate passed `npm test`: model and source preservation,
@@ -91,7 +102,9 @@ now observes terminal UI changes with a bounded 30-second correctness deadline,
 records actual elapsed time, and additionally checks recovered share/save controls.
 Both local browser app suites passed. A 5.5-second delayed callback succeeds;
 null and missing callbacks still fail or time out with sharing disabled.
-Runtime and dist are unchanged. The replacement CI run is pending, not passed.
+Runtime and dist are unchanged. Replacement Linux run 39832035805 passed the
+complete `npm test` suite on checkpoint `cad0f47` at 18:33 UTC. The original CI
+failure and fault-injection evidence remain in ignored `.dream-loop/` records.
 
 Current protected preview: https://pulsepainting-muws2mix2-sontakeys-projects.vercel.app
 Deployment `dpl_Ej9RxFtVzDFMhcuyWdNPPQCSTrVd` is READY. All 73 served files
