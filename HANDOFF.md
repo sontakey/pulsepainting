@@ -21,15 +21,24 @@ The dream-loop workflow reached its stalled criterion again after this major
 revision. The user has been shown the actual current atlas and asked whether to
 pursue natural watercolor texture/distinct scenery (recommended) or retain the
 abstract contour style and finish deployment. Await that direction before a
-further renderer rewrite or release. No landscape production deployment or
-source PR has occurred. The goal remains active.
+further renderer rewrite or release. Draft source PR 1 is open at
+https://github.com/sontakey/pulsepainting/pull/1; its first checkpoint is
+`7d4b42b`. Vercel preview `dpl_ChGLMjcdfhecNVooYbatvteiyEDt` is READY at
+https://pulsepainting-eo0kdeo0a-sontakeys-projects.vercel.app. This is a preview,
+not a landscape production release. The goal remains active.
 
 The current curve/volume candidate passes the Node source model and browser view
 suite, including all sixteen families, retained source knots, no interpolated
 amplitude overshoot, fragmentation density, pause/resume, reduced motion, bounded
-cache storage, and exact live/direct raster parity. The final full three-minute
-WebKit session and longer performance tests remain queued for visual freeze;
-earlier runs are not final evidence for this material revision.
+cache storage, and exact live/direct raster parity. Chromium and accelerated
+WebKit app/report/export checks pass. A full three-minute interrupted WebKit
+session passed with 59.68 fps active painting, and four 20-second performance
+cases measured 60 fps at 1×/4× CPU throttling. These used an immutable snapshot
+of `7d4b42b`. The portrait parity test now compares identical destination
+coordinates; Chromium and WebKit both report zero difference with its original
+tolerance. A fresh Linux CI run remains pending. The style choice remains pending. See
+`docs/validation/landscape-candidate-2026-10-21.md` for scoped results and retained
+intermediate failures. Tests do not imply visual acceptance.
 
 ## Runtime and build
 

@@ -1,8 +1,9 @@
 # Landscape candidate validation
 
 This is a draft implementation, not a production release or visual acceptance.
-The runtime under review is on `codex/landscape-reveal`. The existing public
-site still serves the earlier manuscript application.
+The runtime under review is commit `7d4b42bffff29cdb11de76e27c1699b156d645ed`,
+on `codex/landscape-reveal`, in [draft PR 1](https://github.com/sontakey/pulsepainting/pull/1).
+The existing public site still serves the earlier manuscript application.
 
 ## Candidate scope
 
@@ -67,10 +68,57 @@ encoder and renderer recovery. The original timeout is retained and its cause
 has not been established. It must not be silently reclassified as a confirmed
 application fix.
 
-The full WebKit session and longer performance measurements are being run on an
-immutable build snapshot. Results will be added when those processes finish.
-Local detailed evidence, including failures and SHA-256 manifests, stays in the
-ignored `.dream-loop/landscape-round5-functional/` directory.
+## Full-session and performance evidence
+
+The full WebKit replay completed **180.407 seconds of active measurement in
+209.809 seconds wall time**, then automatically stopped once and revealed the
+same scene. It recovered from a four-second camera-frame pause, a 2.5-second
+main-thread stall, and a four-second simulated hidden-page interval. All three
+resumed without stale-frame or catch-up recording credit. Hidden and paused
+periods added no recording time.
+
+Active painting averaged **59.68 fps**, with an 18 ms p95 frame interval. The
+overall cadence excluding deliberate test interruptions was 59.97 fps. The
+cache remained at 2.56 million pixels; no invalid camera transforms, uncaught
+errors, console errors or first-party request failures were recorded. Report
+parity, graph bounds, PNG privacy, original manuscript export, print and share
+payload checks passed. Injected encoder/renderer retries took 83/80 ms. The
+replay used the public recording and, when needed, repeated its recorded tail
+with shifted timestamps to provide enough input for the interrupted session.
+
+Four separate 20-second desktop Chrome streaming checks used a 390 × 844
+viewport at DPR 3. Both the actual entry backend and independent Canvas2D
+landscape were active; the results do not measure physical mobile hardware or
+GPU execution time.
+
+| Entry backend | CPU throttling | Painting fps | Frame p95 | Submission CPU p95 |
+| --- | ---: | ---: | ---: | ---: |
+| WebGPU | 1× | 60.0 | 16.7 ms | 0.7 ms |
+| WebGL2 | 1× | 60.0 | 16.7 ms | 0.7 ms |
+| WebGPU | 4× | 60.0 | 16.7 ms | 1.6 ms |
+| WebGL2 | 4× | 60.0 | 16.8 ms | 1.7 ms |
+
+The timed runs used an immutable build snapshot. Runtime, harness and built-file
+SHA-256 checks found no changes during those runs; the renderer SHA-256 is
+`f1f331e614425b966b9dd7f5053d08dfdb757acd68147607fe22f82e40194e95`.
+Detailed evidence, including failures and integrity manifests, stays in ignored
+`.dream-loop/landscape-round5-functional/`.
+
+## Hosted checkpoint
+
+Vercel preview `dpl_ChGLMjcdfhecNVooYbatvteiyEDt` is READY for source commit
+`7d4b42bffff29cdb11de76e27c1699b156d645ed`:
+https://pulsepainting-eo0kdeo0a-sontakeys-projects.vercel.app.
+Provider readiness is not a production release or a hosted capture acceptance.
+
+The first Linux CI run passed the model and view checks, then detected a maximum
+two-level channel difference (mean 0.00057525) in the portrait parity test. That
+test compared two different canvas copy/resampling paths. A test-only correction
+now compares identical destination coordinates without loosening its original
+tolerance. Chromium and WebKit app/export suites both pass with zero channel
+difference, including the sand-dunes scene on WebKit. The five-second retry
+deadline is unchanged, with retries taking 51–89 ms. These checks ran after the
+timed suite; runtime files are unchanged. A fresh Linux CI result remains pending.
 
 Physical iPhone camera/flash behavior, sustained thermal performance and native
 share-sheet acceptance are not established by these browser checks. npm 0.3.1

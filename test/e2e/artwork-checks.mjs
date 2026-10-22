@@ -209,18 +209,22 @@ export async function checkArtwork(page, output = process.env.PPG_ARTWORK_ARTIFA
     const sceneBefore = JSON.stringify(landscape);
     const exact = document.createElement('canvas'); exact.width = exact.height = 1080;
     PulseLandscape.render(landscape, exact);
-    const portraitArt = document.createElement('canvas'); portraitArt.width = portraitArt.height = 1000;
-    portraitArt.getContext('2d').drawImage(document.querySelector('.portrait-preview canvas'), 40, 146, 1000, 1000, 0, 0, 1000, 1000);
-    const expectedArt = document.createElement('canvas'); expectedArt.width = expectedArt.height = 1000;
-    expectedArt.getContext('2d').drawImage(exact, 0, 0, 1000, 1000);
-    const a=portraitArt.getContext('2d').getImageData(0,0,1000,1000).data,b=expectedArt.getContext('2d').getImageData(0,0,1000,1000).data;
+    const portraitCanvas=document.querySelector('.portrait-preview canvas');
+    // Use the portrait's exact destination coordinates for both render paths.
+    // Comparing a copied crop against an origin-aligned resample adds a second
+    // backend-dependent rounding step that is unrelated to scene preservation.
+    const expectedArt = document.createElement('canvas'); expectedArt.width=1080;expectedArt.height=1350;
+    expectedArt.getContext('2d').drawImage(exact,40,146,1000,1000);
+    const a=portraitCanvas.getContext('2d').getImageData(40,146,1000,1000).data,b=expectedArt.getContext('2d').getImageData(40,146,1000,1000).data;
+    const portraitArt=document.createElement('canvas');portraitArt.width=portraitArt.height=1000;
+    portraitArt.getContext('2d').drawImage(portraitCanvas,40,146,1000,1000,0,0,1000,1000);
     let maxArtDelta=0, artDelta=0, deltaBounds={minY:1000,maxY:0,minX:1000,maxX:0};for(let i=0;i<a.length;i++){const d=Math.abs(a[i]-b[i]);maxArtDelta=Math.max(maxArtDelta,d);artDelta+=d;if(d>2){const pixel=Math.floor(i/4),x=pixel%1000,y=Math.floor(pixel/1000);deltaBounds.minX=Math.min(deltaBounds.minX,x);deltaBounds.maxX=Math.max(deltaBounds.maxX,x);deltaBounds.minY=Math.min(deltaBounds.minY,y);deltaBounds.maxY=Math.max(deltaBounds.maxY,y);}}
 
     return {
       state, expectedDuration: elapsedMeasuringMs / 1000,
       scene: { family: landscape.family, seed: landscape.seed, version: landscape.version, strokeCount: landscape.strokes.length, usableSeconds: landscape.usableSeconds },
       sourceUnchanged: sceneBefore === JSON.stringify(landscape),
-      art: portraitArt.toDataURL(), expectedArt: expectedArt.toDataURL(), maxArtDelta, meanArtDelta:artDelta/a.length, deltaBounds,
+      art: portraitArt.toDataURL(), maxArtDelta, meanArtDelta:artDelta/a.length, deltaBounds,
       image: document.querySelector('.portrait-preview canvas').toDataURL(),
       accessibleDescription: document.querySelector('.portrait-preview canvas').getAttribute('aria-label'),
     };
