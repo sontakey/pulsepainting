@@ -74,12 +74,28 @@ for scope, exact measurements and evidence paths. Older evidence is retained
 separately, including round9's 266.6 ms WebGL2 outlier; it is not validation of
 the current build.
 
-Draft source PR1 is https://github.com/sontakey/pulsepainting/pull/1; the last
-pushed head remains `029c8c0` at this checkpoint. The old round5 protected Vercel
-preview is https://pulsepainting-eo0kdeo0a-sontakeys-projects.vercel.app and does
-not contain the current desktop or materials. Production still serves the
-manuscript app. The goal is active and incomplete. Source and preview publication
-status must be updated after verification; neither implies production release.
+Draft source PR1 is https://github.com/sontakey/pulsepainting/pull/1. Runtime and
+desktop checkpoint `35b6195` is pushed to `codex/landscape-reveal`. GitHub CI run
+39822883752 timed out in the Ubuntu apt mirror download before app tests ran.
+CI now uses the official Playwright 1.63.0 Noble image, matching the pinned
+package and providing Chromium/WebKit dependencies without runtime apt setup.
+The unchanged application checks are being rerun.
+
+Current protected preview: https://pulsepainting-muws2mix2-sontakeys-projects.vercel.app
+Deployment `dpl_Ej9RxFtVzDFMhcuyWdNPPQCSTrVd` is READY. All 73 served files
+exactly match the frozen timed-test build and local dist. Hosted Chromium/WebKit
+gallery checks and accelerated WebKit capture, animated reveal, report, artwork,
+original manuscript export and retry checks passed. Same-scene export parity
+was exact; there were no runtime errors or failed first-party requests.
+Evidence: `.dream-loop/landscape-round11-functional/hosted-preview/`.
+The hosted tests use replayed public data and mocked camera/sharing APIs.
+
+The old round5 preview is historical evidence only. Production still serves the
+manuscript app. Canonical gallery links and social metadata become publicly
+available with the candidate's future production release; the preview is
+protected by Vercel authentication. The goal is active and incomplete while the
+visual direction question is pending. Source and preview publication do not
+imply production release.
 
 ## Runtime and build
 

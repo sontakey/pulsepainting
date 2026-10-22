@@ -90,6 +90,29 @@ in `.dream-loop/desktop-gallery-round11/`; the README's direct quality-85 JPEG
 and its provenance are documented in [the media record](../media/README.md).
 Capture browsers were closed; the existing local preview server was untouched.
 
+## GitHub checkpoint and protected preview
+
+Runtime checkpoint `35b6195` was pushed to draft PR1. Preview
+[https://pulsepainting-muws2mix2-sontakeys-projects.vercel.app](https://pulsepainting-muws2mix2-sontakeys-projects.vercel.app) is READY as deployment
+`dpl_Ej9RxFtVzDFMhcuyWdNPPQCSTrVd`; production was not changed.
+
+All 73 served files exactly match the frozen build manifest and local dist.
+Hosted Chromium/WebKit gallery checks passed, followed by accelerated WebKit
+capture, animated reveal, report, sharing/export and retry checks. The chosen
+hosted scene was Forest canopy. Scene export parity was pixel-identical, encoder
+and renderer retries recovered in 168/183 ms, and there were zero page errors
+or failed first-party requests. This hosted smoke run supplements the full
+three-minute local replay above; it does not replace it or simulate a real phone.
+
+Evidence is preserved in the ignored `hosted-preview/` subdirectory, including
+asset integrity, harness hashes, gallery results and capture screenshots/results.
+Preview authentication was injected in memory and restricted to its exact origin.
+GitHub Linux CI run 39822883752 timed out while installing system dependencies
+from the Ubuntu apt mirror; it never reached the app tests. The workflow now
+uses the official `mcr.microsoft.com/playwright:v1.63.0-noble` image with matching
+browsers and dependencies, preserving the same `npm test` checks. A rerun is
+pending; no successful Linux pass is implied by the local or hosted results.
+
 ## Remaining scope
 
 The style decision remains pending; passing functional checks does not meet the
