@@ -1,8 +1,9 @@
 # Landscape and desktop candidate validation · 2026-10-22
 
 The retained landscape candidate passes the browser checks recorded here. Its
-visual review remains below the requested target, and the user's style decision
-is pending. Production still serves the earlier manuscript app. This record
+visual review remains below the requested target. The user chose to perfect
+Quiet Lake before extending its paint treatment to the other scenes; that study
+is separate from this frozen runtime. Production still serves the earlier manuscript app. This record
 does not approve or claim a production deployment.
 
 ## Candidate identity
@@ -110,13 +111,23 @@ Preview authentication was injected in memory and restricted to its exact origin
 GitHub Linux CI run 39822883752 timed out while installing system dependencies
 from the Ubuntu apt mirror; it never reached the app tests. The workflow now
 uses the official `mcr.microsoft.com/playwright:v1.63.0-noble` image with matching
-browsers and dependencies, preserving the same `npm test` checks. A rerun is
-pending; no successful Linux pass is implied by the local or hosted results.
+browsers and dependencies, preserving the same `npm test` checks.
+
+Run 39830531276 reached the tests and passed model and all-family raster checks,
+then stopped at the artwork-retry harness's five-second deadline while PNG
+encoding was still pending. The original source and scene seed were unchanged.
+The harness now observes terminal UI changes with a 30-second correctness limit,
+retains actual elapsed timing, and verifies the recovered sharing/saving controls.
+Both local Chromium and WebKit app suites passed. Fault injection confirms a
+valid 5.5-second encoder callback succeeds, a null callback fails immediately,
+and a missing callback times out with sharing disabled. No runtime or animation
+performance assertion changed. Evidence: ignored `.dream-loop/ci-recovery/`.
+The next Linux run is pending; local results do not imply its success.
 
 ## Remaining scope
 
-The style decision remains pending; passing functional checks does not meet the
-unresolved visual target. Physical iPhone camera/flash behavior, sustained
+The focused Quiet Lake refinement remains underway; passing functional checks
+does not meet the unresolved visual target. Physical iPhone camera/flash behavior, sustained
 mobile thermal performance, physiological accuracy, physical QR scanning and
 native share-sheet acceptance remain unverified by these browser runs. Source
 checkpoint, preview publication and production deployment are separate states;

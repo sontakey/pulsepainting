@@ -187,10 +187,24 @@ export async function checkArtwork(page, output = process.env.PPG_ARTWORK_ARTIFA
         const retry=host.querySelector('.portrait-retry');
         const held=retry&&!retry.hidden&&share.disabled&&save.disabled&&!PulsePortrait.getState(host).ready;
         HTMLCanvasElement.prototype.toBlob=originalToBlob;window.PulseLandscape=originalLandscape;
-        const retryStarted=performance.now();retry.click();
-        const until=performance.now()+5000;
-        while(!PulsePortrait.getState(host).ready&&performance.now()<until)await new Promise(resolve=>setTimeout(resolve,20));
-        outcomes.push({mode,held,ready:PulsePortrait.getState(host).ready,sourceStable:sourceBefore===JSON.stringify(landscape),sameSeed:PulsePortrait.getState(host).seed===landscape.seed,family:landscape.family,retryMs:performance.now()-retryStarted,status:host.querySelector('.portrait-status')?.textContent,retryVisible:!retry.hidden});
+        const retryStarted=performance.now();
+        // PNG encoding is asynchronous; CI can still be preparing at five
+        // seconds. Observe the terminal UI state instead of polling. This is a
+        // bounded correctness wait; retryMs remains visible and mobile
+        // performance is checked separately.
+        const completion=await new Promise(resolve=>{
+          const finish=result=>{clearTimeout(deadline);observer.disconnect();resolve(result);};
+          const inspect=()=>{
+            if(PulsePortrait.getState(host).ready)finish('ready');
+            else if(!retry.hidden)finish('failed');
+          };
+          const observer=new MutationObserver(inspect);
+          const deadline=setTimeout(()=>finish('timeout'),30000);
+          observer.observe(host,{attributes:true,childList:true,subtree:true});
+          retry.click();
+          inspect();
+        });
+        outcomes.push({mode,held,completion,ready:PulsePortrait.getState(host).ready,actionsEnabled:!share.disabled&&!save.disabled,sourceStable:sourceBefore===JSON.stringify(landscape),sameSeed:PulsePortrait.getState(host).seed===landscape.seed,family:landscape.family,retryMs:performance.now()-retryStarted,status:host.querySelector('.portrait-status')?.textContent,retryVisible:!retry.hidden});
       } finally {HTMLCanvasElement.prototype.toBlob=originalToBlob;window.PulseLandscape=originalLandscape;PulsePortrait.clear(host);host.remove();}
     }
     return outcomes;
@@ -198,7 +212,11 @@ export async function checkArtwork(page, output = process.env.PPG_ARTWORK_ARTIFA
   console.log('ARTWORK_RECOVERY',JSON.stringify(recovery));
   for(const result of recovery){
     assert.equal(result.held,true, `${result.mode}: unavailable export offers retry and disables sharing`);
+    assert.equal(result.completion,'ready', `${result.mode}: retry completes successfully within 30 seconds: ${JSON.stringify(result)}`);
     assert.equal(result.ready,true, `${result.mode}: retry prepares the original artwork`);
+    assert.equal(result.actionsEnabled,true, `${result.mode}: recovered artwork enables sharing and saving`);
+    assert.equal(result.retryVisible,false, `${result.mode}: successful recovery hides the retry action`);
+    assert.equal(result.status,'', `${result.mode}: successful recovery clears the preparing message`);
     assert.ok(result.sourceStable&&result.sameSeed, `${result.mode}: failure and recovery preserve every source stroke and scene seed`);
   }
   const canvas = page.locator('.portrait-preview canvas');

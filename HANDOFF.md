@@ -28,13 +28,14 @@ was discarded; it exists only in ignored `.dream-loop/absorption-study/`.
 The best candidate is tracked, renderer SHA-256:
 `878928ede818f9866dca9994506df2802570f2c6673c961310d9988a10866b1a`.
 
-The dream-loop workflow reached its stalled criterion after that major
-experiment. A user question is pending: release the current illustrative
-watercolor style, or perfect one scene first before carrying the treatment
-across all sixteen. Prior authorization to deploy still stands; the pending
-question concerns visual direction, not deployment permission. Do not silently
-resume broad visual iterations or promote the candidate before that answer.
-Independent validation, a source checkpoint and a reviewable preview can proceed.
+The prior whole-set dream-loop stalled after the absorption experiment. On
+October 22 the user chose **Perfect one scene first**. Production remains held
+while Quiet Lake is refined against a focused target before carrying the paint
+treatment across the other fifteen scenes. Broad iteration is no longer waiting
+on a style decision; work is intentionally scoped to one representative scene.
+Study code stays in ignored `.dream-loop/quiet-lake-study/`, with a generated
+visual target and prompt in `.dream-loop/quiet-lake-target/`. These are design
+studies; tracked runtime and the hosted preview retain the verified round11 build.
 
 ## Current verification
 
@@ -79,7 +80,18 @@ desktop checkpoint `35b6195` is pushed to `codex/landscape-reveal`. GitHub CI ru
 39822883752 timed out in the Ubuntu apt mirror download before app tests ran.
 CI now uses the official Playwright 1.63.0 Noble image, matching the pinned
 package and providing Chromium/WebKit dependencies without runtime apt setup.
-The unchanged application checks are being rerun.
+The replacement configuration is pushed as `01fdadf`. GitHub initially delayed
+the PR-head update and run creation while reporting a separate PR-service
+incident; causality was unconfirmed. Run 39830531276 started at 18:21 UTC and
+passed dependency setup, model and all-family raster checks. It then failed
+the artwork encoder recovery test: its five-second polling deadline elapsed
+while PNG preparation was still pending (5407.6 ms; original scene preserved).
+The following renderer-failure retry succeeded in 1404.1 ms. The recovery harness
+now observes terminal UI changes with a bounded 30-second correctness deadline,
+records actual elapsed time, and additionally checks recovered share/save controls.
+Both local browser app suites passed. A 5.5-second delayed callback succeeds;
+null and missing callbacks still fail or time out with sharing disabled.
+Runtime and dist are unchanged. The replacement CI run is pending, not passed.
 
 Current protected preview: https://pulsepainting-muws2mix2-sontakeys-projects.vercel.app
 Deployment `dpl_Ej9RxFtVzDFMhcuyWdNPPQCSTrVd` is READY. All 73 served files
@@ -94,7 +106,7 @@ The old round5 preview is historical evidence only. Production still serves the
 manuscript app. Canonical gallery links and social metadata become publicly
 available with the candidate's future production release; the preview is
 protected by Vercel authentication. The goal is active and incomplete while the
-visual direction question is pending. Source and preview publication do not
+approved one-scene refinement is underway. Source and preview publication do not
 imply production release.
 
 ## Runtime and build
