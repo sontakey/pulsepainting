@@ -22,6 +22,6 @@ The new domain `pulsepainting.com` is planned. DNS, TLS, hosting attachment, and
 
 ## Verification status
 
-The standalone build, app capture/report/export regression suite, and both GPU fallback cases passed against this repository's built output. README screenshots were regenerated from this app. A full 180-second active WebKit session with interruption recovery and the regenerated QR suite are running before the production gate. Public ChatPPG deployment is still owned by the host repository and is not established by this commit.
+The standalone build, app capture/report/export regression suite, and both GPU fallback cases passed against this repository's built output. README screenshots were regenerated from this app. The full WebKit session completed 180.489 seconds of active measurement in 210.059 seconds wall time, recovered all three interruptions without stale-frame credit, and passed report/export checks. Active painting averaged 59.67 fps with an 18 ms p95 interval in desktop WebKit mobile emulation. The new-route QR passed 66/66 decode variants and 21/21 contrast checks; mobile decorative-asset exclusion also passed. See `docs/validation/standalone-extraction-2026-10-21.md`. Public ChatPPG deployment is still owned by the host repository and is not established by this commit.
 
 Physical iPhone capture, camera/flash behavior, sustained thermal performance, and native share-sheet acceptance remain separate from browser replay checks.
