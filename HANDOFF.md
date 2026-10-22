@@ -43,7 +43,7 @@ V6 through v10 then reached 7.3, 7.4, 7.8, 7.9 and 7.9. V10 improves pigment
 edges but still reads as curved ribbons and stacked reflections. The major
 boundary redesign reached the dream-loop stall checkpoint. Root showed the
 actual rendered image, and the user immediately chose **Flatter, more natural
-washes**. That resolves the checkpoint; no question is pending. V11 now changes
+washes**. That resolved that checkpoint. V11 changed
 the artistic lake-water projection into broader, flatter overlapping washes.
 Every measured sample/time and the original waveform manuscript remain intact.
 
@@ -91,11 +91,20 @@ closer to the target or keep explicit bands. That visual question is pending;
 broad material transfer remains held. Original source knots, normalization,
 timestamps, quality and accepted counts remain unchanged.
 
-The new all-family harness exposed a real actively-partial compositing defect:
-the live stroke blended against already-composed lower layers, while direct
-rendering blended against its transparent layer. Completed exports still match.
-A no-extra-canvas fix is being audited in ignored study code; no threshold is
-being weakened. Neither V13 nor V14 has final performance evidence.
+The new real-recording harness exposed a real actively-partial compositing
+defect: the live stroke blended against already-composed lower layers, while
+direct rendering blended against its transparent layer. Completed layer
+consumption also differed. A compositor-only scratch correction adds no canvas
+or CPU readback and preserves round11 geometry/materials. Across all sixteen
+families, three seeds and short/full source records, Chromium is pixel-exact at
+all 288 checkpoints. WebKit still differs by up to three channel levels and
+fails eleven checkpoints against its newly defined two-level criterion. The
+precise native cause remains unproven; the criterion is not widened again.
+The scratch correction is not integrated. The stronger diagnostic is available
+as `test/e2e/landscape-parity.mjs`, separate from the existing `npm test` suite
+while the defect is open. See
+[raster parity scope and results](docs/validation/landscape-raster-parity.md).
+Neither V13 nor V14 has final performance evidence.
 
 A separate short-screen layout bug was reproduced at 320×568: a 640px capture
 minimum pushed live metrics beneath the floating action dock. The app now lets
@@ -111,11 +120,13 @@ previously verified versions. No study has been released.
 
 ## Current verification
 
-The retained candidate passed `npm test`: model and source preservation,
-all-family live/direct parity, partial rendering, capture/report/export,
-GPU fallback, and Chromium/WebKit desktop-gallery checks. Live/direct artwork
-compositing differs by at most one channel level with mean error below 0.001;
-repeat rendering is exact. Pigment canvases and immutable pattern snapshots
+The retained candidate passed the existing `npm test` suite: model and source
+preservation, synthetic presentation-path checks, partial rendering,
+capture/report/export, GPU fallback, and Chromium/WebKit desktop-gallery checks.
+The older raster checks differ by at most one channel level with mean error
+below 0.001 and exact repeat rendering. They did not cover the real-recording
+partial-stroke states that fail the stronger diagnostic described above.
+Pigment canvases and immutable pattern snapshots
 have a fixed 4,489,216-pixel budget; the live raster layers use 2,560,000 pixels.
 A gallery hash guard checks the renderer, engine, acceptance adapter, fixture
 and every published image.
@@ -163,9 +174,13 @@ now observes terminal UI changes with a bounded 30-second correctness deadline,
 records actual elapsed time, and additionally checks recovered share/save controls.
 Both local browser app suites passed. A 5.5-second delayed callback succeeds;
 null and missing callbacks still fail or time out with sharing disabled.
-Runtime and dist are unchanged. Replacement Linux run 39832035805 passed the
+Runtime and dist were unchanged by that test repair. Replacement Linux run 39832035805 passed the
 complete `npm test` suite on checkpoint `cad0f47` at 18:33 UTC. The original CI
 failure and fault-injection evidence remain in ignored `.dream-loop/` records.
+
+The later mobile layout fix is pushed as `5006e1f`; Linux run 39848489075 passed
+the complete existing suite. That run does not include the newly added manual
+real-recording parity diagnostic and does not establish release readiness.
 
 Current protected preview: https://pulsepainting-muws2mix2-sontakeys-projects.vercel.app
 Deployment `dpl_Ej9RxFtVzDFMhcuyWdNPPQCSTrVd` is READY. All 73 served files

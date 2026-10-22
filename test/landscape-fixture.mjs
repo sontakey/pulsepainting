@@ -11,7 +11,7 @@ const fixture=JSON.parse(readFileSync(new URL('fixtures/iphone-200s.json',import
 const vendor=readFileSync(new URL('../vendor/ppg-js/0.3.1/ppg.global.js',import.meta.url),'utf8');
 const landscapeSource=readFileSync(new URL('../app/landscape.js',import.meta.url),'utf8');
 
-export function replayPublicFixture(period=1,gap=0){
+export function replayPublicFixture(period=1,gap=0,until=100){
   const replayContext=vm.createContext({console,performance,EventTarget,document:{getElementById:()=>({})},matchMedia:()=>({matches:true}),animateManuscript(){},paintManuscript(){},useManuscriptFallback(){throw new Error('Unexpected landscape failure');},recoverLandscapeCoverage(){},landscapeCoverageComplete:true,landscapeView:null,manuscript:{lastWindow:-1,pending:[],segments:[]}});
   replayContext.window=replayContext;
   vm.runInContext(vendor,replayContext);vm.runInContext(landscapeSource,replayContext);vm.runInContext(adapter,replayContext);
@@ -19,7 +19,7 @@ export function replayPublicFixture(period=1,gap=0){
   replayContext.monitor={engine};replayContext.landscape=replayContext.PulseLandscape.create({seed:1,family:'meadow'});
   const t0=fixture.samples[0].t;let goodWindows=0;
   for(const sample of fixture.samples){
-    const t=(sample.t-t0)/1000;if(t>100)break;
+    const t=(sample.t-t0)/1000;if(t>until)break;
     if(t>30&&t%period<gap)continue;
     const result=engine.push({...sample,t});
     if(result.window){if(result.window.quality.good)goodWindows++;replayContext.acceptPaintWindow(result.window);}
