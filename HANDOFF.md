@@ -25,7 +25,10 @@ further renderer rewrite or release. Draft source PR 1 is open at
 https://github.com/sontakey/pulsepainting/pull/1; its first checkpoint is
 `7d4b42b`. Vercel preview `dpl_ChGLMjcdfhecNVooYbatvteiyEDt` is READY at
 https://pulsepainting-eo0kdeo0a-sontakeys-projects.vercel.app. This is a preview,
-not a landscape production release. The goal remains active.
+not a landscape production release. Hosted acceptance passed: all 21 assets
+match the tested snapshot, WebKit replay/report/export checks passed, the same
+scene zooms from 2.8× to 1×, and the painted QR passed ten decode variants. The
+goal remains active awaiting the user's visual direction.
 
 The current curve/volume candidate passes the Node source model and browser view
 suite, including all sixteen families, retained source knots, no interpolated
@@ -35,8 +38,10 @@ WebKit app/report/export checks pass. A full three-minute interrupted WebKit
 session passed with 59.68 fps active painting, and four 20-second performance
 cases measured 60 fps at 1×/4× CPU throttling. These used an immutable snapshot
 of `7d4b42b`. The portrait parity test now compares identical destination
-coordinates; Chromium and WebKit both report zero difference with its original
-tolerance. A fresh Linux CI run remains pending. The style choice remains pending. See
+coordinates; Chromium, WebKit and Linux CI all report zero difference with its
+original tolerance. GitHub Actions run `39726258318` passed on `91ef060`, including
+build, model/view, app/report/export and GPU fallback checks. The style choice
+remains pending. See
 `docs/validation/landscape-candidate-2026-10-21.md` for scoped results and retained
 intermediate failures. Tests do not imply visual acceptance.
 

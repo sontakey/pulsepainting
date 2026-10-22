@@ -109,7 +109,19 @@ Detailed evidence, including failures and integrity manifests, stays in ignored
 Vercel preview `dpl_ChGLMjcdfhecNVooYbatvteiyEDt` is READY for source commit
 `7d4b42bffff29cdb11de76e27c1699b156d645ed`:
 https://pulsepainting-eo0kdeo0a-sontakeys-projects.vercel.app.
-Provider readiness is not a production release or a hosted capture acceptance.
+Hosted acceptance passed on October 22: all 21 served files exactly match both
+the local build and immutable tested snapshot. Accelerated WebKit replay passed
+capture/pause, report, PNG privacy, sharing mocks, downloads, renderer/encoder
+retry, responsive graphs, print and camera-error recovery. No unexpected
+console, page or network errors occurred; the two deliberately injected
+camera-denial messages were recorded separately. Retry times were 90/74 ms.
+
+A targeted normal-motion probe verified the same scene zooming from 2.8× through
+1.909×, 1.439×, 1.174×, 1.075× and 1.025× to 1×, centered at (540, 540).
+The rendered painted QR passed ten decode variants, all resolving to
+`https://www.pulsepainting.com/`. Local evidence is in
+`.dream-loop/landscape-round5-functional/hosted-preview/summary.json`.
+This verifies the protected preview, not a production release or real camera.
 
 The first Linux CI run passed the model and view checks, then detected a maximum
 two-level channel difference (mean 0.00057525) in the portrait parity test. That
@@ -118,7 +130,12 @@ now compares identical destination coordinates without loosening its original
 tolerance. Chromium and WebKit app/export suites both pass with zero channel
 difference, including the sand-dunes scene on WebKit. The five-second retry
 deadline is unchanged, with retries taking 51–89 ms. These checks ran after the
-timed suite; runtime files are unchanged. A fresh Linux CI result remains pending.
+timed suite; runtime files are unchanged.
+
+[Linux CI run 39726258318](https://github.com/sontakey/pulsepainting/actions/runs/39726258318)
+passed on `91ef060`: build, all model/view checks, app/report/export checks, and
+both GPU fallback cases. Portrait parity was zero; encoder/renderer retries
+took 195/215 ms. The earlier failed run remains separate evidence.
 
 Physical iPhone camera/flash behavior, sustained thermal performance and native
 share-sheet acceptance are not established by these browser checks. npm 0.3.1
