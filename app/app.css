@@ -1107,9 +1107,10 @@ h1,.capture-title{font-size:clamp(54px,9vw,92px);line-height:.92;letter-spacing:
   #screen-ready:not(.desktop-ready) { min-height:calc(100dvh - 72px - var(--mobile-dock-reserve)); }
   #screen-placement.placement-screen { min-height:calc(100dvh - var(--mobile-dock-reserve)); }
   #screen-measuring.capture-screen {
-    height:calc(100dvh - var(--mobile-dock-reserve)); min-height:640px;
+    height:calc(100dvh - var(--mobile-dock-reserve)); min-height:0;
     padding-bottom:12px;
   }
+  #screen-measuring .manuscript-frame { min-height:clamp(128px,26dvh,200px); }
   #screen-measuring:has(.live-details[open]) {
     height:auto; min-height:calc(100dvh - var(--mobile-dock-reserve));
   }

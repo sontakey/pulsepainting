@@ -37,16 +37,77 @@ Study code stays in ignored `.dream-loop/quiet-lake-study/`, with a generated
 visual target and prompt in `.dream-loop/quiet-lake-target/`. These are design
 studies; tracked runtime and the hosted preview retain the verified round11 build.
 
-Focused Quiet Lake review progressed from 4.0 through 5.9, 6.2, 6.6 and 7.1.
-The finer-ripple redesign then regressed to 7.0, triggering the dream-loop stall
-rule. The user has been shown the strongest v4 study and asked to choose fuller
-rounded paint, crisper target-like ripples, or the current direction. That answer
-is pending. V4 and v5 are archived under the study directory. The best v4 renderer
-hash is `314503a9d4f108fbd41d7e36812200c56ca7f0fd1eeabf1e6bbfaff89524de68`.
-Both preserve exact source data and leave the other fifteen families pixel-identical.
-Visual iteration is held; only two behavior-preserving cache/diagnostic fixes and
-timing verification of the retained study continue independently. No study is in
-the tracked runtime or hosted preview yet.
+Focused Quiet Lake review progressed from 4.0 to 7.1. After a finer-ripple
+regression, the user chose **Denser, crisper ripples closer to the target**.
+V6 through v10 then reached 7.3, 7.4, 7.8, 7.9 and 7.9. V10 improves pigment
+edges but still reads as curved ribbons and stacked reflections. The major
+boundary redesign reached the dream-loop stall checkpoint. Root showed the
+actual rendered image, and the user immediately chose **Flatter, more natural
+washes**. That resolves the checkpoint; no question is pending. V11 now changes
+the artistic lake-water projection into broader, flatter overlapping washes.
+Every measured sample/time and the original waveform manuscript remain intact.
+
+Frozen v12 renderer SHA-256 is
+`07faaf182c9d598fe360f28a543c25974abe7f9355cca51ea51e75a04630bcf7`.
+The independent review scores its full scene 8.0/10 and short recording 7.8/10,
+up from v11's 8.0/7.4. Flatter overlapping washes meet the main direction.
+The shorter initial underwash and compact early water groups give short
+recordings a deliberate vignette, preserving stable placement as later data
+arrives. Some repeated wash chains and a dense middle-water break remain.
+This is a concrete one-scene review checkpoint, not a claim of perfect fidelity.
+V12 source/model/current-adapter and other-fifteen-scene pixel checks pass.
+All twelve actual-fixture cases produce exact completed live/export and
+repeated-export pixels; 77 progress-boundary checks retain existing pigment.
+These compare completed views of partial source records, not an actively
+animating partial stroke; the stronger partial-stroke gate described below
+subsequently found a separate compositing defect.
+A real-fixture canvas edge discrepancy found in v7/v8 was fixed by matching layer
+consumption cadence in live and export rendering, without added rasters or CPU
+readback. No test tolerance was relaxed. All eight v12 desktop Chrome cases
+(first acceptance and late capture; WebGPU/WebGL2 entry; 1x/4x CPU) measured
+60 fps active painting with p95 16.7 ms and maximum 16.8 ms. Entry animation
+also measured 60 fps; submission CPU p95 was at most 1.8 ms. No runtime or console
+errors occurred. This is mobile-viewport browser evidence, not physical-phone
+validation. Material and live raster budgets remain unchanged. Earlier v11
+measurements, including two 33.3 ms active intervals, remain archived separately.
+
+All focused studies and evidence remain beneath ignored
+`.dream-loop/quiet-lake-study/`; the running design record is
+`.dream-loop/quiet-lake-target/status.md`. Root showed the actual V12 full and
+short recordings at the one-scene checkpoint. The user then said the PPG
+waveforms were not clear enough and reattached the focused target because its
+pulse-shaped contours remain visible. That is the current direction: retain
+soft washes but restore distinct source-derived waveform edges in water,
+mountains and trees, readable after the zoom-out. V13 restored legibility but
+its contours looked separate from the paint (independent review: 7.3 dense,
+7.7 sparse). V14 makes the measured contour the upper edge of a pigment body,
+with pooled color and a soft underside; its frozen renderer hash is
+`197392c816b0dc2fb595619139be69bd703c9484e2be625a3138a3976e2a886e`.
+Source/model checks pass and the other fifteen families remain pixel-exact.
+The fresh V14 review scored 7.0 dense and 6.9 sparse: waves are visible at
+390px, but water still reads as separate ribbons. Root showed the actual render
+and asked the user whether to rebuild water as overlapping pulse-shaped marks
+closer to the target or keep explicit bands. That visual question is pending;
+broad material transfer remains held. Original source knots, normalization,
+timestamps, quality and accepted counts remain unchanged.
+
+The new all-family harness exposed a real actively-partial compositing defect:
+the live stroke blended against already-composed lower layers, while direct
+rendering blended against its transparent layer. Completed exports still match.
+A no-extra-canvas fix is being audited in ignored study code; no threshold is
+being weakened. Neither V13 nor V14 has final performance evidence.
+
+A separate short-screen layout bug was reproduced at 320×568: a 640px capture
+minimum pushed live metrics beneath the floating action dock. The app now lets
+the painting shrink with viewport height while retaining readable metrics and
+44px-or-larger controls. Chromium and WebKit layout checks cover ready,
+placement, capture, report and report-bottom at 320×568 and 390×844. The tracked
+app suite now asserts that live metrics and the details disclosure stay above
+the dock without scrolling. Both Chromium and WebKit app suites pass, including
+capture, report, export and recovery checks. This CSS fix does not integrate the
+study renderer.
+Tracked runtime, hosted preview and production remain on their separate,
+previously verified versions. No study has been released.
 
 ## Current verification
 

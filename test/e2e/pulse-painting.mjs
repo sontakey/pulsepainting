@@ -113,9 +113,25 @@ try {
     const group = byPaint.get(update.segments) || []; group.push(update); byPaint.set(update.segments, group);
   }
   assert.ok([...byPaint.values()].some(group => group.length >= 4 && new Set(group.map(update => update.values.join())).size > 1), 'computed metrics visibly update several times within one painted segment');
-  for (const width of [320, 390]) {
-    await page.setViewportSize({ width, height: 844 });
-    await assertViewportFits(page, `capture ${width}px`);
+  for (const viewport of [{ width: 320, height: 568 }, { width: 390, height: 844 }]) {
+    await page.setViewportSize(viewport);
+    await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+    await assertViewportFits(page, `capture ${viewport.width}px`);
+    const captureLayout = await page.evaluate(() => {
+      const rect = selector => {
+        const { top, bottom } = document.querySelector(selector).getBoundingClientRect();
+        return { top, bottom };
+      };
+      return {
+        metrics: rect('.live-metrics'),
+        details: rect('.live-details > summary'),
+        dock: rect('.painting-actions'),
+      };
+    });
+    assert.ok(captureLayout.metrics.top >= 0 && captureLayout.metrics.bottom <= captureLayout.dock.top - 4,
+      `capture ${viewport.width}x${viewport.height}: live metrics stay above floating controls without scrolling`);
+    assert.ok(captureLayout.details.bottom <= captureLayout.dock.top - 4,
+      `capture ${viewport.width}x${viewport.height}: details remain reachable above floating controls`);
   }
   // Follow actual scene geometry with a bounded raster; the source descriptor
   // is independent of presentation and never moves previously accepted strokes.
