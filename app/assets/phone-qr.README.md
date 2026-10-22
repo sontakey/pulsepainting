@@ -1,6 +1,6 @@
 # Phone QR asset
 
-Encodes exactly `https://chatppg.com/pulse-painting`.
+Encodes exactly `https://www.pulsepainting.com/`.
 
 The fixed version-4 (33 × 33) matrix was originally generated with Python
 `qrcode` 8.2 (BSD-3-Clause), error correction Q. Regenerate its presentation with

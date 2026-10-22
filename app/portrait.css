@@ -57,8 +57,10 @@
 }
 .portrait-options input:focus-visible { outline: 3px solid #2855ff; outline-offset: 4px; }
 .portrait-status:empty { display: none; }
+.portrait-retry { min-height: 44px; margin: 0 0 16px; font-size: 16px; }
+.portrait-retry[hidden] { display: none; }
 @media print {
-  .portrait-options, .portrait-status { display: none; }
+  .portrait-options, .portrait-status, .portrait-retry { display: none; }
   .pulse-portrait { break-inside: avoid; }
   .portrait-preview canvas { box-shadow: none; }
 }

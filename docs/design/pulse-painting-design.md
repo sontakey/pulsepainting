@@ -1,10 +1,11 @@
 # Pulse Painting
 
-Status: approved design direction for the next Pulse Painting experience. The
-landscape renderer and continuous zoom-out are not implemented or deployed.
-Repository extraction and the product rename are being handled separately. Pulse Painting remains a
-project by ChatPPG. The user plans to register `pulsepainting.com`; ownership,
-DNS configuration and a live deployment on that domain are not established here.
+Status: landscape renderer and continuous reveal implemented as a release candidate.
+Validation and deployment status are recorded in `HANDOFF.md`; this design contract
+is not itself evidence of deployment. Pulse Painting remains a
+project by ChatPPG. The user connected `pulsepainting.com` to its standalone
+Vercel project; the verified primary address is `https://www.pulsepainting.com/`.
+See the release evidence for which implementation has been deployed.
 
 The generated previews in this brief explore composition, material and density.
 They are illustrative, not derived from a user's recording. Some atlas scenes
@@ -82,11 +83,16 @@ Scene names describe composition, not a person's physiology or personality.
 | Grass | Short pulse sections positioned upright or diagonally | A few rich foreground accents |
 | Sky | Widely spaced waveform runs with pale pigment | Clouds, air and negative space |
 
-Treat these as artistic transforms, not an analysis plot. Retain the internal
-timing and shape proportions of each trace within a bounded transform. Document
-whether any reflected trace is reused; do not imply it is another measured beat.
-The recorded asymmetry, rounded crest, decay and any present secondary shoulder
-must remain recognizable. Do not add a dicrotic notch when the source lacks one.
+Treat these as artistic transforms, not an analysis plot. After reviewing the
+literal waveform compositions, the user explicitly approved curving real traces
+along terrain and giving the pulse strokes organic curves between recorded
+points. Preserve all original samples in the private descriptor and keep the
+original waveform manuscript unchanged. Use deterministic terrain mapping and
+bounded interpolation; never modify scientific measurements to fit the artwork.
+The recorded asymmetry, crest, decay and any present secondary shoulder should
+remain recognizable within the artistic mapping. Do not add a dicrotic notch
+when the source lacks one. Document whether any reflected trace is reused; do not
+imply it is another measured beat.
 Every scenery element must visibly derive from source traces: no conventional
 trees, rocks, stars, reeds or other decorative objects may substitute for measured
 geometry. Paper grain and pigment bloom are material treatments, not extra scene
@@ -356,5 +362,5 @@ the same illustrative-only limits as the atlas and density comparison.
 ## Biometric art direction
 
 See [biometric scene mapping](biometric-scene-mapping.md) for the approved
-visual mappings, evidence limits, and validity gates. These are product design
-requirements, not a claim that the current app already implements them.
+visual mappings, evidence limits, and validity gates. These distinguish the implemented source/quality/density mappings from optional
+future self-report and biometric animation ideas.

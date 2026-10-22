@@ -104,7 +104,7 @@ export async function checkReportGraphs(page) {
   await page.emulateMedia({ media: 'print' });
   await page.evaluate(() => window.dispatchEvent(new Event('beforeprint')));
   results.push(await assertGraphLabels(page, 'print style'));
-  if (out) await page.pdf({ path: path.join(out, 'report-graphs.pdf'), printBackground: true });
+  if (out && page.context().browser()?.browserType().name() === 'chromium') await page.pdf({ path: path.join(out, 'report-graphs.pdf'), printBackground: true });
   // Physical print dimensions must stay the same at phone and desktop widths.
   const printWidth = await page.locator('#psd-canvas').evaluate(c => c.clientWidth);
   await page.setViewportSize({ width: 816, height: 1056 });
@@ -115,9 +115,11 @@ export async function checkReportGraphs(page) {
   // Unlike a native print dialog, Chromium's mobile media emulation retains
   // auto-zoom from the wider physical print page. Restore the test viewport;
   // otherwise pointer coordinates still target the synthetic print zoom.
-  const cdp = await page.context().newCDPSession(page);
-  await cdp.send('Emulation.setPageScaleFactor', { pageScaleFactor: screenScale });
-  await cdp.detach();
+  if (page.context().browser()?.browserType().name() === 'chromium') {
+    const cdp = await page.context().newCDPSession(page);
+    await cdp.send('Emulation.setPageScaleFactor', { pageScaleFactor: screenScale });
+    await cdp.detach();
+  }
   await page.evaluate(() => window.dispatchEvent(new Event('afterprint')));
   results.push(await assertGraphLabels(page, 'screen after print'));
 

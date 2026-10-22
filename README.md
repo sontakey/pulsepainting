@@ -1,8 +1,12 @@
 # Pulse Painting
 
-Your pulse becomes a painting.
+Your pulse, made into a place.
 
-Pulse Painting is a three-minute phone-camera capture experience by [ChatPPG](https://chatppg.com), powered by [ppg-js](https://github.com/sontakey/ppg-js). Accepted pulse waveforms become defined watercolor strokes with organic cobalt, iris, and teal gradients, then a shareable artwork and an expandable HRV report.
+> Landscape release candidate: implementation and browser validation are in progress.
+> The public site and screenshots below currently show the earlier manuscript app.
+> See [HANDOFF.md](HANDOFF.md) for the visual review and deployment status.
+
+Pulse Painting is a three-minute phone-camera capture experience by [ChatPPG](https://chatppg.com), powered by [ppg-js](https://github.com/sontakey/ppg-js). Accepted pulse waveforms paint one of sixteen landscapes, with organic cobalt, iris, and teal gradients. A close-up follows the brush during capture, then pulls back to reveal the same painting, ready to share alongside an expandable HRV report.
 
 <p align="center">
   <img src="docs/media/pulse-painting-ready.jpg" width="230" alt="Pulse Painting phone capture instructions">
@@ -12,7 +16,7 @@ Pulse Painting is a three-minute phone-camera capture experience by [ChatPPG](ht
 
 The screenshots use browser replay with mocked camera input; see [capture provenance](docs/media/README.md). They are not new physical-phone measurements.
 
-The ChatPPG deployment route is [`/pulse-painting`](https://chatppg.com/pulse-painting), separate from the library demo at [`/ppg-js-demo`](https://chatppg.com/ppg-js-demo). The planned dedicated domain, `pulsepainting.com`, is not connected by this repository. Deployment status is tracked in [HANDOFF.md](HANDOFF.md).
+The primary destination is [pulsepainting.com](https://www.pulsepainting.com/), a separate Vercel project connected to this repository. The apex domain redirects to www. The simple library demo remains at [ChatPPG](https://chatppg.com/ppg-js-demo). Release and public verification status are tracked in [HANDOFF.md](HANDOFF.md).
 
 ## Run locally
 
@@ -27,12 +31,17 @@ Open `http://127.0.0.1:5173`. `npm run build` creates a complete static site in 
 
 ## What is implemented
 
-- Accepted waveform strokes, within-stroke gradients, smooth manuscript scrolling, and optional WebGPU/WebGL2 composition with Canvas2D fallback.
+- Sixteen seeded landscape families made from accepted waveform paths, with curved terrain, flowing brush strokes and within-stroke gradients. Artistic mapping preserves the original samples; the original manuscript and computed report remain unchanged.
+- Density based on usable recorded time: sparse sessions keep open paper; longer sessions fill interleaved slots without moving earlier strokes.
+- A close-up artwork camera and a continuous zoom-out reveal of the same accumulated painting. Cached layers keep the main thread available for capture.
+- Optional WebGPU/WebGL2 painted entry transitions and an independent Canvas2D landscape compositor.
 - Placement coaching, a small live finger preview, real-time pulse/RMSSD/SDNN, and floating mobile controls.
 - Report charts, a 1080 × 1350 shareable artwork, native file sharing with download fallback, and optional metrics on the artwork.
 - Accessible supporting typography, one brush heading per screen, reduced motion, interruption recovery, and no recording credit for stale frames.
 
-The proposed landscape scenes and close-up-to-landscape zoom reveal are [design work](docs/design/pulse-painting-design.md), **not implemented features**. The [mapping brief](docs/design/biometric-scene-mapping.md) describes planned use of session data and optional self-report without claiming health or emotion detection. The shipped artwork remains the pulse manuscript and selected-moment portrait.
+The [landscape design contract](docs/design/pulse-painting-design.md) covers the sixteen families, data fidelity, density and recovery. Scene choice is random within an art-directed plan, not a health classification. The [mapping brief](docs/design/biometric-scene-mapping.md) distinguishes implemented source/quality/density mappings from future optional self-report ideas. The original manuscript remains available in the report menu.
+
+No accepted pulse means retry guidance, not fabricated art. A short valid recording can produce a sparse painting even when HRV metrics are unavailable. Shared PNGs exclude raw data and session identifiers, with summary metrics included only when requested.
 
 ## Library boundary
 
@@ -56,7 +65,9 @@ The QR suite uses Python OpenCV, Pillow, and NumPy for bounded image perturbatio
 ## Source map
 
 - `app/`: ready, placement, capture, report, export, local fonts, and static QR assets.
-- `src/paint-gpu.js`: optional Three.js compositor source.
+- `app/landscape.js`: scene planning, accepted-source coverage, pigment rendering and the live artwork camera.
+- `app/portrait.js`: same-scene export and native sharing with download fallback.
+- `src/paint-gpu.js`: optional Three.js entry compositor source.
 - `tools/prepare-dist.mjs`: verify the pinned library and assemble the static app.
 - `tools/serve.mjs`: local static preview.
 - `test/e2e/`: browser replay, graph, accessibility, export, interruption, and QR checks.

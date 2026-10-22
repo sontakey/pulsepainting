@@ -1,6 +1,9 @@
 # Biometric scene mapping
 
-Status: accepted art direction; not a shipped stress classifier or landscape renderer.
+Status: accepted art direction. The landscape implementation uses accepted source
+geometry, recording duration, signal confidence and a saved seed. Pulse-rate-led
+ambient motion, RMSSD/SDNN-driven placement and optional mood check-ins remain
+future ideas. This is not a stress classifier.
 
 Pulse Painting expresses the recording's shape and rhythm. Scene choice remains
 seeded and independent of health interpretation. A meadow is not a calm score;

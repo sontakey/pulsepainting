@@ -4,7 +4,16 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Pulse Painting</title>
+<meta name="description" content="Your pulse, made into a place. Paint a unique landscape with your phone's camera and your real pulse. A project by ChatPPG.">
+<meta name="theme-color" content="#fdfbf7">
+<link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
+<link rel="canonical" href="https://www.pulsepainting.com/">
+<meta property="og:type" content="website">
+<meta property="og:title" content="Pulse Painting — your pulse, made into a place">
+<meta property="og:description" content="Sixteen landscapes. Real pulse strokes. A place only your pulse could paint.">
+<meta property="og:url" content="https://www.pulsepainting.com/">
 <link rel="stylesheet" href="app.css">
+<link rel="stylesheet" href="landscape.css">
 <link rel="stylesheet" href="portrait.css">
 </head>
 <body>
@@ -32,7 +41,7 @@
   <section id="screen-ready" class="screen" data-screen="ready">
   <h1>Pulse Painting<span class="blue-period">.</span></h1>
   <div class="content">
-    <p class="lead">Three minutes. A portrait of your pulse.</p>
+    <p class="lead">Three minutes. A place made from your pulse.</p>
     <ol class="ready-steps">
       <li class="ready-step">
         <span class="ready-step-num">1</span>
@@ -51,7 +60,7 @@
       <li class="ready-step">
         <span class="ready-step-num">3</span>
         <span class="ready-step-text">
-          <strong>Watch your pulse become a painting.</strong>
+          <strong>Watch your pulse become a landscape.</strong>
           Clear signal leaves richer strokes. Your HRV Spot Check report follows.
         </span>
       </li>
@@ -62,15 +71,15 @@
   <aside id="desktop-phone-panel" class="phone-panel" aria-labelledby="phone-panel-title" hidden>
     <div class="phone-panel-copy">
       <p class="phone-panel-kicker">A small moment. Just for you.</p>
-      <h2 id="phone-panel-title">Your pulse becomes a painting.</h2>
+      <h2 id="phone-panel-title">A place only your pulse could paint.</h2>
       <p>This experience begins on your phone, using its rear camera and flash to find your pulse.</p>
       <p class="phone-panel-instruction">Open your phone’s camera and scan the code. Then settle in for three quiet minutes.</p>
     </div>
     <figure class="phone-panel-code">
-      <div class="phone-qr-paper"><img id="phone-qr" width="246" height="246" alt="QR code to open Pulse Painting at chatppg.com/pulse-painting"></div>
+      <div class="phone-qr-paper"><img id="phone-qr" width="246" height="246" alt="QR code to open Pulse Painting at pulsepainting.com"></div>
       <figcaption>Scan to begin on your phone</figcaption>
     </figure>
-    <a class="phone-panel-link" href="https://chatppg.com/pulse-painting">chatppg.com/pulse-painting <span aria-hidden="true">↗</span></a>
+    <a class="phone-panel-link" href="https://www.pulsepainting.com/">pulsepainting.com <span aria-hidden="true">↗</span></a>
     <p class="phone-panel-disclaimer">Not a medical device. For personal curiosity only, not diagnosis or treatment.</p>
   </aside>
 </section>
@@ -103,7 +112,7 @@
     <div class="content measuring-content">
       <div class="capture-topline"><div class="capture-heading"><h2 class="capture-title">Pulse Painting</h2></div></div>
       <div class="painting-status"><div class="quality-pill" id="quality-pill"><span id="quality-dot" class="quality-dot"></span><div role="status" aria-live="polite" aria-atomic="true"><strong id="painting-state">Waiting for clear signal</strong><span id="quality-text">Settling</span></div></div><p id="session-countdown" class="session-countdown">3:00</p><figure class="capture-camera"><div id="capture-camera-preview" class="camera-feed" aria-label="Live rear camera preview"></div><figcaption><span aria-hidden="true"></span>Live</figcaption></figure></div>
-      <div class="manuscript-frame"><canvas id="manuscript" width="1000" height="840" aria-label="Your pulse manuscript. Deeper pigment represents clearer measured recording quality."></canvas><p id="manuscript-empty">Your first brushstroke is on its way.<br><span>Hold still while we check the signal.</span></p></div>
+      <div class="manuscript-frame"><div id="landscape-view" aria-label="A close-up of your accepted pulse strokes painting a landscape"></div><canvas id="manuscript" width="1000" height="840" aria-label="Your pulse manuscript. Deeper pigment represents clearer measured recording quality." hidden></canvas><p id="manuscript-empty">Your first brushstroke is on its way.<br><span>Hold still while we check the signal.</span></p></div>
       <div class="live-metrics" aria-label="Live measurements">
         <div class="live-metric"><span class="metric-label">Pulse</span><p><span id="hr-value" class="metric-number">--</span><span class="metric-unit">bpm</span></p></div>
         <div class="live-metric"><span class="metric-label">RMSSD</span><p><span id="rmssd-value" class="metric-number">--</span><span class="metric-unit">ms</span></p></div>
@@ -145,6 +154,7 @@
 <script src="vendor/ppg.global.js"></script>
 <script>window.PPGMonitor = PPG.PPGMonitor;</script>
 <script src="mobile-dock.js"></script>
+<script src="landscape.js"></script>
 <script src="portrait.js"></script>
 <script src="app.js"></script>
 </body>

@@ -4,7 +4,32 @@
 
 Pulse Painting has been extracted from the ppg-js camera application at source commit `732e1ef51f76bce9145bb7f666f92a30be5e0181`. The app owns capture presentation, painting, reports, and exports; ppg-js retains scientific and camera-acquisition source.
 
-The present app paints a scrolling manuscript and creates a selected-moment portrait. Landscape families, data-driven density, and a continuous brush close-up → landscape reveal remain proposed design work. Do not present them as shipped.
+The landscape release candidate implements sixteen source-mapped scene families,
+usable-time density, a close-up artwork camera and a continuous same-scene reveal.
+Local visual and regression validation is in progress. It has not yet replaced
+the verified manuscript release on production.
+
+The user explicitly approved curving real traces along terrain and adding
+organic curves within the pulse strokes. Those curves are implemented; the
+original manuscript and computed report remain unchanged. Connected channels,
+perspective and source-derived land fills are also implemented. The latest
+independent visual reviews scored 5.5 and 5.3/10. Terrain continuity improved,
+but smooth stacked fills still look artificial, several scene families remain
+too similar, and sparse/dense compositions need stronger art direction.
+
+The dream-loop workflow reached its stalled criterion again after this major
+revision. The user has been shown the actual current atlas and asked whether to
+pursue natural watercolor texture/distinct scenery (recommended) or retain the
+abstract contour style and finish deployment. Await that direction before a
+further renderer rewrite or release. No landscape production deployment or
+source PR has occurred. The goal remains active.
+
+The current curve/volume candidate passes the Node source model and browser view
+suite, including all sixteen families, retained source knots, no interpolated
+amplitude overshoot, fragmentation density, pause/resume, reduced motion, bounded
+cache storage, and exact live/direct raster parity. The final full three-minute
+WebKit session and longer performance tests remain queued for visual freeze;
+earlier runs are not final evidence for this material revision.
 
 ## Runtime and build
 
@@ -16,12 +41,28 @@ The pinned library artifact is the exact tested 0.3.1 browser bundle from the ex
 
 GitHub target: `sontakey/pulsepainting`.
 
-The ChatPPG host integrates this repository separately as `apps/pulsepainting`, runs its build, and publishes `dist/` under `/pulse-painting/v-<contenthash>/`. The canonical HTML route is `https://chatppg.com/pulse-painting`; the ppg-js library demo remains separate at `/ppg-js-demo`. The host owns metadata, submodule pinning, cache invalidation, and deployment.
+The previous ChatPPG host release integrates this repository as `apps/pulsepainting`
+and publishes `dist/` under `/pulse-painting/v-<contenthash>/`. Host PR 251 moves
+its entry route to the standalone domain while retaining those immutable assets
+for existing sessions. That migration is pending the standalone landscape release.
+The ppg-js library demo remains separate at `/ppg-js-demo`.
 
-The new domain `pulsepainting.com` is planned. DNS, TLS, hosting attachment, and redirects have not been configured by the extraction. Keep current links and the painted QR pointed at the ChatPPG route until that domain is verified.
+The user connected the standalone `pulsepainting` Vercel project to this GitHub
+repository and verified both domains. Primary URL: `https://www.pulsepainting.com/`;
+the apex redirects to www with 308. HTTPS was verified on both on October 21, 2026.
+Project `prj_14qDiHVKhjNCMJEKvAz4Hg04H6Yo`, account
+`team_nZ98TMx5s8pjLaFvpyIaux0r`, builds main with Node 24, `npm ci`,
+`npm run build`, output `dist`. The existing production at verification time is
+the earlier manuscript app; the landscape candidate still needs its release gates.
+Canonical metadata and the regenerated painted QR now target the primary domain.
 
-## Verification status
+## Historical verification: manuscript extraction
 
-The standalone build, app capture/report/export regression suite, and both GPU fallback cases passed against this repository's built output. README screenshots were regenerated from this app. The full WebKit session completed 180.489 seconds of active measurement in 210.059 seconds wall time, recovered all three interruptions without stale-frame credit, and passed report/export checks. Active painting averaged 59.67 fps with an 18 ms p95 interval in desktop WebKit mobile emulation. The new-route QR passed 66/66 decode variants and 21/21 contrast checks; mobile decorative-asset exclusion also passed. See `docs/validation/standalone-extraction-2026-10-21.md`. Public ChatPPG deployment is still owned by the host repository and is not established by this commit.
+The previous manuscript app passed its standalone build, capture/report/export
+suite, and both GPU fallback cases. Its full WebKit session completed 180.489
+seconds of active measurement in 210.059 seconds wall time and recovered all three
+interruptions. Painting averaged 59.67 fps with an 18 ms p95 interval. See
+`docs/validation/standalone-extraction-2026-10-21.md`. Those results predate the
+landscape implementation and are not its release evidence.
 
 Physical iPhone capture, camera/flash behavior, sustained thermal performance, and native share-sheet acceptance remain separate from browser replay checks.

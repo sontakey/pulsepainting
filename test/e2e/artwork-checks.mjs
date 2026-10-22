@@ -6,6 +6,38 @@ import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 
 const hash = bytes => createHash('sha256').update(bytes).digest('hex');
 
+export function assertArtworkPngPrivacy(png) {
+  for (let offset=8;offset<png.length;) {
+    const length=png.readUInt32BE(offset),type=png.toString('ascii',offset+4,offset+8),data=png.subarray(offset+8,offset+8+length);
+    assert.ok(!['tEXt','zTXt','iTXt'].includes(type),'shared PNG contains no textual source/session metadata');
+    if(type==='eXIf') {
+      // WebKit's native canvas encoder emits EXIF color space and pixel
+      // dimensions. Permit only those scalar image facts, never GPS, dates,
+      // identifiers, comments, arbitrary payloads or private source descriptors.
+      assert.ok(data.length<=256&&['II','MM'].includes(data.toString('ascii',0,2)),'bounded standard canvas EXIF');
+      const little=data.toString('ascii',0,2)==='II';
+      const u16=o=>little?data.readUInt16LE(o):data.readUInt16BE(o),u32=o=>little?data.readUInt32LE(o):data.readUInt32BE(o);
+      assert.equal(u16(2),42,'standard TIFF metadata marker');
+      const covered=new Uint8Array(data.length);covered.fill(1,0,8);const visited=new Set();
+      const visit=at=>{
+        assert.ok(!visited.has(at)&&at>=8&&at+6<=data.length,'bounded noncyclic EXIF directory');visited.add(at);
+        const count=u16(at),end=at+2+count*12+4;assert.ok(count<=4&&end<=data.length,'bounded EXIF entries');covered.fill(1,at,end);
+        for(let i=0;i<count;i++){
+          const p=at+2+i*12,tag=u16(p),kind=u16(p+2);assert.equal(u32(p+4),1,'canvas EXIF uses scalar image facts');
+          if(tag===0x8769){assert.equal(kind,4);visit(u32(p+8));continue;}
+          assert.ok([0xa001,0xa002,0xa003].includes(tag),'EXIF excludes private or identifying tags');
+          assert.ok(kind===3||kind===4,'EXIF excludes strings and opaque data');
+          const value=kind===3?u16(p+8):u32(p+8);
+          assert.equal(value,tag===0xa001?1:tag===0xa002?png.readUInt32BE(16):png.readUInt32BE(20),'EXIF only describes this rendered image');
+        }
+        assert.equal(u32(end-4),0,'no additional EXIF directories');
+      };
+      visit(u32(4));assert.ok(covered.every(Boolean),'EXIF has no unused payload for private metadata');
+    }
+    offset+=12+length;
+  }
+}
+
 export async function openReportMenu(page) {
   if (!await page.locator('#debug-sheet').isVisible()) await page.locator('#btn-debug-menu').click();
   await page.locator('#debug-sheet').waitFor({ state: 'visible' });
@@ -108,6 +140,7 @@ export async function checkArtwork(page, output = process.env.PPG_ARTWORK_ARTIFA
     try {
       Object.defineProperty(fonts, 'load', { configurable: true, value: () => fontGate });
       const mounting = PulsePortrait.mount(host, {
+        landscape,
         segments: manuscript.segments,
         start: manuscript.segments[0].points[0].t,
         durationSec: elapsedMeasuringMs / 1000,
@@ -140,49 +173,54 @@ export async function checkArtwork(page, output = process.env.PPG_ARTWORK_ARTIFA
   assert.equal(preparation.disabledWhileRegenerating, true, 'external artwork actions wait for regenerated PNG pixels');
   assert.equal(preparation.enabledAfterRegenerating, true, 'external artwork actions become available after regeneration');
   assert.equal(preparation.disabledAfterClear, true, 'clearing a portrait disables its external artwork controls');
+  const recovery = await page.evaluate(async () => {
+    const outcomes=[];
+    for (const mode of ['encoder', 'renderer']) {
+      const host=document.createElement('div');host.style.cssText='position:fixed;left:-10000px;width:500px';document.body.append(host);
+      const share=document.createElement('button'),save=document.createElement('button');
+      const originalToBlob=HTMLCanvasElement.prototype.toBlob, originalLandscape=window.PulseLandscape;
+      const sourceBefore=JSON.stringify(landscape);
+      try {
+        if(mode==='encoder')HTMLCanvasElement.prototype.toBlob=function(callback){callback(null);};
+        else window.PulseLandscape={...originalLandscape,render(){throw new Error('Test-only renderer failure');}};
+        await PulsePortrait.mount(host,{landscape,durationSec:elapsedMeasuringMs/1000,startedAt:new Date(portraitStartedAt),shareButton:share,saveButton:save});
+        const retry=host.querySelector('.portrait-retry');
+        const held=retry&&!retry.hidden&&share.disabled&&save.disabled&&!PulsePortrait.getState(host).ready;
+        HTMLCanvasElement.prototype.toBlob=originalToBlob;window.PulseLandscape=originalLandscape;
+        const retryStarted=performance.now();retry.click();
+        const until=performance.now()+5000;
+        while(!PulsePortrait.getState(host).ready&&performance.now()<until)await new Promise(resolve=>setTimeout(resolve,20));
+        outcomes.push({mode,held,ready:PulsePortrait.getState(host).ready,sourceStable:sourceBefore===JSON.stringify(landscape),sameSeed:PulsePortrait.getState(host).seed===landscape.seed,family:landscape.family,retryMs:performance.now()-retryStarted,status:host.querySelector('.portrait-status')?.textContent,retryVisible:!retry.hidden});
+      } finally {HTMLCanvasElement.prototype.toBlob=originalToBlob;window.PulseLandscape=originalLandscape;PulsePortrait.clear(host);host.remove();}
+    }
+    return outcomes;
+  });
+  console.log('ARTWORK_RECOVERY',JSON.stringify(recovery));
+  for(const result of recovery){
+    assert.equal(result.held,true, `${result.mode}: unavailable export offers retry and disables sharing`);
+    assert.equal(result.ready,true, `${result.mode}: retry prepares the original artwork`);
+    assert.ok(result.sourceStable&&result.sameSeed, `${result.mode}: failure and recovery preserve every source stroke and scene seed`);
+  }
   const canvas = page.locator('.portrait-preview canvas');
   const checkbox = page.locator('.portrait-options input');
   const originalViewport = page.viewportSize();
   const captured = await page.evaluate(() => {
     const state = PulsePortrait.getState(portraitHost);
-    const start = manuscript.segments[0].points[0].t;
-    const occupied = new Set();
-    const coverage = new Map();
-    for (const segment of manuscript.segments) {
-      for (let i = 1; i < segment.points.length; i++) {
-        const a = segment.points[i - 1], b = segment.points[i];
-        if (b.t - a.t > .15) continue;
-        const rowA = Math.floor((a.t - start) / 5), rowB = Math.floor((b.t - start) / 5);
-        if (rowA === rowB) {
-          occupied.add(rowA);
-          coverage.set(rowA, (coverage.get(rowA) || 0) + b.t - a.t);
-        }
-      }
-    }
-    const palette = state.selectedRows.map(row => {
-      const colors = Array.from({ length: 21 }, (_, i) => pigmentAt(start + row * 5 + i / 4, .9));
-      let maxDistance = 0;
-      for (const a of colors) for (const b of colors) maxDistance = Math.max(maxDistance, Math.hypot(...a.map((value, i) => value - b[i])));
-      const boundary = start + (row + 1) * 5;
-      const before = pigmentAt(boundary - .00001, .9), after = pigmentAt(boundary + .00001, .9);
-      return { maxDistance, boundaryDelta: Math.max(...before.map((value, i) => Math.abs(value - after[i]))) };
-    });
-    // A future accepted segment must not recolor any completed waveform row.
-    // Restore the real captured array even if the rasterizer throws.
-    const oldRow = document.createElement('canvas'); oldRow.width = 600; oldRow.height = 180;
-    const draw = () => {
-      paintManuscriptRaster(oldRow, false, true, null, true, { rowIndices: [state.selectedRows[0]] });
-      return oldRow.toDataURL();
-    };
-    const historyBefore = draw();
-    const template = manuscript.segments[0];
-    const shift = manuscript.segments.at(-1).points.at(-1).t + 10 - template.points[0].t;
-    manuscript.segments.push({ ...template, points: template.points.map(point => ({ ...point, t: point.t + shift })) });
-    let historyAfter;
-    try { historyAfter = draw(); } finally { manuscript.segments.pop(); }
+    const sceneBefore = JSON.stringify(landscape);
+    const exact = document.createElement('canvas'); exact.width = exact.height = 1080;
+    PulseLandscape.render(landscape, exact);
+    const portraitArt = document.createElement('canvas'); portraitArt.width = portraitArt.height = 1000;
+    portraitArt.getContext('2d').drawImage(document.querySelector('.portrait-preview canvas'), 40, 146, 1000, 1000, 0, 0, 1000, 1000);
+    const expectedArt = document.createElement('canvas'); expectedArt.width = expectedArt.height = 1000;
+    expectedArt.getContext('2d').drawImage(exact, 0, 0, 1000, 1000);
+    const a=portraitArt.getContext('2d').getImageData(0,0,1000,1000).data,b=expectedArt.getContext('2d').getImageData(0,0,1000,1000).data;
+    let maxArtDelta=0, artDelta=0, deltaBounds={minY:1000,maxY:0,minX:1000,maxX:0};for(let i=0;i<a.length;i++){const d=Math.abs(a[i]-b[i]);maxArtDelta=Math.max(maxArtDelta,d);artDelta+=d;if(d>2){const pixel=Math.floor(i/4),x=pixel%1000,y=Math.floor(pixel/1000);deltaBounds.minX=Math.min(deltaBounds.minX,x);deltaBounds.maxX=Math.max(deltaBounds.maxX,x);deltaBounds.minY=Math.min(deltaBounds.minY,y);deltaBounds.maxY=Math.max(deltaBounds.maxY,y);}}
+
     return {
-      state, expectedDuration: elapsedMeasuringMs / 1000, occupied: [...occupied], coverage: [...coverage], palette,
-      frozenHistory: historyBefore === historyAfter,
+      state, expectedDuration: elapsedMeasuringMs / 1000,
+      scene: { family: landscape.family, seed: landscape.seed, version: landscape.version, strokeCount: landscape.strokes.length, usableSeconds: landscape.usableSeconds },
+      sourceUnchanged: sceneBefore === JSON.stringify(landscape),
+      art: portraitArt.toDataURL(), expectedArt: expectedArt.toDataURL(), maxArtDelta, meanArtDelta:artDelta/a.length, deltaBounds,
       image: document.querySelector('.portrait-preview canvas').toDataURL(),
       accessibleDescription: document.querySelector('.portrait-preview canvas').getAttribute('aria-label'),
     };
@@ -192,23 +230,13 @@ export async function checkArtwork(page, output = process.env.PPG_ARTWORK_ARTIFA
   assert.equal(captured.state.durationSec, captured.expectedDuration, 'portrait uses actual active capture duration, including early finishes');
   assert.equal(captured.state.includeMetrics, false, 'numeric metrics are excluded from shared artwork by default');
   assert.equal(await checkbox.isChecked(), false, 'metrics inclusion starts unchecked');
-  assert.match(captured.accessibleDescription, /Selected moments/, 'selected rows are labeled as an excerpt');
-  assert.ok(captured.state.selectedRows.length > 0 && captured.state.selectedRows.length <= 4, 'portrait has up to four captured rows');
-  assert.ok(captured.state.selectedRows.every(row => captured.occupied.includes(row)), 'selected rows contain accepted, drawable waveform edges');
-  assert.equal(new Set(captured.state.selectedRows).size, captured.state.selectedRows.length, 'selected waveform rows are not duplicated');
-  assert.deepEqual([...captured.state.selectedRows].sort((a, b) => a - b), captured.state.selectedRows, 'selected rows retain temporal order');
-  const coverage = new Map(captured.coverage);
-  const firstRow = Math.min(...captured.occupied), rowSpan = Math.max(...captured.occupied) - firstRow + 1;
-  const bandFor = row => Math.floor((row - firstRow) / rowSpan * captured.state.selectedRows.length);
-  for (const row of captured.state.selectedRows) {
-    const bandHasFullerRow = captured.occupied.some(candidate => bandFor(candidate) === bandFor(row) && coverage.get(candidate) >= 3.5);
-    if (bandHasFullerRow) assert.ok(coverage.get(row) >= 3.5, 'portrait prefers well-observed real rows when available in that time band');
-  }
-  assert.ok(captured.state.pigmentWeights.every(pigment => pigment.weight > 0), 'background pigments come from captured stroke contribution');
-  assert.ok(Math.abs(captured.state.pigmentWeights.reduce((sum, pigment) => sum + pigment.ratio, 0) - 1) < 1e-9, 'accepted pigment contributions are normalized');
-  assert.ok(captured.palette.every(row => row.maxDistance > 65), 'every selected pulse row contains significantly different cool pigments within the stroke');
-  assert.ok(captured.palette.every(row => row.boundaryDelta < 2), 'pigment remains continuous across manuscript line boundaries');
-  assert.equal(captured.frozenHistory, true, 'future captured strokes never recolor completed waveform history');
+  assert.match(captured.accessibleDescription, /landscape|pulse/i, 'artwork has an accessible description');
+  for (const key of ['family', 'seed', 'version', 'strokeCount', 'usableSeconds'])
+    assert.equal(captured.state[key], captured.scene[key], `portrait retains capture scene ${key}`);
+  assert.ok(captured.state.strokeCount > 0 && captured.state.usableSeconds > 0, 'personal landscape contains accepted data');
+  assert.equal(captured.sourceUnchanged, true, 'export never mutates the private source descriptor');
+  console.log('PORTRAIT_SCENE_PARITY',JSON.stringify({max:captured.maxArtDelta,mean:captured.meanArtDelta,bounds:captured.deltaBounds}));
+  assert.ok(captured.maxArtDelta<=1&&captured.meanArtDelta<.01, 'portrait contains the full capture landscape within one-level Canvas2D copy rounding, without re-layout or selected rows');
 
   for (const width of [320, 390]) {
     await page.setViewportSize({ width, height: 844 });
@@ -216,13 +244,13 @@ export async function checkArtwork(page, output = process.env.PPG_ARTWORK_ARTIFA
       const canvasWidth = section.querySelector('canvas').getBoundingClientRect().width;
       return {
         overflow: document.documentElement.scrollWidth > innerWidth,
-        canvasSupportText: canvasWidth / 1080 * 60,
+        canvasWidth,
         labels: [...section.querySelectorAll('p,figcaption,label,button')].map(element => ({ font: parseFloat(getComputedStyle(element).fontSize), height: element.getBoundingClientRect().height })),
         actionHeights: [...document.querySelectorAll('#screen-summary .summary-actions button')].map(button => button.getBoundingClientRect().height),
       };
     });
     assert.equal(layout.overflow, false, `portrait fits ${width}px viewport`);
-    assert.ok(layout.canvasSupportText >= 14, `artwork labels remain at least 14px at ${width}px viewport`);
+    assert.ok(layout.canvasWidth > 0, `full artwork remains visible at ${width}px viewport`);
     assert.ok(layout.labels.every(label => label.font >= 14), `portrait supporting labels remain at least 14px at ${width}px viewport`);
     assert.ok(layout.actionHeights.length === 2 && layout.actionHeights.every(height => height >= 44), 'floating report actions retain touch target height');
   }
@@ -240,15 +268,22 @@ export async function checkArtwork(page, output = process.env.PPG_ARTWORK_ARTIFA
   assert.equal(png.subarray(1, 4).toString(), 'PNG', 'artwork is a PNG');
   assert.equal(png.readUInt32BE(16), 1080, 'downloaded portrait width');
   assert.equal(png.readUInt32BE(20), 1350, 'downloaded portrait height');
+  assertArtworkPngPrivacy(png);
   if (output) { mkdirSync(output, {recursive:true}); writeFileSync(`${output}/portrait.png`, png); }
   assert.equal(hash(png), hash(Buffer.from(captured.image.split(',')[1], 'base64')), 'export uses the exact preview pixels');
 
   await checkbox.check();
   await page.waitForFunction(() => PulsePortrait.getState().ready && PulsePortrait.getState().includeMetrics);
-  assert.notEqual(await canvas.evaluate(node => node.toDataURL()), captured.image, 'explicit metric opt-in changes the shared portrait');
+  assert.notEqual(hash(await canvas.evaluate(node => node.toDataURL())), hash(captured.image), 'explicit metric opt-in changes the shared portrait');
+  const metricsArt = await canvas.evaluate(node => {
+    const crop = document.createElement('canvas'); crop.width = crop.height = 1000;
+    crop.getContext('2d').drawImage(node, 40, 146, 1000, 1000, 0, 0, 1000, 1000);
+    return crop.toDataURL();
+  });
+  assert.equal(hash(metricsArt), hash(captured.art), 'metric opt-in only changes the footer and leaves every landscape pixel unchanged');
   await checkbox.uncheck();
   await page.waitForFunction(() => PulsePortrait.getState().ready && !PulsePortrait.getState().includeMetrics);
-  assert.equal(await canvas.evaluate(node => node.toDataURL()), captured.image, 'regenerating the default portrait preserves its exact seeded composition');
+  assert.equal(hash(await canvas.evaluate(node => node.toDataURL())), hash(captured.image), 'regenerating the default portrait preserves its exact seeded composition');
 
   await page.evaluate(() => {
     window.__portraitShareOriginal = Object.fromEntries(['canShare', 'share'].map(name => [name, Object.getOwnPropertyDescriptor(navigator, name)]));
@@ -323,5 +358,5 @@ export async function checkArtwork(page, output = process.env.PPG_ARTWORK_ARTIFA
     });
     await closeReportMenu(page);
   }
-  return { width: 1080, height: 1350, selectedRows: captured.state.selectedRows, durationSec: captured.state.durationSec, bytes: png.length, nativeShareScope: 'mocked browser API only' };
+  return { width: 1080, height: 1350, family: captured.state.family, seed: captured.state.seed, strokeCount: captured.state.strokeCount, usableSeconds: captured.state.usableSeconds, durationSec: captured.state.durationSec, bytes: png.length, recovery, nativeShareScope: 'mocked browser API only' };
 }

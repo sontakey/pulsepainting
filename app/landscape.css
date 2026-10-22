@@ -1,0 +1,6 @@
+.landscape-view { position: relative; width: 100%; aspect-ratio: 1; overflow: hidden; isolation: isolate; background: #fbf8f0; border-radius: 12px; contain: layout paint; }
+.landscape-stage { position: absolute; top: 0; left: 0; transform-origin: 0 0; will-change: transform; }
+.landscape-canvas { display: block; width: 100%; height: 100%; }
+.landscape-tip { position: absolute; width: 12px; height: 7px; margin: -3.5px -6px; border: 0; border-radius: 47% 63% 51% 42%; background: radial-gradient(ellipse at 43% 47%, rgba(33,91,135,.45), rgba(47,119,148,.14) 52%, transparent 74%); box-shadow: 0 1px 5px rgba(38,105,143,.07); transform: rotate(-24deg); pointer-events: none; }
+.landscape-tip[hidden] { display: none; }
+@media (prefers-reduced-motion: reduce) { .landscape-stage { will-change: auto; } .landscape-tip { display: none; } }
