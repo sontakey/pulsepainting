@@ -1,14 +1,36 @@
 # Pulse Painting screenshots
 
-These are direct browser captures of the actual static app. Capture, report and
-desktop images were refreshed on October 22, 2026 (America/Chicago) for the finer
-Quiet Lake foreground. Ready and QR retain their unchanged first-release images.
+These are direct browser captures of the actual static app. The capture image
+was refreshed on October 23, 2026 for the crisp pulse brush. Report and desktop
+images retain the October 22 foreground release. Ready and QR retain their
+unchanged first-release images.
 The mobile gallery PNG documents the separately tested October 23 build
 described below. Its release was subsequently verified on the public site;
 the screenshot itself was captured locally.
 See [HANDOFF.md](../../HANDOFF.md) for deployment status.
 
-## Current artwork images
+## Crisp brush capture
+
+`pulse-painting-capture.jpg` is the direct native-browser JPEG (quality 92) from
+`2026-10-23T19:22:20.933Z`. Chrome 155.0.8059.85 through Playwright captured the
+actual app at 390 × 844 CSS pixels, DPR 3, with normal motion and loaded fonts.
+The resulting image is 1170 × 2532. No image pixels or UI values were edited.
+
+The checked-in public recording was preloaded through forty seconds using the
+real signal engine, acceptance adapter and app callbacks. Quiet Lake seed 39293
+shows its active measured contour and pointed brush at source-stroke progress
+0.651–0.710. The countdown is 2:39; computed values are 69 bpm, 43 ms RMSSD and
+33 ms SDNN. Camera I/O is mocked, so the camera thumbnail is empty. No samples
+were duplicated and no metrics were substituted. There were no runtime errors.
+
+Source and distribution renderer SHA-256:
+`a033c4bd89461a08f97af86bc971f738257cab1270c750872ce31c35ea749008`.
+The raw PNG, native JPEG and metadata are in ignored
+`.dream-loop/crisp-brush/performance-fixed/public-replay-active-mobile.*`.
+This is presentation evidence, separate from the full-session and performance
+checks in [the brush validation record](../validation/crisp-brush-2026-10-23.md).
+
+## Earlier artwork images
 
 - Chrome 155.0.8059.85 through Playwright 1.63.0 on macOS. Phone viewport:
   390 × 844 CSS pixels; desktop: 1440 × 1000; device scale factor 1. Fonts loaded,
@@ -21,11 +43,12 @@ See [HANDOFF.md](../../HANDOFF.md) for deployment status.
 - Quiet Lake seed 39293 contains 28 accepted segments / 138.967 usable seconds.
   Capture shows the real app countdown **0:29** and computed live values
   **71 bpm, 62 ms RMSSD, 51 ms SDNN** while the normal close-up painting runs.
-  The first pass's mid-water camera position is used for the README.
+  The earlier capture used the first pass's mid-water camera position; the crisp
+  brush image above has now replaced that capture.
 - The actual **Finish painting** button starts the animated zoom-out. The report
   screenshot waits for the same-scene export to become ready. Report values are
   **71 bpm, 52.8 ms RMSSD and 46.8 ms SDNN**. A separate PNG export was also checked.
-- The desktop background is the current public-fixture gallery example: the
+- The desktop background is the earlier public-fixture gallery example: the
   same seed, replay through 180 seconds, 148.9 usable seconds. The desktop and
   report images came from the final screenshot pass at
   `2026-10-23T04:21:11.940Z` and `2026-10-23T04:21:30.194Z`.
@@ -40,7 +63,7 @@ Public fixture SHA-256:
 
 `5f09524bc151460d1a1a1fa58c30681dd84eaf30d989f4637edf6183e4a03b66`
 
-Current gallery manifest SHA-256:
+Gallery manifest SHA-256 at that earlier capture:
 
 `a653ec9f6b48628616ab5b3dcf3e6f6bc07dafc3b0c290636cf484772054da1d`
 
@@ -112,7 +135,7 @@ social-post delivery or sustained frame-rate evidence.
 | `pulse-painting-desktop-candidate.jpg` | 188941 | `71f997d63b0146af03e7cebbaea9b092c927ffd8c044959c591d36365a01fd4f` |
 | `pulse-painting-qr.jpg` | 81054 | `56374f21d8c42f2edc94165adb7b06a762b95fae80e95c147e157f7038c52898` |
 | `pulse-painting-ready.jpg` | 51933 | `1da91b18ec49b70eebb09af1fcea4dff9f87078637b8ffcc70adf00e375a1ddf` |
-| `pulse-painting-capture.jpg` | 54988 | `39ffe97770307230c8a67fd97009d1fcf9be886e31c51da27a36f8a86b912cf9` |
+| `pulse-painting-capture.jpg` | 262553 | `fea6f9434b2a72767ed7d66bc471e288dc4e4887cf651d647747e7ef8cc930b7` |
 | `pulse-painting-report.jpg` | 65173 | `c2f8559f395c9d6ed8d36738f68a0df638aab51f30377e413e8966e1ce234f4c` |
 | `pulse-painting-mobile-gallery.png` | 469347 | `2f7f07374fb73399156555da8a86281d6b982db7714efe9a7bd2b4d4caa1889b` |
 | `pulse-painting-sharing.png` | 196999 | `882d6c79830173bd54366dd235f7477d8eb1484481638ca0f446dbf177e7ce04` |

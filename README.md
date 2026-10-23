@@ -3,15 +3,15 @@
 Your pulse, made into a place.
 
 > Live at [pulsepainting.com](https://www.pulsepainting.com/): sixteen pulse-derived
-> watercolor landscapes, a close-up capture and zoom-out reveal, and shareable artwork.
+> watercolor landscapes, crisp measured pulse strokes, a pointed brush and soft
+> trailing pigment, a calm zoom-out reveal, and shareable artwork.
 > Browser replay and deployed-asset checks passed; physical-phone validation remains separate.
-> See [release verification](docs/validation/defined-foreground-2026-10-22.md).
+> See [current release verification](docs/validation/crisp-brush-2026-10-23.md).
 > The [mobile gallery](https://www.pulsepainting.com/#landscapes) is now live too;
 > see [mobile verification](docs/validation/mobile-gallery-2026-10-23.md).
 > Community publishing, social sharing and personal sketchbooks are live;
 > see [sharing release checks](docs/validation/community-sharing-2026-10-23.md).
 > Shareable sketchbook links are live; see [recipient-page checks](docs/validation/shareable-sketchbooks-2026-10-23.md).
-> Direct sketchbook links are covered by [recipient-page checks](docs/validation/shareable-sketchbooks-2026-10-23.md).
 
 Pulse Painting is a three-minute phone-camera capture experience by [ChatPPG](https://chatppg.com), powered by [ppg-js](https://github.com/sontakey/ppg-js). Accepted pulse waveforms paint one of sixteen landscapes, with layered watercolor washes and recognizable pulse contours. A close-up follows the brush during capture, then pulls back to reveal the same painting, ready to share alongside an expandable HRV report.
 
@@ -21,7 +21,7 @@ Pulse Painting is a three-minute phone-camera capture experience by [ChatPPG](ht
   <img src="docs/media/pulse-painting-report.jpg" width="230" alt="Shareable Pulse Painting artwork and report">
 </p>
 
-The current capture and report screenshots use an accelerated preload of the public recording, mocked camera input, and the normal animated artwork reveal; see [capture provenance](docs/media/README.md). They are not new physical-phone measurements or a real-time session benchmark.
+The capture screenshot shows the crisp pulse brush with forty seconds of the public recording preloaded through the actual app. The report image documents the earlier foreground release. Both use mocked camera input; see [capture provenance](docs/media/README.md). They are not physical-phone measurements or session benchmarks.
 
 The primary destination is [pulsepainting.com](https://www.pulsepainting.com/), a separate Vercel project connected to this repository. The apex domain redirects to www. The simple library demo remains at [ChatPPG](https://chatppg.com/ppg-js-demo). Release and public verification status are tracked in [HANDOFF.md](HANDOFF.md).
 
@@ -35,8 +35,8 @@ keep the gallery and phone handoff accessible.
 
 ![Desktop experience with the Quiet lake background and phone QR invitation](docs/media/pulse-painting-desktop-candidate.jpg)
 
-**Desktop experience.** Direct browser capture of the tested build now deployed
-to the public site. See [image provenance](docs/media/README.md).
+**Desktop experience.** Direct browser capture from the earlier foreground
+release. See [image provenance](docs/media/README.md).
 
 <p align="center">
   <img src="app/assets/gallery/alpine-peaks-640.webp" width="230" alt="Alpine peaks landscape generated from the public pulse fixture by the released renderer">

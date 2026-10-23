@@ -1,6 +1,35 @@
 # Pulse Painting handoff
 
-## Current production release: shareable sketchbooks
+## Current production release: crisp pulse brush
+
+All sixteen scene families now show a fine measured PPG contour, a pointed
+brush tip and soft pigment trailing behind it. The active foreground follows
+actual source time and value; measured knots, gaps, quality gating and usable-data
+density are preserved. Calmer scene framing uses continuous damping, including
+between distant landscape layers. The completed artwork and export share the
+same canonical rendering. All sixteen gallery examples are refreshed.
+
+PR #6 merged as `1ce10c81ebacef9dbafcc633205f17ef612c08c9` after full Linux CI
+`40010625096` passed tested source `41c65a929e20ad309048c5676b33136cd57825cd`.
+Chromium and WebKit passed all sixteen live projections and 192 provenance
+cases per engine. A full three-minute WebKit replay passed interruption/recovery,
+camera damping, report, pixel-exact artwork parity and export retries. Normal
+browser runs measured about 60 fps; 4× CPU stress measured 39–43 fps. These are
+mocked-camera browser checks, not physical-phone or thermal validation.
+
+Production `dpl_Bi448yYAVrrMNN1a5iVPrsgrpefs` is READY at
+https://www.pulsepainting.com/. At `2026-10-23T19:31:49.685Z`, all 101 public
+files matched the frozen tested build. Anonymous Chromium/WebKit checks at
+390px and 1440px passed gallery, sharing and sketchbook interactions, plus real
+community reads, without errors or write attempts. No production QA paintings
+were created. The README capture image is a native screenshot of this renderer.
+See `docs/validation/crisp-brush-2026-10-23.md` for evidence and performance scope.
+Renderer SHA-256:
+`a033c4bd89461a08f97af86bc971f738257cab1270c750872ce31c35ea749008`.
+Later documentation-only commits can change the deployment ID without changing
+the verified runtime. npm 0.3.1 remains intentionally unpublished.
+
+## Previous production release: shareable sketchbooks
 
 Published paintings now open directly at `/book/<uuid>` in the existing
 three-spread paper sketchbook. Private report sharing offers **Create a
