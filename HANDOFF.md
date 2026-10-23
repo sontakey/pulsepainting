@@ -17,9 +17,13 @@ the actual renderer. See
 The correction is live at https://www.pulsepainting.com/.
 PR #2 merged as `def02f672d83cb8df7cc0f3dbd73dbb49ca816e3`; CI run `39900142944`
 passed on tested source `cefbe4aee7664b4fa0a2d13a7f5f6bd340028906`.
-Deployment `dpl_92dHN471Lnz7bvv3giJK12rb3rcJ` is READY and promoted. Anonymous
-verification at `2026-10-23T04:26:56.586Z` matched all 73 public files to the tested
-build. Hosted WebKit capture/report/export/recovery checks passed. Dense replay
+CLI deployment `dpl_92dHN471Lnz7bvv3giJK12rb3rcJ` was staged and promoted.
+The connected Git integration also deploys main; its merged-source deployment
+`dpl_48coHpR5Xn1aHrmiyePtuD8b7Q6R` was subsequently observed READY on the public
+domains. Later documentation-only main commits can advance the deployment ID;
+the frozen runtime hash above is the release identity. Anonymous verification
+at `2026-10-23T04:26:56.586Z` matched all 73 public files to the tested build.
+Hosted WebKit capture/report/export/recovery checks passed. Dense replay
 measured 59.95 fps normally and 57.05–57.40 fps at 4× CPU throttling; this is
 browser evidence, not physical-phone certification.
 

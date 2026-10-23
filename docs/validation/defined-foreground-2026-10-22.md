@@ -72,7 +72,13 @@ it or relax its threshold.
   and Quiet Lake image matched local hashes before promotion. Build: 16 seconds.
 - The same deployment was promoted to [Pulse Painting](https://www.pulsepainting.com/).
   Anonymous verification at `2026-10-23T04:26:56.586Z` matched all 73 public files
-  to the tested build. The apex returns 308 to www. The deployment is READY.
+  to the tested build. The apex returns 308 to www.
+- The connected Git integration also deploys main. Its merged-source deployment
+  `dpl_48coHpR5Xn1aHrmiyePtuD8b7Q6R` was subsequently observed READY on the public
+  domains. Documentation-only main commits can produce newer deployment IDs
+  without changing the runtime. Compare the frozen renderer and complete public
+  file manifest when checking release identity; do not infer a code change from
+  a newer deployment ID alone.
 - The actual hosted app passed the WebKit capture/report/export/recovery suite,
   including pixel-exact source-artwork parity. No private recording was uploaded.
 - Release manifest and staged/anonymous verification evidence remain in ignored
