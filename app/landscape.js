@@ -1122,6 +1122,8 @@
     washGroup.append(feather,wet,blooms);ink.append(defs,washGroup,core,tip,tipLight);stage.append(canvas);container.append(stage,ink);container.classList.add('landscape-view');
     const pixels=2560000,side=800;for(const item of [canvas,...caches])item.width=item.height=side;
     let disposed=false,paused=false,frame=0,last=0,painted=0,progress=0,finished=false,revealing=false;
+    let rasterPainted=-1,rasterProgress=-1,rasterElapsed=0,rasterInterval=1000/30;
+    let presentationInterval=1000/60,rasterPressure=0,rasterRecovery=0;
     let settling=false,settleElapsed=0,settleDuration=0;
     let revealStart=0,revealFrom=null,resolveFinish=null,finishPromise=null,finishing=false;
     let box={width:1,height:1},camera={x:540,y:540,scale:1},target={x:540,y:540,scale:1};
@@ -1131,7 +1133,7 @@
     // liveTexturePixels accounts for this active view's decoded-image reference;
     // materialPixels conservatively retains the shared decode after disposal.
     // Mask backing is a DPR-adjusted estimate, not browser GPU instrumentation.
-    const stats=global.__pulseLandscapeStats={frames:0,active:false,revealing:false,frameMs:0,pixelBudget:pixels,cachedPixels:side*side*4,materialPixelBudget:2*INK_SIDE*INK_SIDE+2*INK_PIXEL_LIMIT,get materialPixels(){return 2*INK_SIDE*INK_SIDE+2*(pigmentAtlases.get(doc)?.pixels||0);},liveTexturePixels:INK_SIDE*INK_SIDE,liveMaskPixelEstimate:0,camera:{...camera},finished:false,strokes:0,painted:0,activeStroke:null,progress:0,frontier:null,nib:null,cameraBaseline:null,visibleSeconds:0,wetTrail:null,projection:null,settling:false};
+    const stats=global.__pulseLandscapeStats={frames:0,rasterFrames:0,forcedRasterFrames:0,rasterSkipped:0,rasterIntervalMs:rasterInterval,rasterPainted:-1,rasterProgress:-1,active:false,revealing:false,frameMs:0,pixelBudget:pixels,cachedPixels:side*side*4,materialPixelBudget:2*INK_SIDE*INK_SIDE+2*INK_PIXEL_LIMIT,get materialPixels(){return 2*INK_SIDE*INK_SIDE+2*(pigmentAtlases.get(doc)?.pixels||0);},liveTexturePixels:INK_SIDE*INK_SIDE,liveMaskPixelEstimate:0,camera:{...camera},finished:false,strokes:0,painted:0,activeStroke:null,progress:0,frontier:null,nib:null,cameraBaseline:null,visibleSeconds:0,wetTrail:null,projection:null,settling:false};
     const ctx=canvas.getContext('2d',{willReadFrequently:true}),cached=caches.map(item=>item.getContext('2d',{willReadFrequently:true}));
     function base() {const back=cached[0];back.setTransform(side/WORLD,0,0,side/WORLD,0,0);paper(back,scene);back.setTransform(1,0,0,1,0,0);publishLayer(ctx,caches[0]);}
     base();ctx.drawImage(caches[0],0,0);
@@ -1238,7 +1240,7 @@
       stats.camera={...camera};
       inkFrame();
     }
-    function paintFrame(){
+    function paintFrame(forced=false){
       ctx.setTransform(1,0,0,1,0,0);ctx.globalCompositeOperation='source-over';ctx.clearRect(0,0,side,side);
       const active=scene.strokes[painted];
       if(active&&progress>0){
@@ -1254,6 +1256,27 @@
         for(let layer=0;layer<3;layer++)ctx.drawImage(caches[layer],0,0);
       }
       if(!active||progress<=0)hideInk();
+      rasterPainted=painted;rasterProgress=progress;
+      stats.rasterFrames++;stats.forcedRasterFrames+=forced?1:0;
+      stats.rasterPainted=painted;stats.rasterProgress=progress;
+      if(forced)rasterElapsed=0;
+    }
+    function flushRaster(){
+      if(rasterPainted!==painted||rasterProgress!==progress)paintFrame(true);
+    }
+    function updateRasterCadence(delta){
+      // Only the subdued scenic raster is budgeted. Source-time ink, its nib
+      // and the damped camera still advance on every presentation frame.
+      // Hysteresis avoids bouncing quality after a single delayed frame.
+      presentationInterval=mix(presentationInterval,delta,.10);
+      if(rasterInterval<40){
+        rasterPressure=presentationInterval>21?Math.min(700,rasterPressure+delta):Math.max(0,rasterPressure-delta);
+        if(rasterPressure>=700){rasterInterval=50;rasterRecovery=0;}
+      }else{
+        rasterRecovery=presentationInterval<18.5?rasterRecovery+delta:0;
+        if(rasterRecovery>=1800){rasterInterval=1000/30;rasterPressure=0;rasterRecovery=0;}
+      }
+      stats.rasterIntervalMs=rasterInterval;
     }
     function schedule(){if(!disposed&&!paused&&!doc.hidden&&!frame&&(revealing||painted<scene.strokes.length))frame=win.requestAnimationFrame(tick);}
     function settle(){
@@ -1261,9 +1284,9 @@
       stats.finished=true;stats.revealing=false;stats.active=false;hideInk();transform();
       const done=resolveFinish;resolveFinish=null;done?.(scene);
     }
-    function bakeAll(){settling=false;settleElapsed=0;if(painted===0&&scene.strokes.length)base();for(;painted<scene.strokes.length;painted++)strokeIntoCache(scene.strokes[painted]);progress=0;paintFrame();stats.painted=painted;}
+    function bakeAll(){settling=false;settleElapsed=0;if(painted===0&&scene.strokes.length)base();for(;painted<scene.strokes.length;painted++)strokeIntoCache(scene.strokes[painted]);progress=0;paintFrame(true);stats.painted=painted;}
     function completeStroke(active){
-      strokeIntoCache(active);painted++;progress=0;settling=false;settleElapsed=0;stats.painted=painted;stats.settling=false;paintFrame();
+      strokeIntoCache(active);painted++;progress=0;settling=false;settleElapsed=0;stats.painted=painted;stats.settling=false;paintFrame(true);
       if(finishing)beginReveal();
     }
     function tick(now){
@@ -1292,7 +1315,11 @@
         // scenery follow only this damped guide, including distant new layers;
         // snapping to an offscreen scenic frontier would bypass that damping.
         const damp=1-Math.exp(-delta/850);camera={x:mix(camera.x,target.x,damp),y:mix(camera.y,target.y,damp),scale:mix(camera.scale,target.scale,damp)};
-        paintFrame();transform();
+        updateRasterCadence(delta);rasterElapsed+=delta;
+        const boundary=rasterPainted!==painted||progress>=1;
+        if(boundary||rasterElapsed+1e-6>=rasterInterval){paintFrame(boundary);rasterElapsed%=rasterInterval;}
+        else stats.rasterSkipped++;
+        transform();
         if(progress>=1){
           if(finishing||!settleDuration)completeStroke(active);
           else{settling=true;settleElapsed=0;stats.settling=true;}
@@ -1326,8 +1353,8 @@
       return finishPromise;
     }
     function cancelFinish(){if(disposed)return;win.cancelAnimationFrame(frame);frame=0;bakeAll();settle();}
-    function pause(value){paused=!!value;stats.active=false;if(paused){win.cancelAnimationFrame(frame);frame=0;last=0;hideInk();stage.classList.remove('is-writing');}else sync();}
-    function visibility(){if(doc.hidden){win.cancelAnimationFrame(frame);frame=0;last=0;hideInk();stats.active=false;if(finishing||revealing)cancelFinish();}else sync();}
+    function pause(value){paused=!!value;stats.active=false;if(paused){flushRaster();win.cancelAnimationFrame(frame);frame=0;last=0;hideInk();stage.classList.remove('is-writing');}else sync();}
+    function visibility(){if(doc.hidden){flushRaster();win.cancelAnimationFrame(frame);frame=0;last=0;hideInk();stats.active=false;if(finishing||revealing)cancelFinish();}else sync();}
     function motionChanged(event){reduced=!!event.matches;win.cancelAnimationFrame(frame);frame=0;last=0;if(reduced){if(finishing||revealing)cancelFinish();else if(!paused){bakeAll();camera=fitCamera();transform();}}else sync();}
     doc.addEventListener('visibilitychange',visibility);motion?.addEventListener?.('change',motionChanged);
     function dispose(){if(disposed)return;disposed=true;win.cancelAnimationFrame(frame);observer?.disconnect();doc.removeEventListener('visibilitychange',visibility);motion?.removeEventListener?.('change',motionChanged);hideInk();stage.remove();ink.remove();for(const item of [canvas,...caches])item.width=item.height=1;stats.active=false;stats.revealing=false;stats.cachedPixels=4;stats.liveTexturePixels=0;const done=resolveFinish;resolveFinish=null;done?.(scene);}

@@ -582,7 +582,7 @@ function syncScreenChrome(name) {
   tools.append(document.getElementById('btn-debug-menu'));
   const report = name === 'summary';
   document.getElementById('report-menu-actions').hidden = !report;
-  document.getElementById('btn-debug-menu').setAttribute('aria-label', report ? 'Report options' : 'More options');
+  document.getElementById('btn-debug-menu').setAttribute('aria-label', report ? 'More report options' : 'More options');
   document.getElementById('debug-sheet').setAttribute('aria-label', report ? 'Report options' : 'More options');
 }
 

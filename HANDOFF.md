@@ -1,5 +1,26 @@
 # Pulse Painting handoff
 
+## Release candidate: adaptive painting and gallery polish
+
+Branch `codex/slow-phone-painting` keeps the crisp real PPG contour, pointed
+brush, wet pigment and camera animation on every frame while budgeting scenic
+raster work separately. A matched layout comparison improved active cadence
+21.2% under 4× CPU throttle. Final browser runs measured 59.95–60 fps normally
+and 51.62–52.57 active fps under 4× stress. The full three-minute WebKit replay
+passed all three interruption/recovery cases, report metrics and exact export
+parity. These are mocked-camera browser checks, not physical-phone evidence.
+
+Capture has a compact title and upper-right LIVE preview with signal below.
+Desktop has cleaner QR/footer/menu treatment and a painted example-viewer CTA.
+Community fills unused spaces with clearly labeled examples until eight real
+publications are present. Three generated watercolor walkthrough illustrations
+load only near the desktop process section, never during phone capture.
+
+Renderer: `2e7e417aeffe1cfef835bfbf49d80e49029de02314a00591a3366aa18d0df794`.
+All sixteen canonical gallery images are unchanged. Details and release checks:
+`docs/validation/slow-phone-2026-10-23.md`. Hosted checks and deployment are still
+pending; the production release below remains the verified live version.
+
 ## Current production release: crisp pulse brush
 
 All sixteen scene families now show a fine measured PPG contour, a pointed

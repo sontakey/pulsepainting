@@ -51,11 +51,58 @@ async function layout(page,width,selector){
   for(const control of measurements.controls){assert.ok(control.height>=44&&control.width>=44,`touch target: ${control.text}`);assert.ok(control.font>=14,`readable control: ${control.text}`);}
   return measurements;
 }
+async function checkExampleRecovery(browser,name){
+  const context=await browser.newContext({...devices['iPhone 13'],viewport:{width:390,height:844},deviceScaleFactor:1,reducedMotion:'reduce'}),errors=[];
+  await context.route(`${BLOB}/**`,route=>route.fulfill({body:route.request().url().endsWith('thumbnail.webp')?publicThumbnail:publicJpeg,contentType:route.request().url().endsWith('thumbnail.webp')?'image/webp':'image/jpeg'}));
+  const paintings=Array.from({length:8},(_,i)=>makePainting(`88888888-8888-4888-8888-${String(i).padStart(12,'0')}`,{displayName:`Maker ${i+1}`}));
+  try{
+    // A late public page can replace the card that opened the example viewer.
+    const delayed=await context.newPage();delayed.on('pageerror',error=>errors.push(error.message));
+    let holdList;const pendingList=new Promise(resolve=>{holdList=resolve;});
+    await delayed.route('**/api/paintings**',route=>holdList(route));
+    await delayed.goto(`${url}?collection=community#landscapes`);
+    await delayed.waitForFunction(()=>document.querySelectorAll('.community-example-card').length===8);
+    const opener=await delayed.locator('.community-example-card').first().elementHandle();
+    await delayed.locator('.community-example-card').first().click();await delayed.locator('.gallery-lightbox').waitFor({state:'visible'});
+    await (await pendingList).fulfill({json:{paintings,nextCursor:null}});
+    await delayed.waitForFunction(()=>document.querySelectorAll('.community-card').length===8&&document.querySelectorAll('.community-example-card').length===0);
+    assert.equal(await opener.evaluate(el=>el.isConnected),false,'late real paintings replace the example opener while its viewer remains open');
+    await delayed.locator('.gallery-dialog-close').click();await delayed.locator('.gallery-lightbox').waitFor({state:'hidden'});
+    await delayed.waitForFunction(()=>document.activeElement?.matches('.community-card'));
+    assert.equal(await delayed.locator('.community-card').first().evaluate(el=>el===document.activeElement),true,'closing a replaced example returns focus to a visible shared painting');
+    assert.equal(await delayed.locator('#gallery-tab-community').getAttribute('aria-pressed'),'true');await delayed.close();
+
+    // Real paintings below the eight-card target must not hide example retry.
+    for(const count of [1,7,8]){
+      const page=await context.newPage();page.on('pageerror',error=>errors.push(error.message));let manifestFails=true,manifestRequests=0;
+      await page.route('**/assets/gallery/manifest.json',route=>{manifestRequests++;return manifestFails?route.fulfill({status:503,json:{error:'Example manifest unavailable'}}):route.continue();});
+      await page.route('**/api/paintings**',route=>route.fulfill({json:{paintings:paintings.slice(0,count),nextCursor:null}}));
+      await page.goto(`${url}?collection=community#landscapes`);
+      await page.waitForFunction(count=>document.querySelectorAll('.community-card').length===count&&document.getElementById('community-grid').getAttribute('aria-busy')==='false',count);
+      if(count<8){
+        assert.match(await page.locator('#community-status').innerText(),/example paintings could not load/);
+        assert.equal(await page.locator('#community-more').innerText(),'Try loading again');assert.equal(await page.locator('#community-more').isVisible(),true,`${count} real paintings retain example retry`);
+        if(count===1)await shot(page,`${name}-community-example-retry`);
+        manifestFails=false;await page.locator('#community-more').click();
+        await page.waitForFunction(count=>document.querySelectorAll('.community-example-card').length===8-count&&document.getElementById('community-grid').getAttribute('aria-busy')==='false',count);
+        assert.ok(manifestRequests>=2,'Retry fetches the failed example manifest again');assert.equal(await page.locator('#community-status').innerText(),'');assert.equal(await page.locator('#community-more').isVisible(),false);
+      }else{
+        assert.equal(await page.locator('#community-status').innerText(),'','a full real gallery does not need fallback examples');assert.equal(await page.locator('#community-more').isVisible(),false);
+      }
+      await page.close();
+    }
+    assert.deepEqual(errors,[]);
+  }finally{await context.close();}
+}
 let browser;
 try{
   for(const[name,engine]of[['chromium',chromium],['webkit',webkit]]){
     if(process.env.PPG_COMMUNITY_BROWSER&&process.env.PPG_COMMUNITY_BROWSER!==name)continue;
     browser=await engine.launch(name==='chromium'&&process.platform==='darwin'?{channel:'chrome'}:{});
+    if(process.env.PPG_COMMUNITY_RECOVERY_ONLY==='1'){
+      await checkExampleRecovery(browser,name);results.browsers.push({name,checks:'replaced example opener focus; mixed gallery manifest failure and retry at one, seven and eight real paintings'});
+      await browser.close();browser=null;console.log(`COMMUNITY_EXAMPLE_RECOVERY_PASS ${name}`);continue;
+    }
     const context=await browser.newContext({...devices['iPhone 13'],viewport:{width:390,height:844},deviceScaleFactor:1,reducedMotion:'reduce'});
     const page=await context.newPage(),errors=[],requests=[],posts=[],reports=[],deletes=[],held=[];
     let items=[],listMode='empty',postMode='success',listCalls=0;
@@ -80,13 +127,24 @@ try{
     });
     await page.goto(url);await page.evaluate(()=>document.fonts.ready);await settle(page);
     assert.equal(requests.filter(r=>r.url.includes('/api/')||r.url.startsWith(BLOB)).length,0,'default phone has no community request');
+    assert.equal(requests.filter(r=>r.url.includes('/assets/gallery/')).length,0,'default phone does not preload fallback examples');
     await page.getByRole('button',{name:'Explore the paintings',exact:true}).click();await page.locator('.gallery-card').first().waitFor();
     assert.equal(listCalls,0,'example collection does not fetch community');assert.equal(await page.locator('.gallery-card').count(),16,'fixture examples retain all sixteen scenes');
     listMode='error';await page.locator('#gallery-tab-community').click();await page.getByRole('button',{name:'Try loading again',exact:true}).click({trial:true});
     assert.match(await page.locator('#community-status').innerText(),/unavailable/);
-    listMode='empty';await page.locator('#community-more').click();await page.locator('#community-empty').waitFor({state:'visible'});assert.equal(await page.locator('.community-card').count(),0,'honest empty gallery');
+    await page.waitForFunction(()=>document.querySelectorAll('.community-example-card').length===8);
+    listMode='empty';await page.locator('#community-more').click();await page.waitForFunction(()=>document.getElementById('community-grid').getAttribute('aria-busy')==='false');assert.equal(await page.locator('.community-card').count(),0,'examples are never represented as real shared paintings');
+    assert.equal(await page.locator('.community-example-card').count(),8,'empty community shows eight curated examples');
+    assert.deepEqual(await page.locator('.community-example-label').allTextContents(),Array(8).fill('Example'),'every fallback card has an explicit Example label');
+    const exampleIds=await page.locator('.community-example-card').evaluateAll(cards=>cards.map(card=>card.dataset.example));
+    assert.equal(new Set(exampleIds).size,8);for(const id of ['quiet-lake','alpine-peaks','aurora-night','sand-dunes'])assert.ok(exampleIds.includes(id),'fallback spans water, land and sky');
+    assert.equal(await page.locator('#community-status').innerText(),'');
+    await page.locator('.community-example-card').first().click();await page.locator('.gallery-lightbox').waitFor({state:'visible'});
+    assert.match(await page.locator('#gallery-dialog-note').innerText(),/public pulse recording/);assert.equal(new URL(page.url()).searchParams.get('collection'),'community');
+    await page.goBack();await page.locator('.gallery-lightbox').waitFor({state:'hidden'});assert.equal(await page.locator('#gallery-tab-community').getAttribute('aria-pressed'),'true');assert.equal(await page.locator('.community-example-card').first().evaluate(el=>el===document.activeElement),true,'example close restores its community opener');
+    await page.goForward();await page.locator('.gallery-lightbox').waitFor({state:'visible'});await page.locator('.gallery-dialog-close').click();await page.locator('.gallery-lightbox').waitFor({state:'hidden'});
     const widths=[];for(const width of[320,390,430])widths.push(await layout(page,width,'#community-gallery'));
-    await page.setViewportSize({width:390,height:844});await shot(page,`${name}-community-empty`);
+    await page.setViewportSize({width:390,height:844});await shot(page,`${name}-community-examples`);
 
     await report(page);await page.locator('.portrait-options input').check();await page.waitForFunction(()=>PulsePortrait.getState().ready);
     await openPublisher(page);assert.equal(await page.locator('#community-include-metrics').isChecked(),false,'public metrics do not inherit report export opt-in');assert.equal(await page.locator('#community-public-consent').isChecked(),false);assert.equal(await page.locator('.community-publish-submit').isDisabled(),true);assert.equal(posts.length,0,'opening preview does not upload');
@@ -123,6 +181,8 @@ try{
     assert.equal(await page.locator('.community-publish-dialog').isVisible(),false,'late receipt cannot reopen publisher');assert.equal(await page.locator('#screen-ready').isVisible(),true);
     postMode='success';listMode='pages';items=[makePainting(first.body.id,{displayName:first.body.displayName}),makePainting(ids[1],{displayName:'Another maker',metrics:{hr:70,rmssd:null,sdnn:42}})];
     await page.goto(`${url}?collection=community#landscapes`);await page.locator('.community-card').first().waitFor();assert.equal(await page.locator('.community-card').count(),1);await page.locator('#community-more').click();await page.waitForFunction(()=>document.querySelectorAll('.community-card').length===2);
+    await page.waitForFunction(()=>document.querySelectorAll('.community-example-card').length===6);
+    assert.deepEqual(await page.locator('#community-grid').evaluate(el=>[...el.children].map(card=>card.hasAttribute('data-painting')?'shared':'example')),['shared','shared',...Array(6).fill('example')],'real paintings appear first and replace examples as pages arrive');
     assert.equal(await page.locator('.community-card img').first().evaluate(img=>img.src.endsWith('/thumbnail.webp')),true,'backend thumbnail URL accepted');await page.locator('.community-card img').first().evaluate(img=>img.decode());
     assert.equal(await page.locator('.community-card-caption strong').first().innerText(),'<Ada & friends>','public name is plain text');assert.equal(await page.locator('.community-card-caption ada').count(),0);
     await page.locator('.community-card').first().click();await page.waitForFunction(()=>document.querySelector('.community-byline').textContent.includes('<Ada'));
@@ -155,8 +215,13 @@ try{
     assert.deepEqual(errors,[]);await context.close();
 
     const desktop=await browser.newContext({viewport:{width:1440,height:1000},deviceScaleFactor:1,reducedMotion:'reduce'}),desktopPage=await desktop.newPage();
-    await desktopPage.route('**/api/paintings**',route=>route.fulfill({json:{paintings:[],nextCursor:null}}));await desktopPage.goto(url);await desktopPage.locator('.gallery-card').first().waitFor();assert.equal(await desktopPage.locator('.gallery-card').count(),16);await desktopPage.locator('#gallery-tab-community').click();await desktopPage.locator('#community-empty').waitFor({state:'visible'});assert.equal(await desktopPage.evaluate(()=>document.documentElement.scrollWidth),1440);await shot(desktopPage,`${name}-desktop-community`);await desktop.close();
-    results.browsers.push({name,widths,checks:'consent, metrics isolation, pre-POST receipt, timeout/idempotency, late response, lazy/error/empty/pagination, backend thumbnail URL, public history, native gesture, report/removal, recovery fragment, desktop layout'});
+    await desktop.route(`${BLOB}/**`,route=>route.fulfill({body:route.request().url().endsWith('thumbnail.webp')?publicThumbnail:publicJpeg,contentType:route.request().url().endsWith('thumbnail.webp')?'image/webp':'image/jpeg'}));
+    let desktopPaintings=[];
+    await desktopPage.route('**/api/paintings**',route=>route.fulfill({json:{paintings:desktopPaintings,nextCursor:null}}));await desktopPage.goto(url);await desktopPage.locator('.gallery-card').first().waitFor();assert.equal(await desktopPage.locator('.gallery-card').count(),16);await desktopPage.locator('#gallery-tab-community').click();await desktopPage.waitForFunction(()=>document.querySelectorAll('.community-example-card').length===8);assert.equal(await desktopPage.evaluate(()=>document.documentElement.scrollWidth),1440);await shot(desktopPage,`${name}-desktop-community`);
+    desktopPaintings=Array.from({length:8},(_,i)=>makePainting(`77777777-7777-4777-8777-${String(i).padStart(12,'0')}`,{displayName:`Maker ${i+1}`}));
+    await desktopPage.reload();await desktopPage.waitForFunction(()=>document.querySelectorAll('.community-card').length===8&&document.querySelectorAll('.community-example-card').length===0);assert.equal(await desktopPage.locator('#community-grid > button').count(),8,'eight shared paintings fully replace the fallback examples');await desktop.close();
+    await checkExampleRecovery(browser,name);
+    results.browsers.push({name,widths,checks:'consent, metrics isolation, pre-POST receipt, timeout/idempotency, late response, lazy/error/examples/mixed pagination, example history and focus, backend thumbnail URL, public history, native gesture, report/removal, recovery fragment, desktop layout'});
     await browser.close();browser=null;console.log(`COMMUNITY_SHARING_PASS ${name}`);
   }
   if(out)writeFileSync(path.join(out,'result.json'),JSON.stringify(results,null,2));

@@ -1,4 +1,4 @@
-// Public paintings are separate from the fixture examples and local recordings.
+// Public paintings keep their identity beside clearly labeled fixture examples.
 // Only a reviewed raster and explicitly selected summary fields are submitted.
 (() => {
   'use strict';
@@ -10,8 +10,9 @@
   const BLOB_PATH=/^\/community\/[a-z0-9-]{1,48}\/[0-9a-f-]{36}\/[0-9a-f-]{36}\/(?:painting\.(?:jpg|png)|thumbnail\.webp)$/i;
   const byId=new Map(), drafts=new WeakMap(), memoryOwners=new Map();
   let hooks={},active=false,listLoaded=false,listBusy=false,cursor=null,listRequest=null,listVersion=0;
+  let examples=[],examplesLoaded=false,examplesPromise=null,listError='',exampleError='';
   let publishDialog=null,publishingView=null,publishVersion=0,viewer=null,viewVersion=0,viewRequest=null,viewed=null,viewOpener=null;
-  const grid=document.getElementById('community-grid'),status=document.getElementById('community-status'),more=document.getElementById('community-more'),empty=document.getElementById('community-empty');
+  const grid=document.getElementById('community-grid'),status=document.getElementById('community-status'),more=document.getElementById('community-more');
   const node=(tag,className,text)=>{const el=document.createElement(tag);if(className)el.className=className;if(text!=null)el.textContent=text;return el;};
   function readReceipts(){try{const value=JSON.parse(localStorage.getItem(STORAGE)||'{}');return value&&typeof value==='object'&&!Array.isArray(value)?value:{};}catch{return {};}}
   function receipt(id){return memoryOwners.get(id)||readReceipts()[id]||null;}
@@ -59,7 +60,40 @@
     card.setAttribute('aria-label',`Open painting shared by ${item.displayName||'Anonymous'}`);
     const frame=node('span','community-card-art'),img=node('img');img.src=item.thumbnailURL;img.alt=`A pulse painting shared by ${item.displayName||'Anonymous'}`;img.width=1080;img.height=1350;img.loading='lazy';img.decoding='async';frame.append(img,node('span','community-card-arrow','↗'));
     const caption=node('span','community-card-caption');caption.append(node('strong','',item.displayName||'Anonymous'),node('span','', 'Shared a moment'));
-    card.append(frame,caption);card.addEventListener('click',()=>hooks.openPainting?.(item.id,card));grid.append(card);
+    card.append(frame,caption);card.addEventListener('click',()=>hooks.openPainting?.(item.id,card));grid.insertBefore(card,grid.querySelector('[data-example]'));
+  }
+  function renderExamples(){
+    if(!active)return;
+    const count=Math.max(0,8-grid.querySelectorAll('[data-painting]').length),shown=examples.slice(0,count),wanted=new Set(shown.map(scene=>scene.id));
+    let restoreFocus=false;
+    for(const card of grid.querySelectorAll('[data-example]'))if(!wanted.has(card.dataset.example)){restoreFocus ||= card===document.activeElement;card.remove();}
+    for(const scene of shown){
+      if(grid.querySelector(`[data-example="${scene.id}"]`))continue;
+      const card=node('button','community-example-card');card.type='button';card.dataset.example=scene.id;card.setAttribute('aria-label',`Open ${scene.name} example`);
+      const frame=node('span','community-card-art'),img=node('img');img.src=scene.thumbnailURL;img.alt=`${scene.name}: an example made from a public pulse recording`;img.width=640;img.height=640;img.loading='lazy';img.decoding='async';
+      frame.append(img,node('span','community-example-label','Example'),node('span','community-card-arrow','↗'));
+      const caption=node('span','community-card-caption');caption.append(node('strong','',scene.name),node('span','','From a public pulse recording'));
+      card.append(frame,caption);card.addEventListener('click',()=>hooks.openExample?.(scene.id,card));grid.append(card);
+    }
+    if(restoreFocus)(grid.lastElementChild||document.getElementById('gallery-tab-community')).focus({preventScroll:true});
+  }
+  function syncListControls(){
+    const realCount=grid.querySelectorAll('[data-painting]').length;
+    const failed=listError||(realCount<8&&exampleError);
+    grid.setAttribute('aria-busy',String(listBusy||!!examplesPromise));
+    status.textContent=listBusy?'Gathering the shared paintings…':failed||'';
+    more.textContent=failed?'Try loading again':'More paintings';more.hidden=listBusy||(!cursor&&!failed);
+  }
+  function loadExamples(){
+    if(examplesLoaded){renderExamples();return;}
+    if(examplesPromise||!hooks.loadExamples)return;
+    exampleError='';
+    examplesPromise=Promise.resolve().then(()=>hooks.loadExamples()).then(value=>{
+      examples=value;examplesLoaded=true;renderExamples();
+    }).catch(()=>{exampleError='The example paintings could not load. Try loading the gallery again.';}).finally(()=>{
+      examplesPromise=null;if(active)syncListControls();
+    });
+    syncListControls();
   }
   function ownedLinks(){
     const section=document.getElementById('community-owned'),host=section.querySelector('div');host.replaceChildren();
@@ -74,20 +108,19 @@
   async function loadList({reset=false}={}){
     if(listBusy)return;
     const current=++listVersion;listRequest?.abort();listRequest=new AbortController();listBusy=true;more.hidden=true;
-    if(reset){cursor=null;listLoaded=false;grid.replaceChildren();byId.clear();}
-    grid.setAttribute('aria-busy','true');status.textContent='Gathering the shared paintings…';empty.hidden=true;
+    if(reset){cursor=null;listLoaded=false;grid.replaceChildren();byId.clear();renderExamples();}
+    listError='';syncListControls();
     const url=new URL('/api/paintings',location.origin);url.searchParams.set('limit','12');if(cursor)url.searchParams.set('cursor',cursor);
     try{
       const data=await request(url,{signal:listRequest.signal});
       if(current!==listVersion||!active)return;
       if(!Array.isArray(data.paintings))throw new Error('The gallery could not load. Please try again.');
       data.paintings.map(painting).forEach(addCard);cursor=typeof data.nextCursor==='string'?data.nextCursor:null;listLoaded=true;
-      status.textContent=grid.children.length?'':'A shared gallery begins with one painting.';empty.hidden=grid.children.length>0;
-      more.textContent='More paintings';more.hidden=!cursor;
-    }catch(error){if(error.name!=='AbortError'&&current===listVersion&&active){status.textContent=error.message||'The gallery could not load.';more.textContent='Try loading again';more.hidden=false;}}
-    finally{if(current===listVersion){listBusy=false;grid.setAttribute('aria-busy','false');}}
+      renderExamples();
+    }catch(error){if(error.name!=='AbortError'&&current===listVersion&&active)listError=error.message||'The gallery could not load.';}
+    finally{if(current===listVersion){listBusy=false;syncListControls();}}
   }
-  more.addEventListener('click',()=>loadList());
+  more.addEventListener('click',()=>{loadList();loadExamples();});
 
   function ensureViewer(){
     if(viewer)return;
@@ -147,7 +180,7 @@
     keep.addEventListener('click',()=>{panel.hidden=true;viewer.querySelector('.community-remove').focus();});
     remove.addEventListener('click',async()=>{
       remove.disabled=true;keep.disabled=true;const feedback=viewer.querySelector('.community-view-status');feedback.textContent='Removing the painting…';
-      try{await request(`/api/paintings?id=${item.id}`,{method:'DELETE',headers:{'Content-Type':'application/json'},body:JSON.stringify({ownerToken:credentials.ownerToken})});saveReceipt({...credentials,status:'removed'});byId.delete(item.id);grid.querySelector(`[data-painting="${item.id}"]`)?.remove();listLoaded=false;if(viewed?.id!==item.id)return;viewer.querySelector('img').removeAttribute('src');viewer.querySelector('.community-view-share').disabled=true;viewer.querySelector('.community-view-book').hidden=true;viewer.querySelector('.community-owner-actions').hidden=true;panel.hidden=true;feedback.textContent='Your painting has been removed from the gallery.';}
+      try{await request(`/api/paintings?id=${item.id}`,{method:'DELETE',headers:{'Content-Type':'application/json'},body:JSON.stringify({ownerToken:credentials.ownerToken})});saveReceipt({...credentials,status:'removed'});byId.delete(item.id);grid.querySelector(`[data-painting="${item.id}"]`)?.remove();renderExamples();listLoaded=false;if(viewed?.id!==item.id)return;viewer.querySelector('img').removeAttribute('src');viewer.querySelector('.community-view-share').disabled=true;viewer.querySelector('.community-view-book').hidden=true;viewer.querySelector('.community-owner-actions').hidden=true;panel.hidden=true;feedback.textContent='Your painting has been removed from the gallery.';}
       catch(error){if(viewed?.id===item.id){feedback.textContent=error.message;remove.disabled=false;keep.disabled=false;}}
     });remove.focus();
   }
@@ -279,8 +312,8 @@
   const arrival=new URL(location.href),recoveryToken=arrival.hash.match(/^#remove=([0-9a-f]{64})$/i)?.[1],recoveryId=arrival.searchParams.get('painting');
   if(recoveryToken&&UUID.test(recoveryId||'')){if(!owner(recoveryId))saveReceipt({id:recoveryId,ownerToken:recoveryToken.toLowerCase(),status:'published'});arrival.hash='landscapes';history.replaceState(history.state,'',arrival);}
   window.PulseCommunity=Object.freeze({
-    configure:value=>{hooks=value;},
-    show:({paintingId=null,opener=null}={})=>{active=true;ownedLinks();if(!listLoaded&&!listBusy)loadList({reset:true});if(paintingId)openPainting(paintingId,opener);else dismissViewer();},
+    configure:value=>{hooks=value;if(active)loadExamples();},
+    show:({paintingId=null,opener=null}={})=>{active=true;ownedLinks();if(!listLoaded&&!listBusy)loadList({reset:true});loadExamples();if(paintingId)openPainting(paintingId,opener);else dismissViewer();},
     hide:()=>{active=false;++listVersion;listRequest?.abort();listBusy=false;grid.setAttribute('aria-busy','false');dismissViewer();},
     dismiss:dismissViewer,openPublish,closePublication,
   });

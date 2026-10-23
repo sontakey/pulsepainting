@@ -28,7 +28,7 @@
 <div id="app" class="screen-host">
 
   <!-- More options: report downloads and session tools. -->
-  <button id="btn-debug-menu" class="debug-menu-trigger" type="button" aria-label="More options" aria-haspopup="dialog" aria-controls="debug-sheet" aria-expanded="false">&#8942;</button>
+  <button id="btn-debug-menu" class="debug-menu-trigger" type="button" aria-label="More options" aria-haspopup="dialog" aria-controls="debug-sheet" aria-expanded="false"><span>More</span><svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="4" cy="10" r="1.5"/><circle cx="10" cy="10" r="1.5"/><circle cx="16" cy="10" r="1.5"/></svg></button>
   <div id="debug-sheet-backdrop" class="debug-sheet-backdrop" hidden></div>
   <div id="debug-sheet" class="debug-sheet" hidden role="dialog" aria-modal="true" aria-label="More options">
     <div class="debug-sheet-handle"></div>
@@ -88,7 +88,7 @@
     <section class="gallery-hero" aria-labelledby="desktop-hero-title">
       <div class="gallery-hero-art" aria-hidden="true"><img id="gallery-hero-image" width="1080" height="1080" alt="" decoding="async"></div>
       <div class="gallery-hero-content">
-        <p class="gallery-eyebrow">A little art. A little science. Entirely you.</p>
+        <p class="gallery-eyebrow">Paint with your pulse. Create a keepsake that’s uniquely yours.</p>
         <div id="desktop-title-slot"></div>
         <p class="gallery-hero-description">Three quiet minutes. Your phone’s camera. A landscape painted by the rhythm of your own pulse.</p>
         <a class="gallery-paint-button" href="#paint-on-phone"><span>Paint with your pulse</span><span aria-hidden="true">↗</span></a>
@@ -97,7 +97,6 @@
       <aside id="paint-on-phone" class="phone-panel gallery-phone" aria-labelledby="phone-panel-title">
         <div class="phone-panel-copy"><p class="phone-panel-kicker">Your next quiet moment</p><h2 id="phone-panel-title">Begin on your phone.</h2><p>Scan with your phone’s camera.<br>We’ll guide you from there.</p></div>
         <figure class="phone-panel-code"><div class="phone-qr-paper"><img id="phone-qr" width="246" height="246" alt="QR code to open Pulse Painting at pulsepainting.com"></div><figcaption>Rear camera + flash · About 3 minutes</figcaption></figure>
-        <a class="phone-panel-link" href="https://www.pulsepainting.com/">pulsepainting.com <span aria-hidden="true">↗</span></a>
       </aside>
       <div class="gallery-hero-bottom"><a href="#landscapes">Discover the landscapes <span aria-hidden="true">↓</span></a><p><span id="gallery-hero-scene">Quiet lake</span> · An example from a public recording</p></div>
     </section>
@@ -112,18 +111,20 @@
       <p class="gallery-example-note">Example landscapes made from a public pulse recording. Your painting comes from your own rhythm.</p>
       </div>
       <section id="community-gallery" class="community-gallery" aria-label="Community paintings" hidden>
-        <p class="community-intro">A moment from someone’s world. Paintings shared by choice, each with its own rhythm.</p>
+        <p class="community-intro">Shared moments and a few places to begin. Find a little inspiration for your own painting.</p>
         <details id="community-owned" class="community-owned" hidden><summary>Your painting links on this device</summary><div></div></details>
         <div id="community-grid" class="community-grid"></div>
-        <div id="community-empty" class="community-empty" hidden><span aria-hidden="true">〰</span><h3>A little space for a first painting.</h3><p>No paintings have been shared yet. Make your own, then choose whether to add it here.</p></div>
         <p id="community-status" class="community-status" role="status" aria-live="polite"></p>
         <button id="community-more" class="community-more" type="button" hidden>More paintings</button>
-        <p class="community-note">These paintings are shared by their makers. Names are optional; measurements appear only when selected for publication. Art does not measure health.</p>
       </section>
     </section>
     <section class="gallery-process" id="how-it-works" aria-labelledby="process-title">
       <div class="gallery-section-heading"><div><p class="gallery-eyebrow">From a heartbeat to a keepsake</p><h2 id="process-title">A moment worth making.</h2></div><a class="gallery-text-link" href="#paint-on-phone">Make your own <span aria-hidden="true">↗</span></a></div>
-      <ol class="gallery-process-steps"><li><span class="gallery-step-index">01</span><h3>Find a quiet rhythm.</h3><p>On your phone, gently cover the rear camera and flash with a fingertip. The guided preview helps you find a clear signal.</p></li><li><span class="gallery-step-index">02</span><h3>Let your pulse paint.</h3><p>Hold still and breathe normally. Your pulse strokes shape the scenery, then the view pulls back to reveal the whole painting.</p></li><li><span class="gallery-step-index">03</span><h3>Keep a piece of the moment.</h3><p>Save your artwork or choose to share it. A separate report lets you explore your pulse and heart-rate variability.</p></li></ol>
+      <ol class="gallery-process-steps">
+        <li><div class="gallery-step-art" aria-hidden="true"><img data-step-art="01-find-rhythm" width="960" height="720" decoding="async" fetchpriority="low" alt=""></div><span class="gallery-step-index">01</span><h3>Find a quiet rhythm.</h3><p>On your phone, gently cover the rear camera and flash with a fingertip. The guided preview helps you find a clear signal.</p></li>
+        <li><div class="gallery-step-art" aria-hidden="true"><img data-step-art="02-pulse-paints" width="960" height="720" decoding="async" fetchpriority="low" alt=""></div><span class="gallery-step-index">02</span><h3>Let your pulse paint.</h3><p>Hold still and breathe normally. Your pulse strokes shape the scenery, then the view pulls back to reveal the whole painting.</p></li>
+        <li><div class="gallery-step-art" aria-hidden="true"><img data-step-art="03-keepsake" width="960" height="720" decoding="async" fetchpriority="low" alt=""></div><span class="gallery-step-index">03</span><h3>Keep a piece of the moment.</h3><p>Save your artwork or choose to share it. A separate report lets you explore your pulse and heart-rate variability.</p></li>
+      </ol>
       <div class="gallery-trust-line"><p>Your recording stays in your browser. Sharing is always your choice.</p><p class="phone-panel-disclaimer">For art and personal curiosity. Not a medical device or a diagnosis. Color and scenery do not measure health.</p></div>
     </section>
     <section class="gallery-last-note"><p>A place only your pulse could paint.</p><a class="gallery-paint-button" href="#paint-on-phone"><span>Take three minutes for yourself</span><span aria-hidden="true">↗</span></a></section>
@@ -156,8 +157,19 @@
   <!-- MEASURING -->
   <section id="screen-measuring" class="screen capture-screen" data-screen="measuring" hidden>
     <div class="content measuring-content">
-      <div class="capture-topline"><div class="capture-heading"><h2 class="capture-title">Pulse Painting</h2></div></div>
-      <div class="painting-status"><div class="quality-pill" id="quality-pill"><span id="quality-dot" class="quality-dot"></span><div role="status" aria-live="polite" aria-atomic="true"><strong id="painting-state">Waiting for clear signal</strong><span id="quality-text">Settling</span></div></div><p id="session-countdown" class="session-countdown">3:00</p><figure class="capture-camera"><div id="capture-camera-preview" class="camera-feed" aria-label="Live rear camera preview"></div><figcaption><span aria-hidden="true"></span>Live</figcaption></figure></div>
+      <div class="capture-topline">
+        <div class="capture-heading">
+          <h2 class="capture-title">Pulse Painting</h2>
+          <div class="painting-status">
+            <strong id="painting-state" role="status" aria-live="polite" aria-atomic="true">Waiting for clear signal</strong>
+            <p class="capture-time"><span id="session-countdown" class="session-countdown">3:00</span><span class="countdown-label">remaining</span></p>
+          </div>
+        </div>
+        <div class="capture-monitor">
+          <figure class="capture-camera"><div id="capture-camera-preview" class="camera-feed" aria-label="Live rear camera preview"></div><figcaption><span aria-hidden="true"></span>Live</figcaption></figure>
+          <div class="quality-pill" id="quality-pill"><span id="quality-dot" class="quality-dot" aria-hidden="true"></span><span id="quality-text" role="status" aria-live="polite" aria-atomic="true">Settling</span></div>
+        </div>
+      </div>
       <div class="manuscript-frame"><div id="landscape-view" aria-label="A close-up of your accepted pulse strokes painting a landscape"></div><canvas id="manuscript" width="1000" height="840" aria-label="Your pulse manuscript. Deeper pigment represents clearer measured recording quality." hidden></canvas><p id="manuscript-empty">Your first brushstroke is on its way.<br><span>Hold still while we check the signal.</span></p></div>
       <div class="live-metrics" aria-label="Live measurements">
         <div class="live-metric"><span class="metric-label">Pulse</span><p><span id="hr-value" class="metric-number">--</span><span class="metric-unit">bpm</span></p></div>

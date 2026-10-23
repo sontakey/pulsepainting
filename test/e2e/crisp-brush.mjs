@@ -81,6 +81,79 @@ for(const engine of engines){
    }
    return results;
   },{regular:recording.segments,fragmented:fragmented.segments});
+  // Drive presentation at known intervals, without making a wall-clock frame
+  // rate claim. Scenic work may skip frames; measured ink must not share that
+  // slower clock, and explicit rest boundaries must expose an exact raster.
+  result.cadence=await page.evaluate(segments=>{
+   const scene=PulseLandscape.create({family:'quiet-lake',seed:39293});
+   segments.forEach(segment=>PulseLandscape.append(scene,segment));
+   const before=JSON.stringify(scene),view=PulseLandscape.createView(document.querySelector('main'),scene);
+   if(!Number.isFinite(__pulseLandscapeStats.rasterFrames)||!Number.isFinite(__pulseLandscapeStats.rasterProgress))throw Error('Scenic raster cadence must be observable separately from the measured foreground');
+   const observations={frames:0,skippedForegroundAdvances:0,slowSkippedAdvances:0,maxPresentationLagMs:0,maxEndpointError:0,maxCameraStep:0,phases:[]};
+   let previous=null;
+   const step=dt=>{
+    if(!advancePaint(dt))throw Error('Cadence recording exhausted before the lifecycle checks');
+    const stats=__pulseLandscapeStats,state=view.captureState,core=document.querySelector('.landscape-live-core');
+    const current={painted:state.painted,progress:state.progress,rasterFrames:stats.rasterFrames,frontier:stats.frontier?.t,path:core.getAttribute('d'),camera:{...stats.camera}};
+    observations.frames++;
+    if(stats.nib&&!stats.settling&&state.progress>0){
+     const end=core.getPointAtLength(core.getTotalLength());
+     observations.maxEndpointError=Math.max(observations.maxEndpointError,Math.hypot(end.x-stats.nib.x,end.y-stats.nib.y));
+     if(stats.rasterPainted!==state.painted)throw Error('The scenic raster belongs to an obsolete stroke');
+     const lag=(state.progress-stats.rasterProgress)*(stats.playbackMs-stats.settleDurationMs);
+     if(lag< -1e-7)throw Error('Scenic pigment advanced beyond the measured foreground');
+     observations.maxPresentationLagMs=Math.max(observations.maxPresentationLagMs,lag);
+     if(previous&&previous.painted===state.painted&&state.progress>previous.progress&&stats.rasterFrames===previous.rasterFrames){
+      if(current.path===previous.path||!(current.frontier>previous.frontier))throw Error('Measured ink stopped when only scenic paint was skipped');
+      observations.skippedForegroundAdvances++;
+      if(stats.rasterIntervalMs>=49)observations.slowSkippedAdvances++;
+     }
+    }
+    if(previous)observations.maxCameraStep=Math.max(observations.maxCameraStep,Math.hypot(current.camera.x-previous.camera.x,current.camera.y-previous.camera.y));
+    previous=current;
+   };
+   const phase=(name,frames,dt)=>{
+    const before={frames:__pulseLandscapeStats.frames,rasters:__pulseLandscapeStats.rasterFrames,skips:__pulseLandscapeStats.rasterSkipped};
+    for(let i=0;i<frames;i++)step(dt);
+    const stats=__pulseLandscapeStats,result={name,interval:stats.rasterIntervalMs,foregroundFrames:stats.frames-before.frames,rasterFrames:stats.rasterFrames-before.rasters,skips:stats.rasterSkipped-before.skips};
+    observations.phases.push(result);return result;
+   };
+   const normal=phase('normal',60,1000/60);
+   phase('brief interruption',2,1000/30);
+   const briefRecovery=phase('brief recovery',20,1000/60);
+   const pressure=phase('sustained pressure',36,1000/30);
+   const seekStaleFrame=()=>{
+    for(let i=0;i<30;i++){
+     step(1000/60);const stats=__pulseLandscapeStats,state=view.captureState;
+     if(!stats.settling&&state.progress>0&&stats.rasterPainted===state.painted&&state.progress-stats.rasterProgress>1e-7)return {...state};
+    }
+    throw Error('No deferred scenic frame was available to test the explicit flush');
+   };
+   const pausedState=seekStaleFrame(),beforePauseRaster=__pulseLandscapeStats.rasterFrames;
+   view.pause(true);
+   const pause={flushed:__pulseLandscapeStats.rasterFrames>beforePauseRaster,exact:__pulseLandscapeStats.rasterPainted===pausedState.painted&&__pulseLandscapeStats.rasterProgress===pausedState.progress,pending:pendingPaint()};
+   const pausedFrames=__pulseLandscapeStats.frames,pausedImage=view.canvas.toDataURL();
+   advancePaint(5000);pause.stable=__pulseLandscapeStats.frames===pausedFrames&&view.canvas.toDataURL()===pausedImage;
+   view.pause(false);
+   const resume=phase('early resume',15,1000/60),recovered=phase('sustained recovery',150,1000/60);
+   const hiddenState=seekStaleFrame(),beforeHiddenRaster=__pulseLandscapeStats.rasterFrames;
+   Object.defineProperty(document,'hidden',{configurable:true,get:()=>true});document.dispatchEvent(new Event('visibilitychange'));
+   const hidden={flushed:__pulseLandscapeStats.rasterFrames>beforeHiddenRaster,exact:__pulseLandscapeStats.rasterPainted===hiddenState.painted&&__pulseLandscapeStats.rasterProgress===hiddenState.progress,pending:pendingPaint()};
+   const hiddenFrames=__pulseLandscapeStats.frames;advancePaint(5000);hidden.stable=__pulseLandscapeStats.frames===hiddenFrames;
+   delete document.hidden;document.dispatchEvent(new Event('visibilitychange'));step(1000/60);
+   hidden.recovered=__pulseLandscapeStats.frames>hiddenFrames;
+   const output={...observations,normal,briefRecovery,pressure,resume,recovered,pause,hidden,sourceStable:JSON.stringify(scene)===before};
+   view.dispose();return output;
+  },recording.segments);
+  assert.ok(result.cadence.normal.interval>=33&&result.cadence.normal.interval<=34&&result.cadence.normal.skips>0,'normal presentation budgets scenic raster work to 30 Hz');
+  assert.equal(result.cadence.briefRecovery.interval,result.cadence.normal.interval,'one brief presentation interruption does not lower scenic cadence');
+  assert.ok(result.cadence.pressure.interval>=49&&result.cadence.pressure.interval<=50.1&&result.cadence.slowSkippedAdvances>0,'sustained presentation pressure reduces only scenic raster work to 20 Hz');
+  assert.equal(result.cadence.resume.interval,result.cadence.pressure.interval,'resuming does not immediately oscillate the scenic budget');
+  assert.equal(result.cadence.recovered.interval,result.cadence.normal.interval,'sustained healthy presentation restores scenic cadence');
+  assert.ok(result.cadence.skippedForegroundAdvances>20&&result.cadence.maxEndpointError<.03&&result.cadence.maxPresentationLagMs<=50.01,'real source ink and attached nib advance through skipped scenic frames with at most 50 ms presentation lag');
+  assert.deepEqual(result.cadence.pause,{flushed:true,exact:true,pending:0,stable:true},'pause flushes the current exact pigment once and leaves no scheduled work');
+  assert.deepEqual(result.cadence.hidden,{flushed:true,exact:true,pending:0,stable:true,recovered:true},'visibility interruption flushes the exact pigment and resumes without hidden catch-up');
+  assert.ok(result.cadence.maxCameraStep<250&&result.cadence.sourceStable,'raster budgeting preserves source data and continuous camera damping');
   const families=await page.evaluate(()=>PulseLandscape.FAMILIES);
   for(const family of families){
    const item=await page.evaluate(({family,segments})=>{
