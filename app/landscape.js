@@ -1231,15 +1231,6 @@
       stats.frontier=frontier;stats.cameraBaseline={...baseline};stats.visibleSeconds=visibleSeconds;
       return {x:clamp(baseline.x,margin,WORLD-margin),y:clamp(baseline.y,margin,WORLD-margin),scale};
     }
-    function keepBrushInFrame(active){
-      const point=strokeFrontier(active,progress);if(!point)return;
-      const head=screenPoint(point),size=Math.min(box.width,box.height),unit=size/WORLD*camera.scale;
-      const inset=Math.min(28,size*.09);
-      // The slow guide can lag at a curved bank or a new layer. Intervene only
-      // at the outer paper margin, rather than moving with every pulse crest.
-      camera.x+=(head.x-clamp(head.x,inset,box.width-inset))/unit;
-      camera.y+=(head.y-clamp(head.y,inset,box.height-inset))/unit;
-    }
     function transform(){
       const size=Math.min(box.width,box.height),left=(box.width-size)/2,top=(box.height-size)/2;
       stage.style.width=stage.style.height=`${size}px`;
@@ -1297,10 +1288,10 @@
         stats.playbackMs=budget;stats.settleDurationMs=settleDuration;
         progress=clamp(progress+delta/duration,0,1);
         target=reduced?fitCamera():followStroke(active);
-        // The view follows only the slow terrain guide, never a pulse crest.
-        // This leaves the measured upstroke and decay still enough to read.
+        // The foreground brush has its own screen-space projection. Let the
+        // scenery follow only this damped guide, including distant new layers;
+        // snapping to an offscreen scenic frontier would bypass that damping.
         const damp=1-Math.exp(-delta/850);camera={x:mix(camera.x,target.x,damp),y:mix(camera.y,target.y,damp),scale:mix(camera.scale,target.scale,damp)};
-        if(!reduced)keepBrushInFrame(active);
         paintFrame();transform();
         if(progress>=1){
           if(finishing||!settleDuration)completeStroke(active);

@@ -12,7 +12,7 @@ import { replayPublicFixture } from '../landscape-fixture.mjs';
 const root=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'../..');
 const out=path.resolve(root,process.env.PPG_BRUSH_ARTIFACTS||'.dream-loop/crisp-brush/verification');
 mkdirSync(out,{recursive:true});
-const source=readFileSync(path.join(root,'app/landscape.js'),'utf8');
+const source=readFileSync(path.resolve(root,process.env.PPG_BRUSH_SOURCE||'app/landscape.js'),'utf8');
 const marker='sync();return {sync,pause,finish,cancelFinish,dispose,canvas,';
 assert.equal(source.split(marker).length,2,'observe presentation without replacing its paint loop');
 const observed=source.replace(marker,'sync();return {get captureState(){return {painted,progress};},sync,pause,finish,cancelFinish,dispose,canvas,');
@@ -87,9 +87,15 @@ for(const engine of engines){
     window.view?.dispose();window.scene=PulseLandscape.create({family:family.id,seed:39293});
     segments.slice(0,7).forEach(segment=>PulseLandscape.append(scene,segment));
     const before=JSON.stringify(scene);window.view=PulseLandscape.createView(document.querySelector('main'),scene);
-    const target=scene.strokes.length-1,frames=[];
+    const target=scene.strokes.length-1,frames=[],cameraSteps={samples:0,maxContinuousStep:0,worst:null};
+    let previousCamera=null,previousStroke=0;
     for(let i=0;i<12000;i++){
-     const state=view.captureState;
+     const state=view.captureState,camera={...__pulseLandscapeStats.camera};
+     if(previousCamera){
+      const step=Math.hypot(camera.x-previousCamera.x,camera.y-previousCamera.y);cameraSteps.samples++;
+      if(step>cameraSteps.maxContinuousStep){cameraSteps.maxContinuousStep=step;cameraSteps.worst={fromStroke:previousStroke,toStroke:state.painted,from:previousCamera,to:camera};}
+     }
+     previousCamera=camera;previousStroke=state.painted;
      if(state.painted===target&&state.progress>=.12&&state.progress<=.88){
       const core=document.querySelector('.landscape-live-core'),tip=document.querySelector('.landscape-tip'),ink=document.querySelector('.landscape-ink');
       const end=core.getPointAtLength(core.getTotalLength()),bounds=tip.getBoundingClientRect(),container=document.querySelector('main').getBoundingClientRect();
@@ -105,10 +111,11 @@ for(const engine of engines){
      if(!advancePaint())throw Error('The active paint queue stopped before the sampled source frontier');
     }
     if(frames.length<8)throw Error('No sustained active stroke was observed');
-    return{family:family.id,sourceStable:before===JSON.stringify(scene),frames,sourceEnd:scene.strokes[target].sourceEnd,state:view.captureState};
+    return{family:family.id,sourceStable:before===JSON.stringify(scene),frames,cameraSteps,sourceEnd:scene.strokes[target].sourceEnd,state:view.captureState};
    },{family,segments:recording.segments});
    assert.equal(item.sourceStable,true);
    const issues=new Set(),check=(condition,message)=>{if(!condition)issues.add(message)};
+   check(item.cameraSteps.samples>20&&item.cameraSteps.maxContinuousStep<250,`${family.id}: healthy frames damp camera movement across distant stroke boundaries`);
    for(const frame of item.frames){
     check(frame.inkVisible&&frame.nib,`${family.id}: the ongoing stroke has visible ink and a brush tip`);
     check(frame.nib&&Math.hypot(frame.core.x-frame.nib.x,frame.core.y-frame.nib.y)<.03,`${family.id}: pointed brush contacts the exact end of the drawn pulse`);
@@ -193,6 +200,26 @@ for(const engine of engines){
   assert.ok(result.settling.frames.every(frame=>frame.progress===1&&frame.frontier===result.settling.sourceEnd&&frame.endpointError<1e-7),'settling transforms the same completed pulse without advancing or inventing samples');
   assert.ok(result.settling.elapsed<=result.settling.expectedMs+40,'settling fits inside source playback time instead of adding delay to every stroke');
   assert.equal(result.settling.sourceStable,true,'settling retains the exact canonical scene for exports');
+  // Traverse the full accepted recording quickly through the normal backlog
+  // playback. Sampling only the middle of one line misses a hard camera jump
+  // when the next real stroke belongs to a distant layer. Every stepped frame
+  // remains a healthy 60 Hz frame; this is correctness, not wall-clock timing.
+  result.cameraTraversal=await page.evaluate(segments=>{
+   const scene=PulseLandscape.create({family:'quiet-lake',seed:39293});segments.forEach(segment=>PulseLandscape.append(scene,segment));
+   const before=JSON.stringify(scene),view=PulseLandscape.createView(document.querySelector('main'),scene);
+   const result={samples:0,transitions:0,maxContinuousStep:0,worst:null,strokes:scene.strokes.length};
+   let previous={...__pulseLandscapeStats.camera},previousStroke=0;
+   for(let i=0;i<15000&&view.captureState.painted<scene.strokes.length;i++){
+    if(!advancePaint())throw Error('Full-recording camera traversal stopped while accepted strokes remained');
+    const current={...__pulseLandscapeStats.camera},stroke=view.captureState.painted,step=Math.hypot(current.x-previous.x,current.y-previous.y);
+    result.samples++;if(stroke!==previousStroke)result.transitions++;
+    if(step>result.maxContinuousStep){result.maxContinuousStep=step;result.worst={fromStroke:previousStroke,toStroke:stroke,from:previous,to:current};}
+    previous=current;previousStroke=stroke;
+   }
+   result.complete=view.captureState.painted===scene.strokes.length;result.sourceStable=JSON.stringify(scene)===before;view.dispose();return result;
+  },recording.segments);
+  assert.ok(result.cameraTraversal.complete&&result.cameraTraversal.transitions>30&&result.cameraTraversal.sourceStable,'full-recording traversal crosses distant real stroke layers without altering source');
+  assert.ok(result.cameraTraversal.maxContinuousStep<250,'healthy frames damp scene camera movement across the full accepted recording');
   assert.deepEqual(result.errors,[]);
   assert.deepEqual(result.failures,[],'all scene families preserve readable active ink, a visible pointed brush and calm bounded framing');
   result.passed=true;
