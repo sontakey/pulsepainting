@@ -1,4 +1,5 @@
-// Reproducible browser benchmark for the optional paint compositor.
+// Reproducible browser benchmark: optional GPU entry compositor plus the
+// cached Canvas2D landscape and compositor-driven camera.
 // npm run build && node test/e2e/paint-performance.mjs
 // PPG_PERF_URL=http://127.0.0.1:5173 tests the host's script URLs.
 // Camera I/O is mocked; the streaming engine and monitor callbacks are real.
@@ -9,12 +10,18 @@ import { readFileSync, existsSync, statSync, mkdirSync, writeFileSync } from 'no
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { chromium, devices } from 'playwright';
+import { selectReplayLandscape } from './landscape-selection.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const log = JSON.parse(readFileSync(process.env.PPG_SESSION_LOG || path.join(root, 'test/fixtures/iphone-200s.json'), 'utf8'));
 const duration = Math.max(5, Number(process.env.PPG_PERF_SECONDS) || 20);
 // The checked-in recording's first accepted window ends at 36.337 seconds.
-const preloadSeconds = 40;
+const preloadSeconds = Number(process.env.PPG_PERF_PRELOAD) || 40;
+const family = process.env.PPG_PERF_FAMILY || 'quiet-lake';
+const seed = Number(process.env.PPG_PERF_SEED) || 39293;
+const availableSeconds = (log.samples.at(-1).t - log.samples[0].t) / 1000;
+assert.ok(preloadSeconds >= 40 && preloadSeconds + duration <= availableSeconds,
+  'performance interval must contain accepted, actually recorded samples');
 const output = path.resolve(root, process.env.PPG_PERF_ARTIFACTS || '.dream-loop/gpu-performance');
 mkdirSync(output, { recursive: true });
 const mime = { '.html': 'text/html', '.js': 'application/javascript', '.css': 'text/css', '.woff2': 'font/woff2' };
@@ -44,6 +51,7 @@ function timing(values) {
   };
 }
 async function installReplay(page) {
+  await selectReplayLandscape(page, family, seed);
   await page.evaluate(log => {
     window.PPGMonitor = class extends PPG.PPGMonitor {
       constructor(host, options) {
@@ -97,7 +105,7 @@ async function installReplay(page) {
   }, log);
 }
 let browser;
-const results = { generatedAt: new Date().toISOString(), scope: 'Desktop Chrome with mobile viewport and real streaming replay; camera I/O mocked; no physical-phone or GPU execution-time claim.', threeVersion: JSON.parse(readFileSync(path.join(root, 'node_modules/three/package.json'), 'utf8')).version, viewport: { width: 390, height: 844, deviceScaleFactor: 3 }, preloadSeconds, durationSeconds: duration, cases: [] };
+const results = { generatedAt: new Date().toISOString(), scope: 'Desktop Chrome with mobile viewport and real streaming replay; camera I/O mocked; no physical-phone or GPU execution-time claim.', threeVersion: JSON.parse(readFileSync(path.join(root, 'node_modules/three/package.json'), 'utf8')).version, viewport: { width: 390, height: 844, deviceScaleFactor: 3 }, family, seed, preloadSeconds, durationSeconds: duration, cases: [] };
 try {
   browser = await chromium.launch(process.env.PPG_CHROMIUM ? { executablePath: process.env.PPG_CHROMIUM } : process.platform === 'darwin' ? { channel: 'chrome' } : {});
   results.browser = await browser.version();
@@ -115,7 +123,7 @@ try {
     const context = await browser.newContext({ ...devices['iPhone 13'], viewport: { width: 390, height: 844 }, deviceScaleFactor: 3, reducedMotion: 'no-preference' });
     const page = await context.newPage(), errors = [], consoleErrors = [];
     page.on('pageerror', error => errors.push(String(error)));
-    page.on('console', message => { if (message.type() === 'error') consoleErrors.push(message.text()); });
+    page.on('console', message => { if (message.type() === 'error') consoleErrors.push(`${message.text()} [${message.location().url ? new URL(message.location().url).pathname : 'console'}]`); });
     const url = new URL(baseURL);
     if (test.backend === 'webgl2') url.searchParams.set('paintBackend', 'webgl2');
     await page.goto(url.href);
@@ -134,29 +142,34 @@ try {
     const entry = await page.evaluate(() => window.__entryPerf);
     assert.ok(!entry.timedOut && entry.frames > 10, `${name}: entry animation rendered and completed`);
     await page.evaluate(seconds => monitor.feedUntil(seconds), preloadSeconds);
+    assert.equal(await page.evaluate(() => landscape.family), family, `${name}: selected landscape is active`);
     assert.ok(await page.evaluate(() => manuscript.segments.length > 0), `${name}: accepted replay waveform is present`);
     const replay = await page.evaluate(({ seconds, preload }) => new Promise(resolve => {
       const intervals = [], activeIntervals = [], renderCPU = [], engineCPU = [];
-      const started = performance.now(), initialFrames = window.__paintGpuStats.surfaces.manuscript.frames;
+      const started = performance.now(), initialFrames = window.__pulseLandscapeStats.frames;
       const initialSegments = manuscript.segments.length, initialSamples = monitor.i;
-      let previous = 0, previousDraw = 0, previousFrames = initialFrames;
+      let previous = 0, previousDraw = 0, previousFrames = initialFrames, previousDrawWasActive = false;
       function frame(now) {
         if (previous) intervals.push(now - previous);
         previous = now;
         const began = performance.now(); monitor.feedUntil(preload + (now - started) / 1000); engineCPU.push(performance.now() - began);
-        const surface = window.__paintGpuStats.surfaces.manuscript;
+        const surface = window.__pulseLandscapeStats;
         if (surface.frames > previousFrames) {
-          // >100ms is an intentional idle period between validated windows.
-          if (previousDraw && now - previousDraw < 100) activeIntervals.push(now - previousDraw);
+          // Use actual renderer state to exclude idle windows. Keep long active
+          // intervals: a main-thread stall must remain visible in the results.
+          if (previousDraw && previousDrawWasActive) activeIntervals.push(now - previousDraw);
           previousDraw = now; previousFrames = surface.frames; renderCPU.push(surface.frameMs);
         }
+        previousDrawWasActive = surface.active;
         if (now - started >= seconds * 1000) resolve({ intervals, activeIntervals, renderCPU, engineCPU, frames: surface.frames - initialFrames, elapsedMs: now - started, initialSegments, finalSegments: manuscript.segments.length, samplesFed: monitor.i - initialSamples, surface: { ...surface }, stats: JSON.parse(JSON.stringify(window.__paintGpuStats)) });
         else requestAnimationFrame(frame);
       }
       requestAnimationFrame(frame);
     }), { seconds: duration, preload: preloadSeconds });
-    assert.ok(replay.frames > duration * 10, `${name}: GPU renders actual live reveal`);
+    assert.ok(replay.frames > duration * 10, `${name}: cached landscape renders actual live reveal`);
     assert.ok(replay.finalSegments > replay.initialSegments && replay.samplesFed > duration * 20, `${name}: real engine keeps accepting waveform during measurement`);
+    assert.ok(replay.surface.cachedPixels <= replay.surface.pixelBudget, `${name}: live landscape raster is bounded independently of session length`);
+    assert.ok(replay.surface.materialPixels <= replay.surface.materialPixelBudget, `${name}: pigment canvases and immutable patterns stay bounded`);
     assert.equal(replay.stats.ready, true, `${name}: GPU remains available`);
     for (const [surfaceName, surface] of Object.entries(replay.stats.surfaces)) {
       assert.equal(surface.backend, test.backend, `${name}/${surfaceName}: backend remains active`);
@@ -165,7 +178,7 @@ try {
     assert.deepEqual(errors, [], `${name}: no runtime errors`);
     assert.deepEqual(consoleErrors, [], `${name}: no browser console errors`);
     await cdp.send('Emulation.setCPUThrottlingRate', { rate: 1 });
-    await page.screenshot({ path: path.join(output, `${name}-manuscript.png`) });
+    await page.screenshot({ path: path.join(output, `${name}-landscape.png`) });
     const result = {
       ...test, actualBackend,
       entry: { cadence: timing(entry.intervals), frames: entry.frames, elapsedMs: Math.round(entry.elapsedMs), submissionCPU: { p50Ms: percentile(entry.cpu, .5), p95Ms: percentile(entry.cpu, .95), maxMs: percentile(entry.cpu, 1) }, surface: entry.surface },
@@ -174,7 +187,7 @@ try {
     };
     results.cases.push(result);
     writeFileSync(path.join(output, 'results.json'), JSON.stringify(results, null, 2) + '\n');
-    console.log(JSON.stringify({ name, entry: result.entry.cadence, replay: result.replay.raf, paint: result.replay.activePaintCadence, submissionP95Ms: result.replay.submissionCPU.p95Ms, pixels: result.replay.surface.pixels }));
+    console.log(JSON.stringify({ name, entry: result.entry.cadence, replay: result.replay.raf, paint: result.replay.activePaintCadence, submissionP95Ms: result.replay.submissionCPU.p95Ms, pixels: result.replay.surface.cachedPixels }));
     await context.close();
   }
   // A separate visual run avoids screenshot readback affecting timing samples.
@@ -187,7 +200,7 @@ try {
   await page.waitForTimeout(350);
   await page.screenshot({ path: path.join(output, 'entry-spreading.png') });
   await context.close();
-  console.log(`PASS: real replay rendered on requested GPU backends; results in ${path.relative(root, output)}/results.json. Frame rates are measurements, not a universal CI guarantee.`);
+  console.log(`PASS: entry used requested GPU backends; real replay painted the cached landscape; results in ${path.relative(root, output)}/results.json. Frame rates are measurements, not a universal CI guarantee.`);
 } finally {
   await browser?.close();
   await new Promise(resolve => server.close(resolve));

@@ -1,0 +1,9 @@
+# Pigment material
+
+The source image was generated with the built-in image generation tool on October 22, 2026. It is a monochrome material field only: no scenery, waveform or biometric content. The actual landscape geometry remains derived from accepted source samples and the documented artistic terrain mapping.
+
+Source: `pigment-source-v1.png`. The renderer embeds a 256×256 scalar alpha field sampled from this source. It needs no image request or asynchronous decoding during capture. Luminance was normalized using the 1st/99th percentiles (146/198), mapped to transparent pigment strength, and encoded as base64. The material is repeated without stretching, tinted by the existing continuous pigment palette and clipped to source-bounded paint supports. Fine texture is visible within the paint; it does not introduce extra contour paths.
+
+## Generation prompt
+
+Use case: stylized-concept. Asset type: seamless grayscale watercolor pigment material texture for a procedural canvas renderer. Generate one square, flat, full-bleed macro scan of real watercolor pigment granulating on cold-pressed paper. No depicted objects, scenery, brushstroke silhouettes, lines, borders, text or symbols. Monochrome neutral gray. Mostly middle-light gray with extremely fine irregular paper tooth, soft capillary branching, subtle granular settling and small broken pigment pools. The texture must feel like authentic transparent watercolor, not marble, clouds, sponge, smoke, fractal noise or rocky terrain. Fine realistic paper fibers and pigment granules; broad low-frequency value changes are very subtle. Uniform lighting, no shadows or perspective. Seamless repeating texture with matching edges, square composition. This is only a material field, not artwork, so avoid any recognizable marks or composition.

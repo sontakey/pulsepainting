@@ -92,14 +92,13 @@ export async function checkCaptureEntry(browser, url) {
       assert.equal(await page.evaluate(() => entryTransition?.kind), 'capture', 'accepted signal uses a lighter brush pass');
       await page.waitForFunction(() => entryTransition === null);
       await page.evaluate(() => {reportArtworkReady=new Promise(resolve=>window.__finishPrepareResolve=resolve);showScreen('summary');});
-      assert.equal(await page.evaluate(() => entryTransition?.preparing), true, 'finish holds a static veil while artwork is being prepared');
-      assert.equal(await page.evaluate(() => entryTransition?.kind), 'finish', 'report arrives through a finishing wash');
-      assert.equal(await page.locator('#screen-summary').isVisible(), true, 'report is live before its visual wash ends');
+      assert.equal(await page.evaluate(() => entryTransition), null, 'report follows the landscape reveal without an obscuring second wash');
+      assert.equal(await page.locator('#screen-summary').isVisible(), true, 'report remains available while shareable artwork is being prepared');
       await page.locator('#btn-again').click();
-      assert.equal(await page.locator('#screen-ready').isVisible(), true, 'measure again works while the finishing wash is active');
+      assert.equal(await page.locator('#screen-ready').isVisible(), true, 'measure again works while artwork is being prepared');
       assert.equal(await page.evaluate(() => entryTransition?.kind), 'return', 'a new gesture replaces the old transition');
       await page.evaluate(() => window.__finishPrepareResolve());
-      assert.equal(await page.evaluate(() => entryTransition?.kind), 'return', 'late portrait preparation cannot restart a canceled finish transition');
+      assert.equal(await page.evaluate(() => entryTransition?.kind), 'return', 'late portrait preparation cannot interrupt the new session transition');
       await page.evaluate(() => beginEntryTransition({kind:'finish',prepare:new Promise(()=>{})}));
       assert.equal(await page.evaluate(() => entryTransition?.preparing), true, 'motion preference test starts during static preparation');
       await page.emulateMedia({ reducedMotion: 'reduce' });

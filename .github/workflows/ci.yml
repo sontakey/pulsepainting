@@ -7,8 +7,12 @@ permissions:
   contents: read
 jobs:
   browser:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
+    container:
+      # Match the pinned Playwright package; avoid apt mirror availability at test time.
+      image: mcr.microsoft.com/playwright:v1.63.0-noble
+      options: --init --ipc=host
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -17,5 +21,4 @@ jobs:
           cache: npm
       - run: npm ci --no-audit --no-fund --fetch-timeout=30000 --fetch-retries=1
         timeout-minutes: 3
-      - run: npx playwright install --with-deps chromium
       - run: npm test

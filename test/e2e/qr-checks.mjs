@@ -1,7 +1,7 @@
 // Desktop phone handoff: actual SVG pixels, stationary scan geometry, clean
 // quiet zone, responsive layout and one-shot / reduced-motion decoration.
 // Run: node test/e2e/qr-checks.mjs
-// Optional: PPG_QR_URL=https://chatppg.com/pulse-painting PPG_QR_OUTPUT=/tmp/qr-live
+// Optional: PPG_QR_URL=https://www.pulsepainting.com/ PPG_QR_OUTPUT=/tmp/qr-live
 // Decoding uses development-only Python OpenCV and numpy, never shipped code.
 import assert from 'node:assert/strict';
 import { createServer } from 'node:http';
@@ -25,7 +25,7 @@ const server = createServer((req, res) => {
 });
 await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
 const url = process.env.PPG_QR_URL || `http://127.0.0.1:${server.address().port}/dist/index.html`;
-const manifest = { url, expectedURL: 'https://chatppg.com/pulse-painting', captures: [], cards: [], layouts: [], errors: [] };
+const manifest = { url, expectedURL: 'https://www.pulsepainting.com/', captures: [], cards: [], layouts: [], errors: [] };
 let browser;
 try {
   for (const [name, type] of [['chromium', chromium], ['webkit', webkit]]) {

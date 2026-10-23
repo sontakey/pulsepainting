@@ -3,11 +3,13 @@
 // npm run build && npm run test:app
 // Optional local recording: PPG_SESSION_LOG=/absolute/path.json npm run test:app
 import assert from 'node:assert/strict';
+import { createHash } from 'node:crypto';
+const fingerprint = value => createHash('sha256').update(value).digest('hex');
 import { createServer } from 'node:http';
 import { readFileSync, existsSync, statSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { chromium, devices } from 'playwright';
+import { chromium, webkit, devices } from 'playwright';
 import { instrumentReportGraphText, checkReportGraphs } from './report-graph-checks.mjs';
 import { checkCaptureEntry } from './capture-entry-checks.mjs';
 import { checkArtwork, openReportMenu, checkEmptyArtworkActions } from './artwork-checks.mjs';
@@ -25,7 +27,7 @@ const server = createServer((req, res) => {
   res.end(readFileSync(file));
 });
 await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
-const url = `http://127.0.0.1:${server.address().port}/dist/index.html`;
+const url = process.env.PPG_APP_URL || `http://127.0.0.1:${server.address().port}/dist/index.html`;
 async function assertViewportFits(page, label) {
   const requestedWidth = page.viewportSize().width;
   const actual = await page.evaluate(() => ({ width: innerWidth, scrollWidth: document.documentElement.scrollWidth }));
@@ -34,7 +36,7 @@ async function assertViewportFits(page, label) {
 }
 let browser;
 try {
-  browser = await chromium.launch(process.env.PPG_CHROMIUM ? { executablePath: process.env.PPG_CHROMIUM } : process.platform === 'darwin' ? { channel: 'chrome' } : {});
+  browser = process.env.PPG_BROWSER === 'webkit' ? await webkit.launch() : await chromium.launch(process.env.PPG_CHROMIUM ? { executablePath: process.env.PPG_CHROMIUM } : process.platform === 'darwin' ? { channel: 'chrome' } : {});
   const context = await browser.newContext({ ...devices['iPhone 13'], reducedMotion: 'reduce' });
   const page = await context.newPage();
   await instrumentReportGraphText(page);
@@ -111,32 +113,49 @@ try {
     const group = byPaint.get(update.segments) || []; group.push(update); byPaint.set(update.segments, group);
   }
   assert.ok([...byPaint.values()].some(group => group.length >= 4 && new Set(group.map(update => update.values.join())).size > 1), 'computed metrics visibly update several times within one painted segment');
-  for (const width of [320, 390]) {
-    await page.setViewportSize({ width, height: 844 });
-    await assertViewportFits(page, `capture ${width}px`);
+  for (const viewport of [{ width: 320, height: 568 }, { width: 390, height: 844 }]) {
+    await page.setViewportSize(viewport);
+    await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+    await assertViewportFits(page, `capture ${viewport.width}px`);
+    const captureLayout = await page.evaluate(() => {
+      const rect = selector => {
+        const { top, bottom } = document.querySelector(selector).getBoundingClientRect();
+        return { top, bottom };
+      };
+      return {
+        metrics: rect('.live-metrics'),
+        details: rect('.live-details > summary'),
+        dock: rect('.painting-actions'),
+      };
+    });
+    assert.ok(captureLayout.metrics.top >= 0 && captureLayout.metrics.bottom <= captureLayout.dock.top - 4,
+      `capture ${viewport.width}x${viewport.height}: live metrics stay above floating controls without scrolling`);
+    assert.ok(captureLayout.details.bottom <= captureLayout.dock.top - 4,
+      `capture ${viewport.width}x${viewport.height}: details remain reachable above floating controls`);
   }
-  // Follow the next manuscript row without a jump or a growing live bitmap.
+  // Follow actual scene geometry with a bounded raster; the source descriptor
+  // is independent of presentation and never moves previously accepted strokes.
   await page.emulateMedia({ reducedMotion: 'no-preference' });
-  const scrollStart = await page.evaluate(() => {
-    monitor.feedUntil(75);
-    return { ...manuscript.scroll, row: manuscript.viewFirstRow, cacheRows: manuscript.raster.rows };
-  });
-  assert.ok(scrollStart.to > scrollStart.from, 'next row starts a downward manuscript follow');
-  await page.waitForFunction(() => manuscript.scroll && manuscript.viewFirstRow > manuscript.scroll.from && manuscript.viewFirstRow < manuscript.scroll.to);
-  await page.waitForFunction(() => !manuscript.scroll);
-  assert.equal(await page.evaluate(() => manuscript.viewFirstRow), scrollStart.to, 'scroll settles at the next row');
-  assert.ok(scrollStart.cacheRows <= 5, 'live cache holds at most four visible rows plus one scrolling row');
+  await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+  const beforeFollow = await page.evaluate(() => ({ frames: __pulseLandscapeStats.frames, strokes: JSON.stringify(landscape.strokes) }));
+  await page.evaluate(() => monitor.feedUntil(75));
+  await page.waitForFunction(frames => __pulseLandscapeStats.frames > frames && __pulseLandscapeStats.camera.scale > 1.05, beforeFollow.frames);
+  const follow = await page.evaluate(previous => ({ stats: __pulseLandscapeStats, stable: JSON.stringify(landscape.strokes.slice(0, JSON.parse(previous).length)) === previous }), beforeFollow.strokes);
+  assert.equal(follow.stable, true, 'new accepted strokes preserve all earlier placements and materials');
+  assert.ok(follow.stats.cachedPixels <= follow.stats.pixelBudget, 'live landscape cache stays within its pixel budget');
   await page.emulateMedia({ reducedMotion: 'reduce' });
   const captureCount = await page.evaluate(() => manuscript.segments.length);
   const beforePauseUpdates = await page.evaluate(() => monitor.metricUpdates.length);
   await page.getByRole('button', { name: 'Pause artwork', exact: true }).click();
+  const pausedImage = await page.locator('.landscape-canvas').evaluate(canvas => canvas.toDataURL());
   await page.evaluate(() => monitor.feedUntil(80));
-  assert.equal(await page.evaluate(() => manuscript.segments.length), captureCount, 'paused artwork does not grow');
+  assert.ok(await page.evaluate(() => manuscript.segments.length) > captureCount, 'paused presentation retains newly accepted source data');
+  assert.equal(fingerprint(await page.locator('.landscape-canvas').evaluate(canvas => canvas.toDataURL())), fingerprint(pausedImage), 'paused artwork pixels remain frozen');
   const pausedUpdates = await page.evaluate(start => monitor.metricUpdates.slice(start), beforePauseUpdates);
   assert.ok(pausedUpdates.length >= 4 && pausedUpdates.some(update => update.good), 'quality-gated metrics continue once a second while artwork is paused');
   assert.ok(pausedUpdates.every(update => update.values.join() === update.expected.join()), 'paused-art readouts still match computed metrics');
   assert.ok(new Set(pausedUpdates.filter(update => update.good).map(update => update.values.join())).size > 1, 'real estimates visibly change while artwork is paused');
-  assert.match(await page.locator('#pause-note').innerText(), /measurement continues/);
+  assert.match(await page.locator('#pause-note').innerText(), /Recording continues/i);
   await page.getByRole('button', { name: 'Resume artwork', exact: true }).click();
   // Keep this export/manual-finish check below automatic completion; the
   // dedicated WebKit session test exercises the full 180 active seconds.
@@ -147,6 +166,7 @@ try {
     return { hr: report.timeDomain.meanHR.toFixed(0), rmssd: report.timeDomain.rmssd.toFixed(1), sdnn: report.timeDomain.sdnn.toFixed(1), beats: report.meta.nBeats };
   });
   await page.getByRole('button', { name: 'Finish painting', exact: true }).click();
+  await page.waitForFunction(() => !document.getElementById('screen-summary').hidden);
   const heroValues = await page.locator('.report-heroes strong').allTextContents();
   assert.doesNotMatch(await page.locator('#report-content').innerText(), /experiment/i, 'report uses research-estimate wording');
   assert.ok(heroValues[0].includes(expected.hr));
@@ -180,6 +200,32 @@ try {
   await page.waitForFunction(() => window.__printedOpen !== undefined);
   assert.equal(await page.evaluate(() => window.__printedOpen), true, 'print opens all report detail');
 
+  const completeScene = await page.evaluate(() => JSON.stringify(landscape));
+  await page.evaluate(() => renderReport([], undefined, null));
+  await page.waitForFunction(() => !document.getElementById('btn-share-artwork').disabled);
+  assert.match(await page.locator('#report-content').innerText(), /not include enough accepted beat intervals/, 'art eligibility is independent of HRV eligibility');
+  assert.equal(await page.locator('.hrv-table').count(), 0, 'unavailable HRV is never fabricated');
+  assert.equal(fingerprint(await page.evaluate(() => JSON.stringify(landscape))), fingerprint(completeScene), 'missing HRV does not change or discard the painting');
+  await page.evaluate(() => useManuscriptFallback());
+  assert.equal(fingerprint(await page.evaluate(() => JSON.stringify(landscape))), fingerprint(completeScene), 'visual fallback preserves the scene identity and every accepted source stroke');
+
+  // Navigate away while the genuine final camera animation is active. Capture
+  // has already stopped; page lifecycle must settle, never strand the report.
+  await page.locator('#btn-again').click();
+  await page.emulateMedia({ reducedMotion: 'no-preference' });
+  await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+  await page.getByRole('button', { name: 'Begin pulse capture', exact: true }).click();
+  await page.evaluate(() => monitor.feedUntil(45));
+  const finishingScene = await page.evaluate(() => { window.__testFinish=stopSession(); return JSON.stringify(landscape); });
+  assert.equal(await page.evaluate(() => sessionFinishing), true, 'normal-motion completion starts the scene reveal');
+  await page.evaluate(() => window.dispatchEvent(new PageTransitionEvent('pagehide', { persisted: true })));
+  await page.waitForFunction(() => !document.getElementById('screen-summary').hidden);
+  await page.evaluate(() => window.__testFinish);
+  assert.equal(await page.evaluate(() => sessionFinishing), false, 'pagehide settles the pending reveal');
+  assert.equal(fingerprint(await page.evaluate(() => JSON.stringify(landscape))), fingerprint(finishingScene), 'lifecycle recovery preserves the same completed scene');
+  assert.equal(await page.locator('#entry-pigment').isHidden(), true, 'pagehide leaves no stale overlay above the report');
+  await page.evaluate(() => window.dispatchEvent(new PageTransitionEvent('pageshow', { persisted: true })));
+
   const attribution = await page.evaluate(() => {
     resetManuscript();
     const w = { t: 2, windowStartSec: 0, gridHz: 10, selectedChannel: 'green', filtered: Float64Array.from({ length: 21 }, (_, i) => i), quality: { good: true }, sqi: { score: .9 } };
@@ -194,12 +240,25 @@ try {
     manuscript.pending = Array.from({ length: 20 }, (_, i) => ({ t: 2 + (i + 1) / 10, v: i }));
     acceptPaintWindow(w);
     const rejected = manuscript.segments.length === 1 && JSON.stringify(first) === unchanged;
+    // A malformed filtered sample is a source barrier, even when valid
+    // neighboring samples are less than the normal dropout threshold apart.
+    resetManuscript();
+    w.t = 2; w.windowStartSec = 0; w.quality.good = true;
+    w.filtered = Float64Array.from({ length:21 }, (_,i) => i === 10 ? NaN : i);
+    manuscript.pending = Array.from({ length:20 }, (_,i) => ({t:(i+1)/10,v:i}));
+    acceptPaintWindow(w);
+    const malformed = { usableSeconds:landscape.usableSeconds, strokes:landscape.strokes.length,
+      bridgesHole:landscape.strokes.some(stroke=>stroke.points.some((point,i)=>i>0&&stroke.points[i-1].t<1&&point.t>1)),
+      finite:landscape.strokes.every(stroke=>stroke.points.every(point=>Number.isFinite(point.t)&&Number.isFinite(point.v))) };
     document.getElementById('pause-note').textContent = 'Artwork paused. Your 3-minute measurement continues.';
     resetManuscript();
-    return { match, rejected, resetNote: document.getElementById('pause-note').textContent, liveRegion: document.getElementById('painting-state').parentElement.getAttribute('role') };
+    return { match, rejected, malformed, resetNote: document.getElementById('pause-note').textContent, liveRegion: document.getElementById('painting-state').parentElement.getAttribute('role') };
   });
   assert.equal(attribution.match, true, 'geometry and pigment quality use the selected analysis channel');
   assert.equal(attribution.rejected, true, 'bad windows add no paint and never recolor captured segments');
+  assert.ok(attribution.malformed.strokes>=2&&attribution.malformed.finite,'valid portions survive a malformed sample as separate finite source runs');
+  assert.equal(attribution.malformed.bridgesHole,false,'app adapter never connects across a nonfinite filtered sample');
+  assert.ok(Math.abs(attribution.malformed.usableSeconds-1.7)<1e-7,'nonfinite sample hole contributes no accepted source duration');
   assert.doesNotMatch(attribution.resetNote, /paused/i);
   assert.equal(attribution.liveRegion, 'status');
 

@@ -8,13 +8,71 @@ function warmPaintGPU() {
 }
 if ('requestIdleCallback' in window) requestIdleCallback(warmPaintGPU, { timeout: 1600 });
 else setTimeout(warmPaintGPU, 300);
-addEventListener('pagehide', () => { clearEntryTransition('pagehide'); paintPageActive = false; paintWarmGeneration++; paintGPU?.dispose(); paintGPU = null; paintManuscript(document.getElementById('manuscript')); });
-addEventListener('paintgpulost', () => paintManuscript(document.getElementById('manuscript')));
-addEventListener('pageshow', event => { if (event.persisted) { paintPageActive = true; warmPaintGPU(); } });
+addEventListener('pagehide', () => {
+  clearEntryTransition('pagehide'); paintPageActive = false; paintWarmGeneration++; paintGPU?.dispose(); paintGPU = null;
+  if (sessionFinishing) { cancelLandscapeReveal(); completeSessionReport(); }
+  try { landscapeView?.pause(true); } catch { useManuscriptFallback(); }
+});
+addEventListener('paintgpulost', () => { if (!landscapeView) paintManuscript(document.getElementById('manuscript')); });
+addEventListener('pageshow', event => { if (event.persisted) { paintPageActive = true; warmPaintGPU(); syncLandscapeView(); } });
 
 // Pulse Painting stores only accepted, measured waveform segments in memory.
 // A window is painted after its quality decision, never speculatively.
 const manuscript = { pending: [], segments: [], lastWindow: -1, paused: false, frame: 0, raster: null, viewFirstRow: 0, scroll: null };
+// This scene is chosen once per capture. Presentation can pause or fail without
+// changing the measurement clock or discarding accepted source segments.
+let landscape = null, landscapeView = null;
+let landscapeCoverageComplete = true;
+let sessionFinishing = false, revealGeneration = 0, sessionFinishPromise = null;
+function cancelLandscapeReveal() {
+  revealGeneration++;
+  try { landscapeView?.cancelFinish(); } catch { /* The retained source remains available. */ }
+  sessionFinishing = false;
+  sessionFinishPromise = null;
+  document.getElementById('screen-measuring').classList.remove('is-revealing');
+  document.getElementById('btn-pause').disabled = false;
+  document.getElementById('btn-stop').textContent = 'Finish painting';
+}
+function useManuscriptFallback() {
+  try { landscapeView?.dispose(); } catch { /* Decorative disposal must not stop capture. */ }
+  landscapeView = null;
+  document.getElementById('landscape-view').hidden = true;
+  document.getElementById('manuscript').hidden = false;
+  document.getElementById('pause-note').textContent = 'Showing your pulse strokes. Your recording is preserved.';
+}
+function recoverLandscapeCoverage() {
+  if (!landscape || landscapeCoverageComplete) return landscapeCoverageComplete;
+  try {
+    // Reconstruct only from retained accepted geometry and the original plan.
+    // Never share a partially appended scene or choose another landscape.
+    const recovered = window.PulseLandscape.create({ seed: landscape.seed, family: landscape.family });
+    manuscript.segments.forEach(segment => window.PulseLandscape.append(recovered, segment));
+    landscape = recovered;
+    landscapeCoverageComplete = true;
+  } catch { /* Keep the original descriptor and all source segments for retry. */ }
+  return landscapeCoverageComplete;
+}
+function syncLandscapeView() {
+  if (!landscapeView) return;
+  try {
+    landscapeView.pause(!sessionFinishing && (manuscript.paused || document.hidden || document.getElementById('screen-measuring').hidden));
+    landscapeView.sync();
+  } catch { useManuscriptFallback(); }
+}
+function resetLandscape() {
+  cancelLandscapeReveal();
+  try { landscapeView?.dispose(); } catch { /* Replace a failed decoration safely. */ }
+  landscapeView = null; landscape = null; landscapeCoverageComplete = true;
+  const host = document.getElementById('landscape-view');
+  host.replaceChildren(); host.hidden = false;
+  document.getElementById('manuscript').hidden = true;
+  try {
+    landscape = window.PulseLandscape.create();
+    landscapeView = window.PulseLandscape.createView(host, landscape, { reducedMotion: matchMedia('(prefers-reduced-motion: reduce)').matches });
+    syncLandscapeView();
+  } catch { useManuscriptFallback(); }
+}
+document.addEventListener('visibilitychange', syncLandscapeView);
 // A continuous pigment journey follows capture time, never the row index or
 // an HRV value. OKLab keeps the cool mixtures luminous between pigment anchors.
 const pigmentAnchors = [[40,85,255],[118,84,184],[40,85,255],[28,138,142]].map(rgb => {
@@ -39,6 +97,7 @@ function pigmentAt(t, quality = 1) {
 }
 function animateManuscript() {
   cancelAnimationFrame(manuscript.frame);
+  if (landscapeView) { syncLandscapeView(); return; }
   let previous = performance.now();
   const draw = now => {
     if (manuscript.paused || document.getElementById('screen-measuring').hidden) return;
@@ -62,7 +121,8 @@ function resetManuscript() {
   document.getElementById('btn-pause').textContent = 'Pause artwork';
   document.getElementById('pause-note').textContent = '3-minute recording · Not a medical device';
   document.getElementById('manuscript-empty').hidden = false;
-  paintManuscript(document.getElementById('manuscript'));
+  resetLandscape();
+  if (!landscapeView) paintManuscript(document.getElementById('manuscript'));
 }
 function acceptPaintWindow(metrics) {
   if (!Number.isFinite(metrics.t) || metrics.t <= manuscript.lastWindow) return;
@@ -77,30 +137,39 @@ function acceptPaintWindow(metrics) {
   if (!Number.isFinite(start)) return;
   const samples = manuscript.pending.filter(p => p.t <= metrics.t && p.t > start);
   manuscript.pending = manuscript.pending.filter(p => p.t > metrics.t);
-  if (manuscript.paused || !metrics.quality?.good || !Number.isFinite(metrics.sqi?.score) || samples.length < 3) return;
+  if (!metrics.quality?.good || !Number.isFinite(metrics.sqi?.score) || samples.length < 3) return;
   // The live display callback is red-channel AC. Use the actual selected-channel
   // analysis window so waveform geometry and SQI describe the same measurement.
   if (!window || window.t !== metrics.t || !window.filtered?.length || !(window.gridHz > 0)) return;
   const firstGrid = Math.round(start * window.gridHz) / window.gridHz;
   const points = [];
-  let sampleIndex = 0;
+  let sampleIndex = 0, penLift = false;
   for (let i = 0; i < window.filtered.length; i++) {
     const t = firstGrid + i / window.gridHz;
     if (t < samples[0].t || t > samples.at(-1).t) continue;
     while (sampleIndex + 1 < samples.length && samples[sampleIndex + 1].t <= t) sampleIndex++;
     const next = samples[sampleIndex + 1];
     // Retain gaps and artwork pauses rather than joining across absent samples.
-    if (next && next.t - samples[sampleIndex].t > .15) continue;
+    if (next && next.t - samples[sampleIndex].t > .15) { penLift = true; continue; }
     const v = window.filtered[i];
-    if (Number.isFinite(v)) points.push({ t, v });
+    if (!Number.isFinite(v)) { penLift = true; continue; }
+    points.push({ t, v, ...(penLift ? { breakBefore: true } : {}) });
+    penLift = false;
   }
   if (points.length < 3) return;
   const values = points.map(p => p.v), lo = Math.min(...values), hi = Math.max(...values);
   if (hi - lo < 1e-8) return;
   manuscript.segments.forEach(segment => { segment.reveal = 1; });
-  manuscript.segments.push({ reveal: matchMedia('(prefers-reduced-motion: reduce)').matches ? 1 : 0, channel: window.selectedChannel, score: Math.max(0, Math.min(1, metrics.sqi.score)), points: points.map(p => ({t:p.t, v:(p.v-lo)/(hi-lo)})) });
+  const segment = { reveal: matchMedia('(prefers-reduced-motion: reduce)').matches ? 1 : 0, channel: window.selectedChannel, score: Math.max(0, Math.min(1, metrics.sqi.score)), sourceAmplitude: { min: lo, max: hi }, points: points.map(p => ({...p, v:(p.v-lo)/(hi-lo)})) };
+  manuscript.segments.push(segment);
+  if (landscape) {
+    try {
+      if (landscapeCoverageComplete) globalThis.PulseLandscape.append(landscape, segment);
+      else recoverLandscapeCoverage();
+    } catch { landscapeCoverageComplete = false; useManuscriptFallback(); }
+  }
   document.getElementById('manuscript-empty').hidden = true;
-  paintManuscript(document.getElementById('manuscript'));
+  if (!landscapeView && !manuscript.paused) paintManuscript(document.getElementById('manuscript'));
   animateManuscript();
 }
 function paintManuscript(canvas, compact = false, all = false) {
@@ -178,7 +247,7 @@ function paintManuscriptRaster(canvas, compact = false, all = false, layer = nul
       const p=segment.points[i], row=Math.floor((p.t-start)/rowSeconds);
       const displayRow = selectedRows ? selectedRows.indexOf(row) : row-firstRow;
       if (displayRow<0 || displayRow>=rows) continue;
-      if (row !== lastRow || (i && p.t-segment.points[i-1].t>.15)) {
+      if (row !== lastRow || p.breakBefore || (i && p.t-segment.points[i-1].t>.15)) {
         if(path.length) paths.push(path);
         path=[]; lastRow=row;
       }
@@ -484,15 +553,16 @@ document.addEventListener('visibilitychange',()=>{if(document.hidden)clearEntryT
 
 function showScreen(name, { brush } = {}) {
   const previous=document.getElementById('app').dataset.activeScreen;
-  if(name==='ready') {clearEntryTransition('ready');sessionStarting=false;}
+  if(name==='ready') {clearEntryTransition('ready');cancelLandscapeReveal();sessionStarting=false;}
   // Recovery coaching must remain immediately visible when a finger is lifted.
   if(name==='placement' && previous==='measuring')clearEntryTransition('recovery');
   if(brush==='return')beginEntryTransition({kind:'return',originElement:document.getElementById('btn-again')});
-  else if(name==='summary' && previous==='measuring')beginEntryTransition({kind:'finish',originElement:document.getElementById('btn-stop'),prepare:reportArtworkReady});
+  else if(name==='summary')clearEntryTransition('landscape-reveal-complete');
   else if(name==='measuring' && previous==='placement' && !entryTransition)beginEntryTransition({kind:'capture',originElement:document.getElementById('placement-wave-canvas')});
   for (const key in screens) screens[key].hidden = key !== name;
   document.getElementById('app').dataset.activeScreen = name;
   syncScreenChrome(name);
+  syncLandscapeView();
 }
 
 function syncScreenChrome(name) {
@@ -708,7 +778,7 @@ function tickSessionCountdown() {
 function renderSummary() {
   // Only beats from windows that passed the quality gate, with their real
   // timestamps so gaps between accepted beats are handled correctly.
-  const beats = monitor.getTachogram({ goodOnly: true, hrvOnly: true }).filter(p => p.valid).map(p => ({ t: p.t, ibiMs: p.ibiMs }));
+  const beats = (monitor?.getTachogram({ goodOnly: true, hrvOnly: true }) || []).filter(p => p.valid).map(p => ({ t: p.t, ibiMs: p.ibiMs }));
   renderReport(beats, lastMetrics ? lastMetrics.rmssdFloorMs : undefined, lastMetrics ? lastMetrics.respiration : null);
 }
 
@@ -1091,6 +1161,7 @@ function drawReportTachogram(canvas, beats, flagged, correctedMs) {
 // Builds the full scrollable report from accepted beats ({t, ibiMs} or plain ms).
 // Exposed via renderSummary() in the real flow and window.__demoReport() for QA.
 let reportChartObserver;
+let reportRedrawFrame = 0;
 let portraitHost = null;
 let reportArtworkReady = Promise.resolve(null);
 let redrawReportCharts = () => {};
@@ -1098,8 +1169,41 @@ window.addEventListener('beforeprint', () => redrawReportCharts());
 window.addEventListener('afterprint', () => redrawReportCharts());
 if (document.fonts) document.fonts.ready.then(() => redrawReportCharts());
 
+function mountLandscapeArtwork(header, td) {
+  if (!landscapeCoverageComplete || !landscape?.strokes?.length || !window.PulsePortrait) {
+    if (manuscript.segments.length) {
+      const note = document.createElement('p');
+      note.className = 'report-note';
+      note.textContent = 'The landscape preview is unavailable. Your captured strokes are preserved; choose Save manuscript in the menu.';
+      header.append(note);
+    }
+    return;
+  }
+  const host = document.createElement('div');
+  portraitHost = host;
+  const date = header.querySelector('.report-date');
+  if (date) date.after(host); else header.append(host);
+  const manuscriptPreview = header.querySelector('#report-manuscript');
+  if (manuscriptPreview) manuscriptPreview.hidden = true;
+  reportArtworkReady = Promise.resolve(window.PulsePortrait.mount(host, {
+    shareButton: document.getElementById('btn-share-artwork'),
+    saveButton: document.getElementById('btn-save-artwork'),
+    landscape,
+    durationSec: elapsedMeasuringMs / 1000,
+    startedAt: new Date(portraitStartedAt || Date.now()),
+    metrics: { hr: td?.ok ? td.meanHR : null, rmssd: td?.ok ? td.rmssd : null, sdnn: td?.ok ? td.sdnn : null },
+  })).catch(() => {
+    if (portraitHost === host) host.textContent = 'Your pulse strokes are saved in this session. Use Save manuscript in the menu.';
+    return null;
+  });
+}
+
 function renderReport(acceptedBeats, rmssdFloorMs, liveRespiration) {
   const el = document.getElementById('report-content');
+  reportChartObserver?.disconnect();
+  cancelAnimationFrame(reportRedrawFrame);
+  reportRedrawFrame = 0;
+  redrawReportCharts = () => {};
   reportArtworkReady = Promise.resolve(null);
   if (portraitHost) window.PulsePortrait?.clear(portraitHost);
   portraitHost = null;
@@ -1110,16 +1214,31 @@ function renderReport(acceptedBeats, rmssdFloorMs, liveRespiration) {
 
   const beats = acceptedBeats.map(b => (typeof b === 'number' ? { ibiMs: b } : b));
   const acceptedIbiMs = beats.map(b => b.ibiMs);
-  if (!beats.length) {
-    el.innerHTML = `
-      <h1 class="report-title">Your pulse report<span class="blue-period">.</span></h1>
-      <p class="insufficient">No good-quality windows were captured this session — try again with steadier finger placement.</p>
-    `;
+  const fusionRespBpm = liveRespiration && liveRespiration.rateBpm != null && liveRespiration.confidence >= 0.5 ? liveRespiration.rateBpm : undefined;
+  let result = null;
+  if (beats.length) {
+    try { result = PPG.hrv.analyzeHRV(beats, { rmssdFloorMs, respirationRateBpm: fusionRespBpm }); }
+    catch { /* Artwork eligibility is independent of HRV report availability. */ }
+  }
+  if (!result?.meta) {
+    const hasArt = landscapeCoverageComplete && !!landscape?.strokes?.length;
+    const header = document.createElement('div');
+    header.className = 'report-card report-header';
+    header.innerHTML = `<h1 class="report-title">Your pulse report<span class="blue-period">.</span></h1>
+      <p class="report-date">${hasArt ? `${Math.round(landscape.usableSeconds)} seconds of accepted pulse, painted` : 'No accepted pulse yet'}</p>`;
+    el.append(header);
+    mountLandscapeArtwork(header, null);
+    const note = document.createElement('p');
+    note.className = 'insufficient';
+    note.textContent = hasArt
+      ? 'Your painting is ready. This recording did not include enough accepted beat intervals for an HRV report.'
+      : manuscript.segments.length
+        ? 'Your pulse strokes are available in Save manuscript. HRV measurements are unavailable for this recording.'
+        : 'No good-quality windows were captured this session — try again with steadier finger placement.';
+    el.append(note);
     return;
   }
 
-  const fusionRespBpm = liveRespiration && liveRespiration.rateBpm != null && liveRespiration.confidence >= 0.5 ? liveRespiration.rateBpm : undefined;
-  const result = PPG.hrv.analyzeHRV(beats, { rmssdFloorMs, respirationRateBpm: fusionRespBpm });
   const td = result.timeDomain, fd = result.frequencyDomain, nl = result.nonlinear, ans = result.ans, si = result.stressIndex;
   const durationSec = result.meta.durationSec;
   const goodFraction = monitor && monitor.getSessionSummary ? monitor.getSessionSummary().goodFraction : null;
@@ -1138,25 +1257,7 @@ function renderReport(acceptedBeats, rmssdFloorMs, liveRespiration) {
   el.appendChild(header);
   paintManuscript(document.getElementById('report-manuscript'),true);
   document.getElementById('report-manuscript').hidden = !manuscript.segments.length;
-  if (manuscript.segments.length && window.PulsePortrait) {
-    portraitHost = document.createElement('div');
-    // Keep the artwork near the beginning while retaining the full scientific
-    // report and its measured values immediately below it.
-    header.querySelector('.report-date').after(portraitHost);
-    document.getElementById('report-manuscript').hidden = true;
-    reportArtworkReady = window.PulsePortrait.mount(portraitHost, {
-      shareButton: document.getElementById('btn-share-artwork'),
-      saveButton: document.getElementById('btn-save-artwork'),
-      segments: manuscript.segments,
-      start: manuscript.segments[0].points[0].t,
-      end: manuscript.segments.at(-1).points.at(-1).t,
-      durationSec: elapsedMeasuringMs / 1000,
-      startedAt: new Date(portraitStartedAt || Date.now()),
-      metrics: { hr: td.ok ? td.meanHR : null, rmssd: td.ok ? td.rmssd : null, sdnn: td.ok ? td.sdnn : null },
-      pigmentAt,
-      paintRows: (canvas, rowIndices) => paintManuscriptRaster(canvas, false, true, null, true, { rowIndices }),
-    });
-  }
+  mountLandscapeArtwork(header, td);
 
   // ANS balance card
   const ansCard = document.createElement('div');
@@ -1316,7 +1417,17 @@ function renderReport(acceptedBeats, rmssdFloorMs, liveRespiration) {
   };
   reportChartObserver?.disconnect();
   if (typeof ResizeObserver !== 'undefined') {
-    reportChartObserver = new ResizeObserver(() => redrawReportCharts());
+    const widths = new WeakMap();
+    reportChartObserver = new ResizeObserver(entries => {
+      let changed = false;
+      for (const { target, contentRect } of entries) {
+        if (widths.get(target) !== contentRect.width) { widths.set(target, contentRect.width); changed = true; }
+      }
+      if (changed && !reportRedrawFrame) reportRedrawFrame = requestAnimationFrame(() => {
+        reportRedrawFrame = 0;
+        redrawReportCharts();
+      });
+    });
     el.querySelectorAll('.report-canvas-wrap').forEach(wrap => reportChartObserver.observe(wrap));
   }
   tdCard.insertAdjacentHTML('beforeend','<p class="report-note">The timing-noise floor is an estimate, not a confidence interval.</p>');
@@ -1375,7 +1486,7 @@ function startSession() {
     onSignalUpdate: ({ time, value, isProcessing }) => {
       if (generation !== sessionGeneration) return;
       advanceSessionClock(time, isProcessing);
-      if (isProcessing && !manuscript.paused && Number.isFinite(value)) manuscript.pending.push({ t:time, v:value });
+      if (isProcessing && Number.isFinite(value)) manuscript.pending.push({ t:time, v:value });
       if (manuscript.pending.length > 1800) manuscript.pending.shift();
       waveBuf.push(value);
       waveBuf.shift();
@@ -1409,15 +1520,54 @@ function startSession() {
   });
 }
 
+function completeSessionReport() {
+  sessionFinishing = false;
+  document.getElementById('screen-measuring').classList.remove('is-revealing');
+  document.getElementById('btn-pause').disabled = false;
+  document.getElementById('btn-stop').textContent = 'Finish painting';
+  renderSummary();
+  showScreen('summary');
+}
 function stopSession() {
+  if (sessionFinishing) {
+    try { landscapeView?.cancelFinish(); } catch { cancelLandscapeReveal(); completeSessionReport(); }
+    return sessionFinishPromise;
+  }
+  // Capture stops before decoration. Late callbacks cannot add data during
+  // the reveal, and its animation never advances the protocol clock.
+  sessionGeneration++;
   lastMeasuringFrame = null;
   if (sessionTimerId) { clearInterval(sessionTimerId); sessionTimerId = null; }
   measuringStartedAt = null;
   if (monitor) {
     monitor.stop();
   }
-  renderSummary();
-  showScreen('summary');
+  clearEntryTransition('landscape-reveal');
+  recoverLandscapeCoverage();
+  manuscript.segments.forEach(segment => { segment.reveal = 1; });
+  cancelAnimationFrame(manuscript.frame);
+  if (!landscapeView || !landscapeCoverageComplete || !landscape?.strokes?.length || document.hidden) {
+    completeSessionReport();
+    return Promise.resolve();
+  }
+  sessionFinishing = true;
+  const generation = ++revealGeneration;
+  showScreen('measuring');
+  clearEntryTransition('landscape-reveal');
+  document.getElementById('screen-measuring').classList.add('is-revealing');
+  document.getElementById('painting-state').textContent = 'Your landscape, revealed';
+  document.getElementById('quality-text').textContent = 'Recording complete';
+  document.getElementById('btn-pause').disabled = true;
+  document.getElementById('btn-stop').textContent = 'Skip reveal';
+  document.getElementById('pause-note').textContent = 'Every accepted stroke, in one place.';
+  let finish;
+  try { finish = landscapeView.finish(); }
+  catch { useManuscriptFallback(); finish = Promise.resolve(); }
+  sessionFinishPromise = Promise.resolve(finish).catch(() => useManuscriptFallback()).then(() => {
+    if (generation !== revealGeneration) return;
+    completeSessionReport();
+  });
+  return sessionFinishPromise;
 }
 
 // ponytail: UA sniff; swap for a camera/torch capability probe once desktop rPPG lands.
@@ -1436,6 +1586,7 @@ document.querySelector('.live-details').addEventListener('toggle', event => {
 document.getElementById('btn-start').addEventListener('click', startSession);
 document.getElementById('btn-cancel-placement').addEventListener('click', () => {
   sessionGeneration++;
+  cancelLandscapeReveal();
   lastMeasuringFrame = null;
   clearEntryTransition();
   if (sessionTimerId) { clearInterval(sessionTimerId); sessionTimerId=null; }
@@ -1449,10 +1600,12 @@ document.getElementById('btn-cancel-placement').addEventListener('click', () => 
   showScreen('ready');
 });
 document.getElementById('btn-pause').addEventListener('click', () => {
-  manuscript.paused = !manuscript.paused; manuscript.pending=[];
+  if (sessionFinishing) return;
+  manuscript.paused = !manuscript.paused;
+  syncLandscapeView();
   if (manuscript.paused) cancelAnimationFrame(manuscript.frame); else animateManuscript();
   document.getElementById('btn-pause').textContent=manuscript.paused?'Resume artwork':'Pause artwork';
-  document.getElementById('pause-note').textContent=manuscript.paused?'Artwork paused. Your 3-minute measurement continues.':'3-minute recording · Not a medical device';
+  document.getElementById('pause-note').textContent=manuscript.paused?'Painting paused. Recording continues.':'3-minute recording · Not a medical device';
   if(lastMetrics) updateMeasuringScreen(lastMetrics);
 });
 document.getElementById('btn-save-artwork').addEventListener('click', () => closeDebugSheet());
@@ -1462,6 +1615,7 @@ document.getElementById('btn-save-manuscript').addEventListener('click', () => {
 });
 document.getElementById('btn-stop').addEventListener('click', stopSession);
 document.getElementById('btn-again').addEventListener('click', () => {
+  cancelLandscapeReveal();
   if (monitor) { monitor.destroy(); monitor = null; }
   showScreen('ready', {brush:'return'});
 });

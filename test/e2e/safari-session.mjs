@@ -10,10 +10,13 @@ import { fileURLToPath } from 'node:url';
 import { webkit, devices } from 'playwright';
 import { instrumentReportGraphText } from './report-graph-checks.mjs';
 import { checkArtwork, openReportMenu } from './artwork-checks.mjs';
+import { selectReplayLandscape } from './landscape-selection.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const out = path.resolve(root, process.env.PPG_SAFARI_ARTIFACTS || '.dream-loop/safari-session-check');
 const timeoutSeconds = Number(process.env.PPG_SAFARI_TIMEOUT_SECONDS) || 260;
+const family = process.env.PPG_SAFARI_FAMILY || 'quiet-lake';
+const seed = Number(process.env.PPG_SAFARI_SEED) || 39293;
 assert.ok(timeoutSeconds >= 180 && timeoutSeconds <= 600, 'session timeout must be180–600seconds');
 mkdirSync(out, { recursive: true });
 const original = JSON.parse(readFileSync(path.join(root, 'test/fixtures/iphone-200s.json'), 'utf8'));
@@ -30,7 +33,7 @@ const server = createServer((req, res) => {
 });
 await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
 const evidence = { url: process.env.PPG_SAFARI_URL || `http://127.0.0.1:${server.address().port}/dist/index.html`, fixture: 'test/fixtures/iphone-200s.json',
-  scope: 'Playwright WebKit with iPhone13 emulation; camera I/O mocked; no physical Safari or real camera claim.',
+  scope: 'Playwright WebKit with iPhone13 emulation; camera I/O mocked; no physical Safari or real camera claim.', family, seed,
   replay: { rate: '1x wall clock from session start', originalSamples: original.samples.length,
     originalSeconds: (originalEnd - original.samples[0].t) / 1000,
     extension: 'Recorded final60s repeated once with monotonically shifted timestamps, only if automatic measurement needs more than the original recording.',
@@ -71,14 +74,14 @@ try {
   });
   await page.goto(evidence.url);
   await page.evaluate(() => document.fonts.ready);
+  await selectReplayLandscape(page, family, seed);
   await page.waitForFunction(() => window.__paintGpuStats?.ready && paintGPU, null, { timeout: 60000 });
   assert.equal(await page.evaluate(() => window.__paintGpuStats.backend), 'webgpu', 'actual WebKit WebGPU backend initializes');
   await page.screenshot({ path: `${out}/ready.png`, fullPage: true });
   await page.evaluate(({ log, originalLength }) => {
     window.__sessionMetrics = { intervals: [], uninterruptedIntervals: [], paintIntervals: [], interruptions: [], checkpointAt: 60,
       stopCalls: 0, originalLength, extensionUsed: false, droppedSamples: 0,
-      scrolling: { samples: 0, min: null, max: null, fractionalPositions: 0, fractionalForwardSteps: 0,
-        backwardSteps: 0, maxRows: 0, cropViolations: 0, maxContinuousPanStep: 0, examples: [] } };
+      camera: { samples: 0, changes: 0, invalid: 0, maxCachedPixels: 0, pixelBudget: 0, maxScale: 1, maxContinuousStep: 0, examples: [] } };
     window.PPGMonitor = class extends PPG.PPGMonitor {
       constructor(host, options) {
         super(host, options);
@@ -91,8 +94,8 @@ try {
         this.options.onReady({ torchSupported: true });
         this.started = performance.now();
         const metrics = window.__sessionMetrics;
-        let previous = 0, previousPaint = 0, previousPaintFrames = 0;
-        let previousViewRow = null, previousPanTarget = null;
+        let previous = 0, previousPaint = 0, previousPaintFrames = 0, previousPaintWasActive = false;
+        let previousCamera = null;
         let framePauseDone = false, stalled = false, hidden = false;
         let activeFeedPause = null, activeHidden = null, pendingResume = null, restoreVisibility = null;
         const pump = now => {
@@ -129,35 +132,28 @@ try {
             }
           }
           metrics.extensionUsed ||= this.i > originalLength;
-          const surface = window.__paintGpuStats.surfaces.manuscript;
-          // Scalar reads only: track the real eased pan without DOM layout or
-          // GPU readback on animation frames. At most12 examples are retained.
-          const viewRow = manuscript.viewFirstRow, raster = manuscript.raster, panTarget = manuscript.scroll?.to ?? null;
-          if (raster && Number.isFinite(viewRow)) {
-            const scrolling = metrics.scrolling;
-            scrolling.samples++;
-            scrolling.min = scrolling.min === null ? viewRow : Math.min(scrolling.min, viewRow);
-            scrolling.max = scrolling.max === null ? viewRow : Math.max(scrolling.max, viewRow);
-            scrolling.maxRows = Math.max(scrolling.maxRows, raster.rows);
-            if (viewRow < raster.firstRow - 1e-6 || viewRow + 4 > raster.firstRow + raster.rows + 1e-6) scrolling.cropViolations++;
-            const fractional = Math.abs(viewRow - Math.round(viewRow)) > 1e-5;
-            if (fractional) {
-              scrolling.fractionalPositions++;
-              if (scrolling.examples.length < 12) scrolling.examples.push(viewRow);
+          const surface = window.__pulseLandscapeStats;
+          // Scalar diagnostics avoid GPU readback/layout during timing samples.
+          const camera = surface.camera, tracking = metrics.camera;
+          if (camera) {
+            tracking.samples++;
+            if (![camera.x, camera.y, camera.scale].every(Number.isFinite) || camera.scale < 1 || camera.scale > 2.801) tracking.invalid++;
+            tracking.maxScale = Math.max(tracking.maxScale, camera.scale);
+            tracking.maxCachedPixels = Math.max(tracking.maxCachedPixels, surface.cachedPixels);
+            tracking.pixelBudget = surface.pixelBudget;
+            if (previousCamera && frameGap <= 100 && !activeHidden && !returningFromStall) {
+              const step = Math.hypot(camera.x-previousCamera.x,camera.y-previousCamera.y);
+              if (step > 1e-5) tracking.changes++;
+              tracking.maxContinuousStep = Math.max(tracking.maxContinuousStep,step);
             }
-            if (previousViewRow !== null) {
-              const step = viewRow - previousViewRow;
-              if (step < -1e-6) scrolling.backwardSteps++;
-              if (step > 1e-6 && fractional) scrolling.fractionalForwardSteps++;
-              if (panTarget !== null && panTarget === previousPanTarget && frameGap <= 100 && !activeHidden && !returningFromStall)
-                scrolling.maxContinuousPanStep = Math.max(scrolling.maxContinuousPanStep, step);
-            }
-            previousViewRow = viewRow; previousPanTarget = panTarget;
+            if (tracking.examples.length < 12 && tracking.changes > tracking.examples.length * 40) tracking.examples.push({...camera});
+            previousCamera = {...camera};
           }
           if (surface.frames > previousPaintFrames) {
-            if (previousPaint && now - previousPaint < 100 && !activeHidden && !returningFromStall) metrics.paintIntervals.push(now - previousPaint);
+            if (previousPaint && previousPaintWasActive && !activeHidden && !returningFromStall) metrics.paintIntervals.push(now - previousPaint);
             previousPaint = now; previousPaintFrames = surface.frames;
           }
+          previousPaintWasActive = surface.active;
           for (const interruption of metrics.interruptions) {
             if (interruption.recoveryCreditMs === undefined && now - interruption.resumedAt >= 1200) {
               interruption.recoveryWallMs = now - interruption.resumedAt;
@@ -197,8 +193,8 @@ try {
             console.log('SESSION_CHECKPOINT ' + JSON.stringify({ wallSeconds: seconds, measuringSeconds: elapsedMeasuringMs / 1000,
               countdown: document.getElementById('session-countdown').textContent, engineState: this.currentMetrics.fingerState,
               samples: this.fedSamples, consumedSamples: this.i, droppedSamples: metrics.droppedSamples, acceptedSegments: manuscript.segments.length, backend: window.__paintGpuStats.backend,
-              gpuFrames: surface.frames, hidden: document.hidden, viewFirstRow: manuscript.viewFirstRow,
-              cachedRows: manuscript.raster?.rows ?? 0, scrollFractionalSteps: metrics.scrolling.fractionalForwardSteps }));
+              landscapeFrames: surface.frames, hidden: document.hidden, camera: surface.camera,
+              cachedPixels: surface.cachedPixels, cameraSteps: metrics.camera.changes }));
             metrics.checkpointAt += 60;
           }
           this.replayFrame = requestAnimationFrame(pump);
@@ -237,8 +233,8 @@ try {
   console.log('SESSION_START', new Date().toISOString());
   await page.locator('#btn-start').click();
   await page.waitForFunction(() => !document.getElementById('screen-summary').hidden, null, { timeout: timeoutSeconds * 1000 });
-  // The report is available immediately; wait for its decorative finish wash
-  // before screenshot/viewport changes so we test completion, not cancellation.
+  // The summary appears after the same-scene landscape reveal. Confirm no
+  // entry overlay remains before exercising report layout and exports.
   await page.waitForFunction(() => entryTransition === null);
   evidence.session = await page.evaluate(() => {
     const beats = monitor.getTachogram({ goodOnly: true, hrvOnly: true }).filter(point => point.valid);
@@ -246,7 +242,7 @@ try {
     return { ...window.__sessionMetrics, samples: monitor.fedSamples, consumedSamples: monitor.i, acceptedSegments: manuscript.segments.length,
       measuringSeconds: elapsedMeasuringMs / 1000, countdown: document.getElementById('session-countdown').textContent,
       expected: { hr: report.timeDomain.meanHR.toFixed(0), rmssd: report.timeDomain.rmssd.toFixed(1), sdnn: report.timeDomain.sdnn.toFixed(1), beats: report.meta.nBeats },
-      gpu: window.__paintGpuStats, brush: window.__pulseBrushStats, fonts: { dmSans: document.fonts.check('16px "DM Sans"'), waterBrush: document.fonts.check('72px "Water Brush"') } };
+      landscape: window.__pulseLandscapeStats, scene: { family: landscape.family, seed: landscape.seed, strokeCount: landscape.strokes.length, usableSeconds: landscape.usableSeconds }, gpu: window.__paintGpuStats, brush: window.__pulseBrushStats, fonts: { dmSans: document.fonts.check('16px "DM Sans"'), waterBrush: document.fonts.check('72px "Water Brush"') } };
   });
   assert.ok(evidence.session.measuringSeconds >= 180, 'automatic countdown completed180s of MEASURING');
   assert.ok(evidence.session.measuringSeconds <= 181.1, 'display tick stops within one normal interval of180active seconds');
@@ -257,22 +253,23 @@ try {
     if (interruption.kind !== 'main-thread-stall') assert.equal(interruption.heldMs, 0, `${interruption.kind}: absent camera frames never advance countdown`);
     assert.ok(interruption.recoveryCreditMs >= 0 && interruption.recoveryCreditMs <= interruption.recoveryWallMs + 50,
       `${interruption.kind}: resumed measurement advances no faster than fresh-frame wall time`);
-    assert.ok(Number.isFinite(interruption.recoveredAtSeconds), `${interruption.kind}: accepted waveform and GPU painting recover`);
+    assert.ok(Number.isFinite(interruption.recoveredAtSeconds), `${interruption.kind}: accepted waveform and landscape painting recover`);
   }
   assert.ok(evidence.session.droppedSamples > 0, 'interruption stimuli actually removed camera frames');
-  const scrolling = evidence.session.scrolling;
-  assert.ok(scrolling.samples > 100 && scrolling.max > scrolling.min + 1, 'new manuscript rows actually advance the view');
-  assert.ok(scrolling.fractionalPositions > 20 && scrolling.fractionalForwardSteps > 20, 'row movement contains real intermediate eased positions');
-  assert.equal(scrolling.backwardSteps, 0, 'automatic follow never reverses');
-  assert.ok(scrolling.maxRows >= 4 && scrolling.maxRows <= 5, 'cached manuscript layers never exceed5rows');
-  assert.equal(scrolling.cropViolations, 0, 'pan stays inside the cached raster');
-  assert.ok(scrolling.maxContinuousPanStep < .25, 'healthy animation frames advance smoothly within the same pan');
+  const camera = evidence.session.camera;
+  assert.ok(camera.samples > 100 && camera.changes > 20 && camera.maxScale > 2, 'live view follows actual scene strokes through intermediate macro camera positions');
+  assert.equal(camera.invalid, 0, 'camera remains finite within its intended zoom bounds');
+  assert.ok(camera.maxCachedPixels <= camera.pixelBudget, 'live scene raster memory remains bounded');
+  assert.ok(camera.maxContinuousStep < 250, 'healthy frames damp scene camera movements');
+  assert.equal(evidence.session.landscape.finished, true, 'same-scene completion reveal settles');
+  assert.deepEqual(evidence.session.landscape.camera, { x:540, y:540, scale:1 }, 'completion reveals the full saved composition');
+  assert.equal(evidence.session.landscape.painted, evidence.session.scene.strokeCount, 'completion includes every accepted scene stroke');
   assert.equal(evidence.session.stopCalls, 1, 'automatic completion stopped exactly once');
   assert.equal(evidence.session.countdown, '0:00');
   assert.equal(evidence.session.gpu.backend, 'webgpu');
   assert.equal(evidence.session.gpu.ready, true);
-  assert.ok(evidence.session.gpu.surfaces.manuscript.frames > 0 && evidence.session.acceptedSegments > 0, 'actual accepted waveform was painted');
-  assert.ok(evidence.session.brush.history.some(item => item.kind === 'finish' && item.reason === 'complete'), 'automatic report brush reveal completes');
+  assert.ok(evidence.session.landscape.frames > 0 && evidence.session.acceptedSegments > 0, 'actual accepted waveform was painted');
+  assert.ok(evidence.session.scene.usableSeconds > 0, 'final scene records accepted source duration');
   assert.ok(evidence.session.fonts.dmSans && evidence.session.fonts.waterBrush);
   const values = await page.locator('.report-heroes strong').allTextContents();
   for (const [index, key] of ['hr', 'rmssd', 'sdnn'].entries()) assert.ok(values[index].includes(evidence.session.expected[key]), `report ${key} agrees with actual engine`);
