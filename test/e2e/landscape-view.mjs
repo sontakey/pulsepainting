@@ -117,7 +117,8 @@ try {
    assert.ok(result.partial&&result.sourceStable,`${result.family} exercises partial painting without source mutation`);
    assert.ok(result.max<=1&&result.mean<.001,`${result.family} live/direct material parity`);
    assert.equal(result.repeatMax,0,`${result.family} repeat rendering is deterministic`);
-   assert.ok(result.materialPixelBudget<=4489216,`${result.family} retains the mobile pigment memory ceiling`);
+   // The live ink wash adds one bounded 256² texture to the existing cache.
+   assert.ok(result.materialPixelBudget<=4489216+256**2,`${result.family} bounds pigment memory including the live wash mask`);
    assert.ok(result.materialPixels<=result.materialPixelBudget,`${result.family} bounds pigment surfaces after multiple families and LRU eviction`);
  }
  console.log('LANDSCAPE_ALL_MATERIAL_PARITY',JSON.stringify(materialParity));
