@@ -357,6 +357,7 @@ export async function checkArtwork(page, output = process.env.PPG_ARTWORK_ARTIFA
     await page.getByRole('button', { name: 'Share artwork', exact: true }).click();
     await page.waitForFunction(() => window.PulseShare?.getState().ready);
     assert.equal(await page.locator('.pulse-share-sheet').isVisible(), true, 'report opens the artwork-first sharing screen');
+    await page.locator('.ps-art img').evaluate(image => image.decode());
     assert.equal(await page.locator('.ps-art img').isVisible(), true, 'the shared image is previewed before choosing an app');
     await page.locator('.ps-share').click();
     await page.waitForFunction(() => window.__portraitShareCalls.length === 1);

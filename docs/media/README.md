@@ -101,9 +101,26 @@ thumbnail decoded. No image pixels or interface text were edited.
   covers Chromium/WebKit behavior, layout, history, retry and capture handoff.
   This screenshot is not physical-phone, native-share or performance evidence.
 
-## Sharing and personal sketchbook
+## Simple painting sharing
 
-`pulse-painting-sharing.png` and `pulse-painting-sketchbook.png` were captured
+`pulse-painting-sharing.png` was refreshed on October 23, 2026 at 22:39 UTC.
+It is the direct 390 × 844 browser capture of the actual built app with loaded
+fonts, DPR 1, iPhone 13 emulation and reduced motion. No screenshot pixels were
+edited. The real report's Share artwork button opened this dialog.
+
+The public fixture was processed through `replayPublicFixture(1, 0, 180)` and
+its accepted segments rendered as Quiet Lake, seed 39293. The report harness
+used a fixed October 23 timestamp and 180-second capture duration. Native-share
+availability was mocked to show the phone's Share image action; no camera,
+native share delivery, visitor recording or public submission was involved.
+
+The same built-app layout passed Chromium and WebKit at 320, 390, 887 and
+1440 CSS pixels, including expanded caption access above the mobile footer.
+Evidence and capture helper are in ignored `.dream-loop/simple-sharing/`.
+
+## Earlier sharing and personal sketchbook
+
+The previous sharing image and retained `pulse-painting-sketchbook.png` were captured
 directly from the actual built app on `2026-10-23T15:28:30.307Z`, served locally
 by a fresh `tools/serve.mjs` process with the sandbox font CORS headers enabled.
 They use Chrome 155.0.8059.85 through Playwright, device scale factor 1, reduced
@@ -138,5 +155,5 @@ social-post delivery or sustained frame-rate evidence.
 | `pulse-painting-capture.jpg` | 249074 | `e5aa4cc9195b77e495e7ae8755259cd429c8f9c323a1c8df5ca6f02eb952fbe4` |
 | `pulse-painting-report.jpg` | 65173 | `c2f8559f395c9d6ed8d36738f68a0df638aab51f30377e413e8966e1ce234f4c` |
 | `pulse-painting-mobile-gallery.png` | 469347 | `2f7f07374fb73399156555da8a86281d6b982db7714efe9a7bd2b4d4caa1889b` |
-| `pulse-painting-sharing.png` | 196999 | `882d6c79830173bd54366dd235f7477d8eb1484481638ca0f446dbf177e7ce04` |
+| `pulse-painting-sharing.png` | 124894 | `03c371c3040993dd16741d01426aa3af462a5749515ccfd4aeb4b2700ec47811` |
 | `pulse-painting-sketchbook.png` | 533165 | `3a39ce8438a318de609cb2ef215e22b07ff9758e1abd86741d1f5f72afbdfb04` |

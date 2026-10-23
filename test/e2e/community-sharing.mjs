@@ -160,6 +160,9 @@ try{
     await page.locator('.community-publish-submit').click();await page.locator('.community-publish-success').waitFor({state:'visible'});
     const first=posts[0];assert.equal(first.before.status,'pending','removal receipt persisted before POST');assert.equal(first.before.ownerToken,first.body.ownerToken);assert.match(first.body.ownerToken,/^[0-9a-f]{64}$/);assert.equal(first.body.metrics,null);assert.equal(first.body.includeMetrics,false);
     assert.deepEqual(Object.keys(first.body).sort(),['id','ownerToken','image','displayName','includeMetrics','metrics','consentVersion'].sort(),'upload has a strict explicit field set');assert.equal(first.body.displayName,'<Ada & friends>');assert.ok(Buffer.from(first.body.image,'base64').length<=2*1024*1024);
+    assert.equal(await page.locator('.community-publish-success a.community-primary').getAttribute('href'),`https://www.pulsepainting.com/p/${first.body.id}`,'publication opens the public painting directly');
+    assert.equal(await page.locator('.community-publish-success a[href*="/book/"]').count(),0,'publication success does not promote a sketchbook');
+    assert.doesNotMatch(await page.locator('.community-publish-success').innerText(),/sketchbook/i);
     await page.locator('.community-publish-cancel').click();
     await page.locator('.community-publish-invitation').click();await page.locator('.community-publish-preview img').evaluate(img=>img.decode());assert.equal(posts.length,1,'reopening a published preview does not republish');await page.locator('.community-publish-cancel').click();
     await page.locator('#btn-again').click();assert.equal(await page.locator('.community-publish-dialog').isVisible(),false);
@@ -191,8 +194,15 @@ try{
     await page.locator('.community-card').first().click();await page.waitForFunction(()=>document.querySelector('.community-byline').textContent.includes('<Ada'));
     await page.goBack();await page.locator('.community-viewer').waitFor({state:'hidden'});await page.goForward();await page.locator('.community-viewer').waitFor({state:'visible'});
     await page.waitForFunction(()=>!document.querySelector('.community-view-share').disabled);
-    await page.evaluate(()=>{window.__shares=[];Object.defineProperty(navigator,'canShare',{configurable:true,value:()=>true});Object.defineProperty(navigator,'share',{configurable:true,value:payload=>{__shares.push({keys:Object.keys(payload).sort(),file:payload.files?.[0]?.type,active:navigator.userActivation?.isActive});return Promise.resolve();}});});
-    await page.locator('.community-view-share').click();await page.waitForFunction(()=>PulseShare.getState().ready);assert.match(await page.locator('.ps-link-title').innerText(),/page for this painting/);assert.equal(await page.locator('[data-action="copy-link"] span').innerText(),'Copy link');
+    assert.equal(await page.locator('.community-view-book, .community-viewer a[href*="/book/"]').count(),0,'community painting actions do not promote a sketchbook');
+    await page.evaluate(()=>{window.__shares=[];window.__copies=[];Object.defineProperty(navigator,'clipboard',{configurable:true,value:{writeText:text=>{__copies.push(text);return Promise.resolve();}}});Object.defineProperty(navigator,'canShare',{configurable:true,value:()=>true});Object.defineProperty(navigator,'share',{configurable:true,value:payload=>{__shares.push({keys:Object.keys(payload).sort(),file:payload.files?.[0]?.type,active:navigator.userActivation?.isActive});return Promise.resolve();}});});
+    await page.locator('.community-view-copy-link').click();await page.waitForFunction(()=>__copies.length===1);
+    assert.equal(await page.evaluate(()=>__copies[0]),`https://www.pulsepainting.com/p/${first.body.id}`,'community viewer copies its public painting link');
+    await page.locator('.community-view-share').click();await page.waitForFunction(()=>PulseShare.getState().ready);
+    assert.equal(await page.locator('[data-action="copy-link"] span').innerText(),'Copy painting link');
+    assert.equal(await page.locator('.ps-paper-toggle, .ps-paper, .ps-book-links').count(),0,'sharing stays focused on the painting');
+    await page.locator('[data-action="copy-link"]').click();await page.waitForFunction(()=>__copies.length===2);
+    assert.equal(await page.evaluate(()=>__copies[1]),`https://www.pulsepainting.com/p/${first.body.id}`,'copy link shares the selected public painting');
     await page.locator('.ps-share').click();assert.deepEqual(await page.evaluate(()=>__shares[0].keys),['files','title']);assert.equal(await page.evaluate(()=>__shares[0].active),true,'native share called in trusted tap');
     await page.locator('.ps-close').click();await shot(page,`${name}-community-viewer`);
     await page.locator('.community-report').click();await page.getByRole('combobox',{name:'Report reason'}).selectOption('privacy');await page.getByRole('button',{name:'Send report',exact:true}).click();await page.waitForFunction(()=>document.querySelector('.community-view-status').textContent.includes('Report received'));assert.deepEqual(reports.at(-1),{id:first.body.id,reason:'privacy'});

@@ -3,33 +3,57 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Personal Pulse Painting sketchbook checks</title>
-<link rel="stylesheet" href="/app/share-sheet.css">
 <style>
   @font-face{font-family:'Water Brush';src:url('/app/fonts/water-brush-latin.woff2')}
   @font-face{font-family:'DM Sans';src:url('/app/fonts/dm-sans-latin.woff2')}
   html,body{margin:0;background:#fdfbf7;font-family:'DM Sans',sans-serif}
-  main{padding:24px}button{min-height:44px;font:inherit;padding:10px 16px}
+  *{box-sizing:border-box}main{max-width:1324px;margin:auto;padding:12px}button{min-height:44px;font:inherit;padding:10px 16px}
+  .controls{display:flex;gap:8px;flex-wrap:wrap}#book-status{min-height:24px;margin:8px 0}
+  #direct-book{width:100%;height:680px;overflow:hidden;background:#ece7dc}
+  @media(max-width:600px){#direct-book{height:390px}}
 </style>
-<main><button id="open" type="button" disabled>Share artwork</button><div id="direct-book"></div></main>
+<main><div class="controls"><button id="open" type="button" disabled>Open component</button><button id="destroy" type="button" disabled>Destroy component</button></div><p id="book-status" role="status">Loading source image</p><div id="direct-book"></div><img id="source-image" src="/app/assets/gallery/quiet-lake-share.jpg" alt="Public fixture source" hidden></main>
 <script>
   // Instrument only browser boundaries. The tested composer, renderer and
-  // share hub are the built product code, with an already-public image file.
+  // component entry are built product code, with an already-public image file.
   window.testURLs = new Map();
   const create = URL.createObjectURL.bind(URL), revoke = URL.revokeObjectURL.bind(URL);
   URL.createObjectURL = blob => { const url = create(blob); testURLs.set(url, {blob, revoked:false}); return url; };
   URL.revokeObjectURL = url => { const item = testURLs.get(url); if(item)item.revoked=true; revoke(url); };
-  window.shareCalls = [];
-  Object.defineProperty(navigator,'canShare',{configurable:true,value:()=>true});
-  Object.defineProperty(navigator,'share',{configurable:true,value:data=>{
-    const call={file:data.files[0],active:navigator.userActivation?.isActive};shareCalls.push(call);
-    return Promise.reject(new DOMException('Cancelled','AbortError'));
-  }});
 </script>
-<script src="/app/share-sheet.js"></script>
 <script type="module">
   window.sourceBlob = await (await fetch('/app/assets/gallery/quiet-lake-share.jpg')).blob();
-  window.openHub = async () => PulseShare.open({blob:sourceBlob,title:'Pulse Painting',fileName:'test-painting.jpg'}).ready;
-  const open = document.getElementById('open');
-  open.addEventListener('click',openHub);open.disabled=false;
+  const open = document.getElementById('open'), destroy = document.getElementById('destroy'), status = document.getElementById('book-status');
+  let generation = 0, book = null;
+  window.destroyBook = () => {
+    generation++; book?.destroy(); book = null;
+    window.bookState = 'closed'; status.textContent = 'Component closed';
+    open.disabled = false; destroy.disabled = true;
+  };
+  window.openBook = () => {
+    window.destroyBook();
+    const current = generation;
+    window.bookState = 'preparing'; status.textContent = 'Preparing component';
+    open.disabled = true; destroy.disabled = false;
+    window.bookReady = (async () => {
+      try {
+        const { mountPulseSketchbook } = await import('/app/sketchbook-entry.js');
+        if(current !== generation)return false;
+        book = mountPulseSketchbook(document.getElementById('direct-book'), {blob:sourceBlob});
+        window.componentReady = book.ready;
+        const ready = await book.ready;
+        if(current !== generation)return false;
+        window.bookState = ready ? 'ready' : 'error';
+        status.textContent = ready ? 'Component ready' : 'Component could not open';
+        return ready;
+      } catch(error) {
+        if(current === generation){window.bookState = 'error';status.textContent = error.message;}
+        return false;
+      }
+    })();
+    return window.bookReady;
+  };
+  open.addEventListener('click',window.openBook);destroy.addEventListener('click',window.destroyBook);
+  open.disabled = false;window.bookState = 'idle';status.textContent = 'Source image ready';
 </script>
 </html>

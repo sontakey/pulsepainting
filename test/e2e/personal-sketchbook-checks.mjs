@@ -1,4 +1,5 @@
-// The live personal adaptation, using the actual already-public painting file.
+// The standalone personal-book component retained for public /book links,
+// using the actual already-public painting file and the built component entry.
 // Browser emulation does not certify physical-phone rendering or native apps.
 import assert from 'node:assert/strict';
 import { createServer } from 'node:http';
@@ -36,12 +37,11 @@ const base=`http://127.0.0.1:${server.address().port}`,results=[];
 const title='Your painting',nextTitle='A closer look',lastTitle='A moment to share';
 let browser,diagnosticPage,diagnosticLabel;
 
-async function openHub(page){
-  await page.goto(base);await page.locator('#open').click();
-  await page.waitForFunction(()=>PulseShare.getState().ready);
+async function loadComponent(page){
+  await page.goto(base);await page.waitForFunction(()=>window.sourceBlob instanceof Blob&&!document.getElementById('open').disabled);
 }
 async function openBook(page){
-  await page.locator('.ps-paper-toggle').click();await page.locator('iframe').waitFor();
+  await page.locator('#open').click();await page.locator('iframe').waitFor();
   const frame=page.frames().find(frame=>frame!==page.mainFrame());assert.ok(frame);
   await frame.waitForFunction(()=>document.body.dataset.ready==='1');
   // Authored desktop intro begins 220 ms after readiness. Let that scheduled
@@ -53,7 +53,7 @@ async function openBook(page){
     const image=document.querySelector('#sbBook .sb-full img');
     return image?.complete&&image.naturalWidth===1760&&image.naturalHeight===1240;
   },null,{timeout:5000});
-  await page.waitForFunction(()=>document.querySelector('.ps-paper-status')?.textContent.startsWith('Drag or tap'));
+  await page.waitForFunction(()=>window.bookState==='ready');
   return frame;
 }
 async function waitTitle(frame,value){
@@ -62,22 +62,21 @@ async function waitTitle(frame,value){
     return image?.alt===expected&&image.complete&&image.naturalWidth===1760&&image.naturalHeight===1240;
   },value);
 }
-async function assertNoLiveURLs(page,except){
-  const live=await page.evaluate(except=>[...testURLs].filter(([url,item])=>!item.revoked&&url!==except).map(([url,item])=>({url,type:item.blob.type})),except);
+async function assertNoLiveURLs(page){
+  const live=await page.evaluate(()=>[...testURLs].filter(([,item])=>!item.revoked).map(([url,item])=>({url,type:item.blob.type})));
   assert.deepEqual(live,[],'all personal page and decoder object URLs are revoked');
 }
-async function shareHash(page){
-  await page.locator('.ps-share').click();await page.waitForFunction(()=>!PulseShare.getState().sharing);
+async function sourceDigest(page){
   return page.evaluate(async()=>{
-    const call=shareCalls.at(-1),hash=await crypto.subtle.digest('SHA-256',await call.file.arrayBuffer());
-    return {hash:[...new Uint8Array(hash)].map(v=>v.toString(16).padStart(2,'0')).join(''),active:call.active,type:call.file.type,bytes:call.file.size};
+    const hash=await crypto.subtle.digest('SHA-256',await sourceBlob.arrayBuffer());
+    return {hash:[...new Uint8Array(hash)].map(v=>v.toString(16).padStart(2,'0')).join(''),type:sourceBlob.type,bytes:sourceBlob.size};
   });
 }
 async function sourceProjection(page){
   return page.evaluate(async rect=>{
     const pngs=[...testURLs].filter(([,item])=>!item.revoked&&item.blob.type==='image/png');
     if(pngs.length!==3)return {pages:pngs.length};
-    const source=new Image();source.src=document.querySelector('.ps-preview img').src;await source.decode();
+    const source=document.getElementById('source-image');await source.decode();
     const expected=document.createElement('canvas');expected.width=rect.w;expected.height=rect.h;
     expected.getContext('2d').drawImage(source,0,0,rect.w,rect.h);
     const pixels=expected.getContext('2d').getImageData(0,0,rect.w,rect.h).data;
@@ -108,11 +107,9 @@ try{
       diagnosticPage=page;diagnosticLabel=`${name}-${label}`;
       const errors=[],requests=[],failed=[];
       page.on('pageerror',error=>errors.push(error.message));page.on('request',request=>requests.push(request.url()));page.on('requestfailed',request=>failed.push(request.url()));
-      await openHub(page);
-      assert.equal(await page.locator('.ps-paper-toggle strong').innerText(),'Open your sketchbook');
+      await loadComponent(page);
       assert.equal(requests.some(url=>url.includes('sketchbook')),false,'personal renderer and fonts remain lazy until explicit action');
-      const originalPreview=await page.locator('.ps-preview img').getAttribute('src');
-      const before=await shareHash(page);assert.equal(before.hash,sourceHash);assert.equal(before.active,true);
+      const before=await sourceDigest(page);assert.equal(before.hash,sourceHash);
       const frame=await openBook(page);
       const initialBounds=await frame.evaluate(()=>({
         width:innerWidth,height:innerHeight,scrollY,
@@ -171,43 +168,30 @@ try{
         assert.ok(Math.abs(parseFloat(view.rx)||0)<.01&&Math.abs(parseFloat(view.ry)||0)<.01,'reduced motion avoids decorative tilt');
       }
       const layout=await page.evaluate(()=>{
-        const dialog=document.querySelector('.pulse-share-sheet'),stage=document.querySelector('.ps-paper-stage'),footer=document.querySelector('.ps-footer'),button=document.querySelector('.ps-share');
-        return{viewport:innerWidth,scroll:document.documentElement.scrollWidth,dialogScroll:dialog.scrollWidth,dialogWidth:dialog.clientWidth,stageWidth:stage.clientWidth,stageHeight:stage.clientHeight,footerBottom:footer.getBoundingClientRect().bottom,buttonHeight:button.getBoundingClientRect().height};
+        const stage=document.getElementById('direct-book');
+        return{viewport:innerWidth,scroll:document.documentElement.scrollWidth,stageScroll:stage.scrollWidth,stageWidth:stage.clientWidth,stageHeight:stage.clientHeight};
       });
-      assert.equal(layout.scroll,viewport.width);assert.ok(layout.dialogScroll<=layout.dialogWidth+1);assert.ok(layout.stageWidth>=260&&layout.stageHeight>=300);assert.ok(layout.footerBottom<=viewport.height+1);assert.ok(layout.buttonHeight>=44);
+      assert.equal(layout.scroll,viewport.width);assert.ok(layout.stageScroll<=layout.stageWidth+1);assert.ok(layout.stageWidth>=260&&layout.stageHeight>=300);
       const controls=await frame.locator('#sbLeft,#sbRight,#zIn,#zOut').evaluateAll(nodes=>nodes.map(el=>({w:el.getBoundingClientRect().width,h:el.getBoundingClientRect().height})));
       assert.ok(controls.every(control=>control.w>=44&&control.h>=44),'adapted controls retain mobile tap targets');
-      assert.equal(await page.locator('.ps-preview img').getAttribute('src'),originalPreview);
       if(out)await page.screenshot({path:path.join(out,`${name}-${label}.png`),fullPage:true});
-      const after=await shareHash(page);assert.equal(after.hash,sourceHash,'the book never replaces or mutates the default shared file');assert.equal(after.active,true);
-      await page.locator('.ps-paper-close').click();assert.equal(await page.locator('iframe').count(),0);assert.equal(await page.locator('.pulse-sketchbook-island').count(),0);
-      assert.equal(await page.locator('.ps-paper-toggle').evaluate(el=>el===document.activeElement),true);
-      await assertNoLiveURLs(page,originalPreview);
-      await page.locator('.ps-close').click();await assertNoLiveURLs(page);
+      const after=await sourceDigest(page);assert.deepEqual(after,before,'the book never replaces or mutates its supplied source image');
+      await page.locator('#destroy').click();assert.equal(await page.locator('iframe').count(),0);assert.equal(await page.locator('.pulse-sketchbook-island').count(),0);
+      await assertNoLiveURLs(page);
       const sketchbookRequests=requests.filter(url=>new URL(url).pathname.startsWith('/sketchbook/'));
       assert.ok(sketchbookRequests.length>0,'authored local type is loaded');
       assert.ok(sketchbookRequests.every(url=>url.endsWith('.woff2')),'no Singapore image is fetched by the personal adaptation');
       assert.equal(requests.some(url=>url.startsWith('http')&&!url.startsWith(base)),false,'personal preparation sends no remote requests');
       assert.equal(requests.some(url=>new URL(url).pathname.startsWith('/api/')),false,'opening the book never publishes an image');
       assert.deepEqual(errors,[]);assert.deepEqual(failed,[]);
-      results.push({browser:name,label,projection,layout,initialBounds,dragInput,tilt,loupeDrag,loupeHidden,sharedSourceHash:after.hash,sketchbookRequests,passed:true});await context.close();
+      results.push({browser:name,label,projection,layout,initialBounds,dragInput,tilt,loupeDrag,loupeHidden,sourceHash:after.hash,sketchbookRequests,passed:true});await context.close();
     }
 
-    // Import, preparation, and decode failures must not reopen a closed sheet
-    // or keep private object URLs alive. These paths use fresh browser pages.
+    // Exercise the component's own asynchronous cancellation and failure paths.
+    // Public route navigation and link sharing are covered by public-sketchbook.
     const context=await browser.newContext({viewport:{width:390,height:844},isMobile:true,hasTouch:true,reducedMotion:'reduce'});
-    for(const navigate of [false,true]){
-      const page=await context.newPage();await openHub(page);
-      let held,resolveSeen;const seen=new Promise(resolve=>{resolveSeen=resolve;});
-      await page.route('**/app/sketchbook-entry.js',route=>{held=route;resolveSeen();});
-      if(navigate)await page.evaluate(()=>history.pushState({},'','#sharing'));
-      await page.locator('.ps-paper-toggle').click();await seen;
-      if(navigate)await page.goBack();else await page.locator('.ps-close').click();
-      await held.fulfill({status:200,contentType:'text/javascript',body:entryBytes});
-      await page.waitForTimeout(150);assert.equal(await page.locator('iframe').count(),0);assert.equal(await page.evaluate(()=>PulseShare.getState().open),false);await assertNoLiveURLs(page);await page.close();
-    }
-    const page=await context.newPage();await openHub(page);
-    const preview=await page.locator('.ps-preview img').getAttribute('src');
+    const page=await context.newPage();await loadComponent(page);
+    diagnosticPage=page;diagnosticLabel=`${name}-component-lifecycle`;
     await page.evaluate(()=>{
       const original=HTMLCanvasElement.prototype.toBlob;
       HTMLCanvasElement.prototype.toBlob=function(callback,...args){
@@ -215,30 +199,35 @@ try{
         return original.call(this,blob=>{window.releaseEncode=()=>callback(blob);window.encodeHeld=true;},...args);
       };
     });
-    await page.locator('.ps-paper-toggle').click();await page.waitForFunction(()=>window.encodeHeld);
-    await page.locator('.ps-paper-close').click();await page.evaluate(()=>releaseEncode());await page.waitForTimeout(100);
-    assert.equal(await page.locator('iframe').count(),0);await assertNoLiveURLs(page,preview);
-    assert.equal(await page.locator('.ps-paper-toggle').getAttribute('aria-expanded'),'false');
-    await openBook(page);await page.locator('.ps-close').click();await assertNoLiveURLs(page);
+    await page.locator('#open').click();await page.waitForFunction(()=>window.encodeHeld);
+    await page.evaluate(()=>{window.pendingComponentReady=componentReady;});
+    await page.locator('#destroy').click();await page.evaluate(()=>releaseEncode());
+    assert.equal(await page.evaluate(()=>pendingComponentReady),false,'destroy settles pending component readiness without mounting a late iframe');
+    assert.equal(await page.locator('iframe').count(),0);await assertNoLiveURLs(page);
+    assert.equal(await page.evaluate(()=>bookState),'closed');
+    await openBook(page);await page.locator('#destroy').click();await assertNoLiveURLs(page);
     const invalid=await page.evaluate(async()=>{
       const{mountPulseSketchbook}=await import('/app/sketchbook-entry.js');
       const book=mountPulseSketchbook(document.getElementById('direct-book'),{blob:new Blob(['invalid'],{type:'image/jpeg'})});
       try{await book.ready;return false;}catch{return true;}finally{book.destroy();}
     });
     assert.equal(invalid,true,'a non-decodable supplied image rejects cleanly');await assertNoLiveURLs(page);assert.equal(await page.locator('iframe').count(),0);
-    await page.evaluate(async()=>{
-      await openHub();const original=HTMLCanvasElement.prototype.toBlob;
+    await page.evaluate(()=>{
+      const original=HTMLCanvasElement.prototype.toBlob;
       HTMLCanvasElement.prototype.toBlob=function(callback){HTMLCanvasElement.prototype.toBlob=original;callback(null);};
     });
-    await page.locator('.ps-paper-toggle').click();await page.waitForFunction(()=>document.querySelector('.ps-paper-status').textContent.includes('could not open'));
-    assert.equal(await page.locator('.ps-share').isEnabled(),true,'optional rendering failure does not block normal sharing');
-    assert.equal((await shareHash(page)).hash,sourceHash);await page.locator('.ps-close').click();await assertNoLiveURLs(page);
+    await page.locator('#open').click();await page.waitForFunction(()=>bookState==='error');
+    assert.match(await page.locator('#book-status').innerText(),/could not be prepared/);
+    assert.equal(await page.locator('iframe').count(),0);await assertNoLiveURLs(page);
+    assert.equal((await sourceDigest(page)).hash,sourceHash,'failed composition retains the original supplied image');
+    await page.locator('#destroy').click();await openBook(page);
+    await page.locator('#destroy').click();await assertNoLiveURLs(page);
     await page.close();await context.close();
-    results.push({browser:name,lifecycle:{closeDuringImport:true,backDuringImport:true,closeDuringPreparation:true,invalidImage:true,encoderFailure:true,allURLsRevoked:true},passed:true});
+    results.push({browser:name,lifecycle:{destroyDuringPreparation:true,pendingReadySettled:true,invalidImage:true,encoderFailure:true,reopenAfterFailure:true,allURLsRevoked:true},passed:true});
     await browser.close();browser=null;
   }
   if(out)writeFileSync(path.join(out,'results.json'),JSON.stringify({scope:'Personal adapted ThreeUI book; public-fixture image and browser emulation only',sourceHash,entryHash,originalSourceRevision:manifest.sourceRevision,results},null,2)+'\n');
-  console.log('PASS personal sketchbook: supplied pixels, three local spreads, pointer arrows, page taps/drags, keyboard, zoom, tilt/loupe, mobile/reduced motion, lazy loading, failure/disposal and unchanged share bytes.');
+  console.log('PASS standalone personal sketchbook: supplied pixels, three local spreads, pointer arrows, page taps/drags, keyboard, zoom, tilt/loupe, mobile/reduced motion, lazy loading, failure/disposal and unchanged source bytes.');
 }catch(error){
   if(out&&diagnosticPage&&!diagnosticPage.isClosed())await diagnosticPage.screenshot({path:path.join(out,`failure-${diagnosticLabel}.png`),fullPage:true}).catch(()=>{});
   throw error;

@@ -25,7 +25,6 @@ figure{margin:0}img{display:block;width:100%;height:auto;border:1px solid #e3ded
 <p class="brand">Pulse Painting</p><h1>A shared moment.</h1><p class="byline">Painted by a pulse. Shared by <strong>${esc(name)}</strong>.</p>
 <figure><img src="${esc(painting.imageURL)}" width="1080" height="1350" alt="A pulse painting shared by ${esc(name)}"><figcaption>A little of someone’s world, for you to discover.</figcaption></figure>
 <p class="invite">What would your pulse paint?</p><div class="actions"><a class="button" href="${origin}/">Make your own painting</a><a class="button secondary" href="${appURL}">Explore this painting</a></div>
-<a class="gallery" href="${origin}/book/${painting.id}">Open the sketchbook <svg class="ui-arrow" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M5 19 19 5M5 5h14v14"/></svg></a><br>
 <a class="gallery" href="${origin}/?collection=community#landscapes">Wander through the gallery <svg class="ui-arrow" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M5 19 19 5M5 5h14v14"/></svg></a>
 <p class="footer">A project by <a href="https://chatppg.com/">ChatPPG</a>. Powered by <a href="https://github.com/sontakey/ppg-js">ppg-js</a>.</p>
 </main></body></html>`;

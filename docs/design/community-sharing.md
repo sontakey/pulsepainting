@@ -22,10 +22,10 @@ The cached painting is prepared before the visitor taps **Share image**, so
 the native share call runs in that click and retains Safari's user activation.
 Cancellation is quiet; browsers without file sharing can save the image.
 
-X, LinkedIn, Facebook and WhatsApp open their link-sharing destinations.
-Instagram and TikTok use the phone's native image-share sheet or an image
-download, with a separate caption-copy action. App availability is controlled
-by the operating system. These controls do not automatically publish posts.
+The default controls are Share image, Save image and Copy painting link
+(or Copy app link while private). The optional caption lives in a disclosure.
+The phone's native share sheet provides available social destinations; the
+application does not add a separate platform grid or publish posts automatically.
 
 Private artwork can be shared without uploading it. Until a painting is
 published, link buttons invite people to the application. Published paintings
@@ -54,9 +54,10 @@ includes that capability. Previously downloaded copies cannot be recalled.
 Storage, limits, migration and moderation are documented in
 [the operations guide](../../db/README.md).
 
-## Personal sketchbook and exact ThreeUI reference
+## Existing sketchbook links and preserved ThreeUI reference
 
-The personal paper book is adapted from the exact
+The main sharing screen no longer promotes or opens a sketchbook. Existing
+public `/book/<id>` links remain compatible. Their renderer is adapted from the exact
 [ThreeUI Sketchbook source](https://threeui.com/source-code/sketchbook.json),
 revision `3938bc8def563f89ed587e52ac35ddc056c0a5f0`. All three registered source
 files and seventeen assets are verified by SHA-256 before building. The

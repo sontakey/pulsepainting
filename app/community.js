@@ -129,7 +129,7 @@
   function ensureViewer(){
     if(viewer)return;
     viewer=node('dialog','community-viewer');viewer.setAttribute('role','dialog');viewer.setAttribute('aria-labelledby','community-view-title');
-    viewer.innerHTML='<button type="button" class="community-close" aria-label="Close painting">×</button><div class="community-view-art"><img alt="" width="1080" height="1350"></div><div class="community-view-copy"><p class="community-kicker">From the community</p><h2 id="community-view-title">A shared moment</h2><p class="community-byline"></p><div class="community-view-metrics"></div><p class="community-note">Shared by choice. The name and any measurements shown were selected by the person publishing this painting.</p><button type="button" class="community-primary community-view-share">Share painting</button><a class="community-secondary community-view-book" hidden>Open the sketchbook</a><div class="community-view-navigation"><button type="button" aria-label="Previous community painting">←</button><span></span><button type="button" aria-label="Next community painting">→</button></div><div class="community-owner-actions" hidden><button type="button" class="community-text-button community-remove">Remove my painting</button><button type="button" class="community-text-button community-recovery">Copy private removal link</button></div><button type="button" class="community-text-button community-report">Report painting</button><div class="community-moderation" hidden></div><p class="community-view-status" role="status" aria-live="polite"></p></div>';
+    viewer.innerHTML='<button type="button" class="community-close" aria-label="Close painting">×</button><div class="community-view-art"><img alt="" width="1080" height="1350"></div><div class="community-view-copy"><p class="community-kicker">From the community</p><h2 id="community-view-title">A shared moment</h2><p class="community-byline"></p><div class="community-view-metrics"></div><p class="community-note">Shared by choice. The name and any measurements shown were selected by the person publishing this painting.</p><button type="button" class="community-primary community-view-share">Share painting</button><button type="button" class="community-secondary community-view-copy-link" disabled>Copy painting link</button><div class="community-view-navigation"><button type="button" aria-label="Previous community painting">←</button><span></span><button type="button" aria-label="Next community painting">→</button></div><div class="community-owner-actions" hidden><button type="button" class="community-text-button community-remove">Remove my painting</button><button type="button" class="community-text-button community-recovery">Copy private removal link</button></div><button type="button" class="community-text-button community-report">Report painting</button><div class="community-moderation" hidden></div><p class="community-view-status" role="status" aria-live="polite"></p></div>';
     document.body.append(viewer);
     const close=()=>hooks.closePainting?.();
     viewer.querySelector('.community-close').addEventListener('click',close);
@@ -142,6 +142,7 @@
     art.addEventListener('pointerdown',event=>{if(event.pointerType==='touch')gesture={id:event.pointerId,x:event.clientX,y:event.clientY};});
     art.addEventListener('pointercancel',()=>gesture=null);art.addEventListener('pointerup',event=>{if(!gesture||gesture.id!==event.pointerId)return;const dx=event.clientX-gesture.x,dy=event.clientY-gesture.y;gesture=null;if(Math.abs(dx)>44&&Math.abs(dx)>Math.abs(dy)*1.5)step(dx<0?1:-1);});
     viewer.querySelector('.community-view-share').addEventListener('click',()=>{if(viewed)window.PulseShare?.open({imageURL:viewed.imageURL,title:'A moment, painted by a pulse',fileName:'pulse-painting.jpg',publicURL:publicURL(viewed.id),caption:'A landscape made from a real pulse. Make your own at Pulse Painting.'});});
+    viewer.querySelector('.community-view-copy-link').addEventListener('click',()=>{if(viewed)copy(publicURL(viewed.id),viewer.querySelector('.community-view-status'),'Painting link copied.');});
     viewer.querySelector('.community-recovery').addEventListener('click',()=>{const value=owner(viewed?.id);if(value)copy(privateURL(value.id,value.ownerToken),viewer.querySelector('.community-view-status'),'Private removal link copied. Keep it to yourself; anyone with it can remove this painting.');});
     viewer.querySelector('.community-remove').addEventListener('click',showRemoval);
     viewer.querySelector('.community-report').addEventListener('click',showReport);
@@ -155,7 +156,7 @@
     viewer.querySelector('.community-remove').textContent='Remove my painting';viewer.querySelector('.community-report').hidden=false;
     viewer.querySelector('.community-moderation').hidden=true;viewer.querySelector('.community-moderation').replaceChildren();
     viewer.querySelector('.community-view-status').textContent='';viewer.querySelector('.community-view-share').disabled=false;
-    const bookLink=viewer.querySelector('.community-view-book');bookLink.href=new URL(`book/${item.id}`,CANONICAL).href;bookLink.hidden=false;
+    viewer.querySelector('.community-view-copy-link').disabled=false;
     const ids=[...byId.keys()];viewer.querySelector('.community-view-navigation span').textContent=ids.length>1?`${ids.indexOf(item.id)+1} of ${ids.length} loaded`:'';
     viewer.querySelectorAll('.community-view-navigation button').forEach(button=>button.disabled=ids.length<2);
   }
@@ -164,7 +165,7 @@
     window.PulseShare?.close();
     ensureViewer();viewOpener=opener||grid.querySelector(`[data-painting="${id}"]`)||document.getElementById('gallery-tab-community');
     const current=++viewVersion;viewRequest?.abort();viewRequest=new AbortController();viewed=null;
-    viewer.querySelector('.community-view-status').textContent='Opening the painting…';viewer.querySelector('.community-view-share').disabled=true;viewer.querySelector('.community-view-book').hidden=true;
+    viewer.querySelector('.community-view-status').textContent='Opening the painting…';viewer.querySelector('.community-view-share').disabled=true;viewer.querySelector('.community-view-copy-link').disabled=true;
     viewer.querySelector('img').removeAttribute('src');viewer.querySelector('.community-byline').textContent='';viewer.querySelector('.community-view-metrics').replaceChildren();viewer.querySelector('.community-owner-actions').hidden=true;viewer.querySelector('.community-moderation').hidden=true;viewer.querySelector('.community-report').hidden=true;
     if(!viewer.open)viewer.showModal();viewer.querySelector('.community-close').focus({preventScroll:true});
     try{const data=await request(`/api/paintings?id=${encodeURIComponent(id)}`,{signal:viewRequest.signal});if(current!==viewVersion||!active||!viewer.open)return;renderViewer(painting(data.painting));}
@@ -184,7 +185,7 @@
     keep.addEventListener('click',()=>{panel.hidden=true;viewer.querySelector('.community-remove').focus();});
     remove.addEventListener('click',async()=>{
       remove.disabled=true;keep.disabled=true;const feedback=viewer.querySelector('.community-view-status');feedback.textContent='Removing the painting…';
-      try{await request(`/api/paintings?id=${item.id}`,{method:'DELETE',headers:{'Content-Type':'application/json'},body:JSON.stringify({ownerToken:credentials.ownerToken})});saveReceipt({...credentials,status:'removed'});byId.delete(item.id);grid.querySelector(`[data-painting="${item.id}"]`)?.remove();renderExamples();listLoaded=false;if(viewed?.id!==item.id)return;viewer.querySelector('img').removeAttribute('src');viewer.querySelector('.community-view-share').disabled=true;viewer.querySelector('.community-view-book').hidden=true;viewer.querySelector('.community-owner-actions').hidden=true;panel.hidden=true;feedback.textContent='Your painting has been removed from the gallery.';}
+      try{await request(`/api/paintings?id=${item.id}`,{method:'DELETE',headers:{'Content-Type':'application/json'},body:JSON.stringify({ownerToken:credentials.ownerToken})});saveReceipt({...credentials,status:'removed'});byId.delete(item.id);grid.querySelector(`[data-painting="${item.id}"]`)?.remove();renderExamples();listLoaded=false;if(viewed?.id!==item.id)return;viewer.querySelector('img').removeAttribute('src');viewer.querySelector('.community-view-share').disabled=true;viewer.querySelector('.community-view-copy-link').disabled=true;viewer.querySelector('.community-owner-actions').hidden=true;panel.hidden=true;feedback.textContent='Your painting has been removed from the gallery.';}
       catch(error){if(viewed?.id===item.id){feedback.textContent=error.message;remove.disabled=false;keep.disabled=false;}}
     });remove.focus();
   }
@@ -232,13 +233,13 @@
       syncPublish();
     }catch(error){if(publishingView===view&&version===publishVersion){publishDialog.querySelector('.community-publish-status').textContent=error.message||'Your preview could not be prepared. Close and try again.';}}
   }
-  function openPublish({container,preparePublication,intent}={}){
+  function openPublish({container,preparePublication}={}){
     if(!container?.isConnected||document.getElementById('screen-summary').hidden||typeof preparePublication!=='function')return;
     closePublication({focus:false});ensurePublisher();
     let draft=drafts.get(container);if(!draft){draft={displayName:'',includeMetrics:false,prepared:null,id:null,ownerToken:null,body:null,busy:false,status:'draft'};drafts.set(container,draft);}
-    publishingView={container,preparePublication,draft,opener:document.activeElement,previewURL:null,intent:intent==='sketchbook'?'sketchbook':'painting'};
-    publishDialog.querySelector('#community-publish-title').textContent=publishingView.intent==='sketchbook'?'Share your sketchbook.':'A place in the gallery.';
-    publishDialog.querySelector('.community-publish-intro').textContent=publishingView.intent==='sketchbook'?'Choose what to publish. Your painting will appear in the community gallery and a sketchbook anyone with the link can open.':'A little of your world, for someone else to discover.';
+    publishingView={container,preparePublication,draft,opener:document.activeElement,previewURL:null};
+    publishDialog.querySelector('#community-publish-title').textContent='A place in the gallery.';
+    publishDialog.querySelector('.community-publish-intro').textContent='A little of your world, for someone else to discover.';
     publishDialog.querySelector('#community-display-name').value=draft.displayName;
     publishDialog.querySelector('#community-include-metrics').checked=draft.includeMetrics;
     publishDialog.querySelector('#community-public-consent').checked=false;
@@ -303,13 +304,10 @@
     publishDialog.querySelector('.community-publish-fields').hidden=true;publishDialog.querySelector('.community-publish-submit').hidden=true;publishDialog.querySelector('.community-publish-cancel').textContent='Done';
     const feedback=publishDialog.querySelector('.community-publish-status');feedback.textContent='Your painting has a place in the gallery.';
     const success=publishDialog.querySelector('.community-publish-success');success.replaceChildren();success.hidden=false;
-    const bookURL=new URL(`book/${draft.id}`,CANONICAL).href;
-    const view=node('a','community-primary','Open your sketchbook');view.href=bookURL;
-    const book=node('button','community-secondary','Preview & share sketchbook');book.type='button';
-    book.addEventListener('click',()=>{closePublication({focus:false});window.PulseShare?.open({blob:draft.prepared?.blob,imageURL:draft.published?.imageURL,publicURL:publicURL(draft.id),title:'My Pulse Painting',fileName:'pulse-painting.jpg',openBook:true});});
-    const share=node('button','community-secondary','Share public link');share.type='button';share.addEventListener('click',()=>window.PulseShare?.open({blob:draft.prepared?.blob,imageURL:draft.published?.imageURL,publicURL:publicURL(draft.id),title:'My Pulse Painting',fileName:'pulse-painting.jpg'}));
+    const view=node('a','community-primary','View your painting');view.href=publicURL(draft.id);
+    const share=node('button','community-secondary','Share painting');share.type='button';share.addEventListener('click',()=>{closePublication({focus:false});window.PulseShare?.open({blob:draft.prepared?.blob,imageURL:draft.published?.imageURL,publicURL:publicURL(draft.id),title:'My Pulse Painting',fileName:'pulse-painting.jpg'});});
     const recovery=node('button','community-text-button','Copy private removal link');recovery.type='button';recovery.addEventListener('click',()=>copy(privateURL(draft.id,draft.ownerToken),feedback,'Private removal link copied. Keep it to yourself; it allows removal of your painting.'));
-    success.append(view,book,share,recovery,node('p','community-note','Your sketchbook opens directly from its link. This browser remembers your removal key. Save the private removal link to manage the painting from another device.'));
+    success.append(view,share,recovery,node('p','community-note','This browser remembers your removal key. Save the private removal link to manage the painting from another device.'));
   }
   // A recovery secret stays in the fragment, never in a request, referrer or
   // public share URL. Consume it into this browser's private ownership receipt.
