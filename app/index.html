@@ -21,6 +21,8 @@
 <link rel="stylesheet" href="landscape.css">
 <link rel="stylesheet" href="portrait.css">
 <link rel="stylesheet" href="gallery.css">
+<link rel="stylesheet" href="share-sheet.css">
+<link rel="stylesheet" href="community.css">
 </head>
 <body>
 <div id="app" class="screen-host">
@@ -50,7 +52,7 @@
     <p class="lead">Three minutes. A place made from your pulse.</p>
     <button id="btn-explore-gallery" class="gallery-invitation" type="button" aria-label="Explore the paintings" aria-controls="landscapes" aria-expanded="false">
       <span class="gallery-invitation-mark" aria-hidden="true"><svg viewBox="0 0 88 54"><path d="M3 32c8 0 8-23 15-23s7 30 15 30 6-20 13-20 7 15 15 15 9-10 24-10"/><path d="M3 44c12-6 16 4 28 0s20-6 31-2 17 0 23-2"/></svg></span>
-      <span><strong>Explore the paintings</strong><span>Sixteen places your pulse could take you</span></span><span class="gallery-invitation-arrow" aria-hidden="true">↗</span>
+      <span><strong>Explore the paintings</strong><span>Shared moments and sixteen places to begin</span></span><span class="gallery-invitation-arrow" aria-hidden="true">↗</span>
     </button>
     <ol class="ready-steps">
       <li class="ready-step">
@@ -101,11 +103,23 @@
     </section>
     <section class="landscape-gallery" id="landscapes" aria-labelledby="gallery-heading">
       <div class="gallery-section-heading"><div><p class="gallery-eyebrow">Sixteen ways to see your rhythm</p><h2 id="gallery-heading">Where will your pulse take you?</h2></div><p>From open water to mountains and night skies. Every recording makes its own marks; each session takes a different path.</p></div>
+      <div class="gallery-collections" role="group" aria-label="Choose a painting collection"><button id="gallery-tab-examples" type="button" aria-pressed="true" aria-controls="example-gallery-content">Example landscapes</button><button id="gallery-tab-community" type="button" aria-pressed="false" aria-controls="community-gallery">Community <span aria-hidden="true">↗</span></button></div>
+      <div id="example-gallery-content">
       <div class="gallery-toolbar"><div class="gallery-filters" role="group" aria-label="Filter landscapes"><button type="button" data-gallery-filter="all" aria-pressed="true">All landscapes <span>16</span></button><button type="button" data-gallery-filter="water" aria-pressed="false">Water</button><button type="button" data-gallery-filter="land" aria-pressed="false">Land</button><button type="button" data-gallery-filter="sky" aria-pressed="false">Sky</button></div><p id="gallery-count" aria-live="polite">16 example landscapes</p></div>
       <div id="gallery-grid" class="gallery-grid" aria-busy="true"></div>
       <p id="gallery-load-status" class="gallery-example-note" role="status">Loading the example landscapes…</p>
       <button id="gallery-retry" class="gallery-retry" type="button" hidden>Try loading again</button>
       <p class="gallery-example-note">Example landscapes made from a public pulse recording. Your painting comes from your own rhythm.</p>
+      </div>
+      <section id="community-gallery" class="community-gallery" aria-label="Community paintings" hidden>
+        <p class="community-intro">A moment from someone’s world. Paintings shared by choice, each with its own rhythm.</p>
+        <details id="community-owned" class="community-owned" hidden><summary>Your painting links on this device</summary><div></div></details>
+        <div id="community-grid" class="community-grid"></div>
+        <div id="community-empty" class="community-empty" hidden><span aria-hidden="true">〰</span><h3>A little space for a first painting.</h3><p>No paintings have been shared yet. Make your own, then choose whether to add it here.</p></div>
+        <p id="community-status" class="community-status" role="status" aria-live="polite"></p>
+        <button id="community-more" class="community-more" type="button" hidden>More paintings</button>
+        <p class="community-note">These paintings are shared by their makers. Names are optional; measurements appear only when selected for publication. Art does not measure health.</p>
+      </section>
     </section>
     <section class="gallery-process" id="how-it-works" aria-labelledby="process-title">
       <div class="gallery-section-heading"><div><p class="gallery-eyebrow">From a heartbeat to a keepsake</p><h2 id="process-title">A moment worth making.</h2></div><a class="gallery-text-link" href="#paint-on-phone">Make your own <span aria-hidden="true">↗</span></a></div>
@@ -187,6 +201,8 @@
 <script>window.PPGMonitor = PPG.PPGMonitor;</script>
 <script src="mobile-dock.js"></script>
 <script src="landscape.js"></script>
+<script src="share-sheet.js"></script>
+<script src="community.js"></script>
 <script src="portrait.js"></script>
 <script src="app.js"></script>
 <script type="module" src="gallery.js"></script>

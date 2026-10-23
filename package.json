@@ -9,10 +9,10 @@
     "node": ">=24"
   },
   "scripts": {
-    "build": "node tools/prepare-dist.mjs && tsup",
+    "build": "node tools/verify-sketchbook.mjs && node tools/prepare-dist.mjs && tsup",
     "dev": "npm run build && node tools/serve.mjs",
     "serve": "node tools/serve.mjs",
-    "test": "npm run build && npm run test:landscape && npm run test:app && npm run test:paint-fallbacks && npm run test:gallery && npm run test:mobile-gallery",
+    "test": "npm run build && npm run test:community-api && npm run test:landscape && npm run test:app && npm run test:paint-fallbacks && npm run test:gallery && npm run test:mobile-gallery && npm run test:community-sharing && npm run test:share-sheet && npm run test:sketchbook && npm run test:personal-sketchbook && npm run test:public-painting-page",
     "test:app": "node test/e2e/pulse-painting.mjs",
     "test:safari-session": "node test/e2e/safari-session.mjs",
     "test:paint-performance": "node test/e2e/paint-performance.mjs",
@@ -20,7 +20,13 @@
     "test:qr": "node test/e2e/qr-checks.mjs",
     "test:landscape": "node test/landscape-model.mjs && node test/e2e/landscape-view.mjs && node test/e2e/landscape-parity.mjs --compositor-regression",
     "test:gallery": "node test/e2e/gallery-checks.mjs",
-    "test:mobile-gallery": "node test/e2e/mobile-gallery-checks.mjs"
+    "test:mobile-gallery": "node test/e2e/mobile-gallery-checks.mjs",
+    "test:community-api": "node test/community-api.mjs",
+    "test:community-sharing": "node test/e2e/community-sharing.mjs",
+    "test:sketchbook": "node test/e2e/sketchbook-checks.mjs",
+    "test:share-sheet": "node test/e2e/share-sheet-checks.mjs",
+    "test:personal-sketchbook": "node test/e2e/personal-sketchbook-checks.mjs",
+    "test:public-painting-page": "node test/e2e/public-painting-page.mjs"
   },
   "devDependencies": {
     "playwright": "1.63.0",
@@ -31,5 +37,13 @@
   "repository": {
     "type": "git",
     "url": "git+https://github.com/sontakey/pulsepainting.git"
+  },
+  "dependencies": {
+    "@vercel/blob": "^2.8.2",
+    "@vercel/functions": "^3.10.3",
+    "pg": "^8.23.1",
+    "react": "19.3.1",
+    "react-dom": "19.3.1",
+    "sharp": "^0.35.5"
   }
 }

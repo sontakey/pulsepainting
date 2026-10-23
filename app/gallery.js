@@ -2,6 +2,8 @@
 const ready = document.getElementById('screen-ready');
 const desktop = ready?.classList.contains('desktop-ready');
 const requestedScene = new URL(location.href).searchParams.get('scene');
+const requestedPainting = new URL(location.href).searchParams.get('painting');
+const requestedCollection = new URL(location.href).searchParams.get('collection');
 const manifestURL = new URL('./assets/gallery/manifest.json', import.meta.url);
 const canonicalURL = 'https://www.pulsepainting.com/';
 const groups = {
@@ -36,16 +38,35 @@ const retry = document.getElementById('gallery-retry');
 const heading = document.getElementById('gallery-heading');
 let galleryPromise=null, galleryAPI=null, openRequest=0, mobileShown=false;
 let returnScroll=0, returnFocus=explore;
+let activeCollection='examples';
+const exampleContent=document.getElementById('example-gallery-content');
+const communityContent=document.getElementById('community-gallery');
+const exampleTab=document.getElementById('gallery-tab-examples');
+const communityTab=document.getElementById('gallery-tab-community');
 
 function routeURL(scene=null) {
-  const url=new URL(location.href);url.searchParams.delete('scene');url.hash='landscapes';
+  const url=new URL(location.href);url.searchParams.delete('scene');url.searchParams.delete('painting');url.searchParams.delete('collection');url.hash='landscapes';
   if(scene)url.searchParams.set('scene',scene.id);
   return url;
 }
 function readyURL() {
-  const url=new URL(location.href);url.searchParams.delete('scene');
+  const url=new URL(location.href);url.searchParams.delete('scene');url.searchParams.delete('painting');url.searchParams.delete('collection');
   if(url.hash==='#landscapes')url.hash='';
   return url;
+}
+function communityURL(id=null){
+  const url=routeURL();url.searchParams.set('collection','community');if(id)url.searchParams.set('painting',id);return url;
+}
+function selectCollection(value){
+  activeCollection=value;
+  exampleContent.hidden=value!=='examples';communityContent.hidden=value!=='community';
+  exampleTab.setAttribute('aria-pressed',String(value==='examples'));communityTab.setAttribute('aria-pressed',String(value==='community'));
+  if(value==='community'){++openRequest;galleryAPI?.dismiss();}
+  else window.PulseCommunity?.hide();
+}
+function presentCommunity(id=null,opener=null){
+  if(ready.hidden)return;
+  selectCollection('community');window.PulseCommunity?.show({paintingId:id,opener});
 }
 function writeRoute(mode, view, url) {
   history[mode+'State']({...history.state,pulsePaintingGallery:view},'',url);
@@ -64,6 +85,7 @@ function showMobileGallery() {
 }
 function hideMobileGallery({focus=true}={}) {
   ++openRequest;galleryAPI?.dismiss();
+  window.PulseCommunity?.hide();
   if(!mobileShown)return;
   mobileShown=false;ready.classList.remove('mobile-gallery-open');panel.hidden=true;
   back.hidden=true;explore.setAttribute('aria-expanded','false');
@@ -93,7 +115,7 @@ async function presentGallery(sceneId=null,{focus=false}={}) {
   try{
     const api=await loadGallery();
     // Network completion must never reopen a dismissed gallery or cover capture.
-    if(request!==openRequest || ready.hidden || (!desktop&&!mobileShown))return;
+    if(request!==openRequest || ready.hidden || activeCollection!=='examples' || (!desktop&&!mobileShown))return;
     api.mount();
     const index=api.scenes.findIndex(scene=>scene.id===sceneId);
     if(index>=0)api.open(index,sceneOpener(api.scenes[index]),{historyMode:'none'});
@@ -102,7 +124,7 @@ async function presentGallery(sceneId=null,{focus=false}={}) {
 }
 function enterMobileGallery() {
   if(ready.hidden)return;
-  writeRoute('push','gallery',routeURL());showMobileGallery();
+  writeRoute('push','gallery',routeURL());selectCollection('examples');showMobileGallery();
   heading.tabIndex=-1;heading.focus({preventScroll:true});window.scrollTo({top:0,behavior:'instant'});
   presentGallery();
 }
@@ -119,12 +141,17 @@ if(desktop){
     event.preventDefault();target.scrollIntoView({behavior:matchMedia('(prefers-reduced-motion: reduce)').matches?'instant':'smooth',block:'start'});
     if(target.id==='paint-on-phone'){target.tabIndex=-1;target.focus({preventScroll:true});}
   }));
-  presentGallery(requestedScene);
+  if(requestedPainting||requestedCollection==='community'){
+    writeRoute('replace','gallery',communityURL());
+    if(requestedPainting)writeRoute('push','painting',communityURL(requestedPainting));
+    presentCommunity(requestedPainting);
+    document.getElementById('landscapes').scrollIntoView({behavior:'instant'});
+  }else presentGallery(requestedScene);
 }else{
   heading.tabIndex=-1;
   heading.textContent='A world within.';
   heading.previousElementSibling.textContent='The Pulse Painting gallery';
-  heading.parentElement.nextElementSibling.textContent='Sixteen landscapes, painted from a pulse. Explore a little. Imagine your own.';
+  heading.parentElement.nextElementSibling.textContent='Shared moments and sixteen landscapes, painted from a pulse. Explore a little. Imagine your own.';
   explore.addEventListener('click',enterMobileGallery);
   back.addEventListener('click',()=>{
     if(history.state?.pulsePaintingGallery==='gallery')history.back();
@@ -134,16 +161,13 @@ if(desktop){
   // the existing startSession handler, including while a manifest is pending.
   start.addEventListener('click',()=>{
     ++openRequest;
-    if(mobileShown || new URL(location.href).searchParams.has('scene'))returnToCapture({focusStart:true});
+    if(mobileShown || new URL(location.href).searchParams.has('scene') || new URL(location.href).searchParams.has('painting'))returnToCapture({focusStart:true});
   },{capture:true});
-  window.addEventListener('popstate',()=>{
-    if(ready.hidden){++openRequest;return;}
-    const url=new URL(location.href),scene=url.searchParams.get('scene');
-    if(url.hash==='#landscapes' || scene){
-      showMobileGallery();if(!scene)galleryAPI?.dismiss();presentGallery(scene);
-    }else hideMobileGallery();
-  });
-  if(requestedScene){
+  if(requestedPainting||requestedCollection==='community'){
+    writeRoute('replace',null,readyURL());writeRoute('push','gallery',communityURL());showMobileGallery();
+    if(requestedPainting)writeRoute('push','painting',communityURL(requestedPainting));
+    presentCommunity(requestedPainting);
+  }else if(requestedScene){
     // Keep the normal ready action usable while a deep-link manifest loads.
     const request=++openRequest;
     loadGallery().then(api=>{
@@ -161,6 +185,26 @@ if(desktop){
   }
 }
 retry.addEventListener('click',()=>presentGallery(new URL(location.href).searchParams.get('scene')));
+exampleTab.addEventListener('click',()=>{if(ready.hidden)return;writeRoute('replace','gallery',routeURL());selectCollection('examples');presentGallery();});
+communityTab.addEventListener('click',()=>{if(ready.hidden)return;writeRoute('replace','gallery',communityURL());presentCommunity();});
+window.PulseCommunity?.configure({
+  openPainting:(id,opener,{replace=false}={})=>{
+    if(ready.hidden)return;writeRoute(replace?'replace':'push','painting',communityURL(id));presentCommunity(id,opener);
+  },
+  closePainting:()=>{
+    if(history.state?.pulsePaintingGallery==='painting')history.back();
+    else {writeRoute('replace','gallery',communityURL());presentCommunity();}
+  },
+});
+window.addEventListener('popstate',()=>{
+  if(ready.hidden){++openRequest;window.PulseCommunity?.hide();return;}
+  const url=new URL(location.href),scene=url.searchParams.get('scene'),painting=url.searchParams.get('painting');
+  if(url.hash==='#landscapes'||scene||painting){
+    showMobileGallery();
+    if(painting||url.searchParams.get('collection')==='community')presentCommunity(painting);
+    else {selectCollection('examples');if(!scene)galleryAPI?.dismiss();presentGallery(scene);}
+  }else if(!desktop)hideMobileGallery();else {window.PulseCommunity?.hide();selectCollection('examples');galleryAPI?.dismiss();}
+});
 
 async function initGallery() {
   const response = await fetch(manifestURL);

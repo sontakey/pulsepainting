@@ -6,6 +6,7 @@
   const WIDTH = 1080, HEIGHT = 1350;
   const PAPER = '#fdfbf7', INK = '#15213a', BLUE = '#445775';
   const instances = new Map();
+  let revision = 0;
   const valueLabel = value => Number.isFinite(value) ? `${Math.round(value)}` : '—';
   function durationLabel(duration) {
     const seconds = Math.max(0, Math.round(Number(duration) || 0));
@@ -38,7 +39,7 @@
     const share = options.shareButton, save = options.saveButton, status = section.querySelector('.portrait-status'), retry = section.querySelector('.portrait-retry');
     const name = sceneName(scene), duration = durationLabel(scene.usableSeconds), date = dateLabel(options.startedAt);
     section.querySelector('figcaption').textContent = `Made from ${duration} of accepted pulse. Your original waveform is in the menu.`;
-    const state = { canvas, section, scene, options, includeMetrics: false, blob: null, file: null, sharing: false, renderVersion: 0, disposed: false, urls: new Set() };
+    const state = { canvas, section, scene, options, revision: ++revision, includeMetrics: false, blob: null, file: null, sharing: false, renderVersion: 0, disposed: false, urls: new Set() };
     const syncActions = () => {
       if (share) share.disabled = !state.file || state.sharing || state.disposed;
       if (save) save.disabled = !state.blob || state.disposed;
@@ -96,6 +97,13 @@
     };
     const shareArtwork = () => {
       if (!state.file || state.sharing || state.disposed) return;
+      if (window.PulseShare) {
+        state.shareHub = window.PulseShare.open({
+          blob: state.blob, title: 'Pulse Painting', fileName: 'pulse-painting.png',
+          onPublish: typeof options.onPublish === 'function' ? options.onPublish : undefined,
+        });
+        return;
+      }
       const data = { files: [state.file], title: 'Pulse Painting' };
       let supported = false;
       try { supported = typeof navigator.share === 'function' && typeof navigator.canShare === 'function' && navigator.canShare(data); } catch { /* Fall back to download. */ }
@@ -148,7 +156,7 @@
   function clear(container) {
     for (const [target, state] of instances) {
       if (container && container !== target) continue;
-      state.disposed = true; state.renderVersion++; state.releaseActions?.();
+      state.disposed = true; state.renderVersion++; state.releaseActions?.(); state.shareHub?.close();
       state.urls.forEach(url => URL.revokeObjectURL(url)); state.urls.clear();
       target.replaceChildren(); instances.delete(target);
     }
@@ -157,12 +165,55 @@
     const state = container ? instances.get(container) : [...instances.values()].at(-1);
     if (!state) return null;
     return {
-      width: state.canvas.width, height: state.canvas.height, ready: !!state.blob,
+      width: state.canvas.width, height: state.canvas.height, ready: !!state.blob, revision: state.revision,
       includeMetrics: state.includeMetrics, family: state.scene.family,
       seed: state.scene.seed, version: state.scene.version, strokeCount: state.scene.strokes.length,
       usableSeconds: state.scene.usableSeconds, durationSec: state.options.durationSec,
       bytes: state.blob?.size || 0,
     };
   }
-  window.PulsePortrait = Object.freeze({ mount, clear, getState });
+  async function preparePublication({ includeMetrics = false } = {}, container) {
+    const state = container ? instances.get(container) : [...instances.values()].at(-1);
+    const current = () => !!state && !state.disposed && (container ? instances.get(container) === state : [...instances.values()].includes(state));
+    if (!current() || !state.art) throw new Error('Your finished painting is not ready yet.');
+    const canvas = document.createElement('canvas'); canvas.width = WIDTH; canvas.height = HEIGHT;
+    const ctx = canvas.getContext('2d');
+    ctx.fillStyle = PAPER; ctx.fillRect(0, 0, WIDTH, HEIGHT);
+    // Public export is a fresh raster from the original cached artwork. It does
+    // not reuse the report preview or its independently chosen metrics setting.
+    ctx.drawImage(state.art, 40, 146, 1000, 1000);
+    ctx.textAlign = 'center'; ctx.textBaseline = 'alphabetic'; ctx.fillStyle = INK;
+    ctx.font = '400 104px "Water Brush", cursive';
+    ctx.fillText('Pulse Painting', WIDTH / 2, 92, WIDTH - 112);
+    ctx.fillStyle = BLUE;
+    let metrics = null;
+    if (includeMetrics === true) {
+      const source = state.options.metrics || {};
+      const metric = value => Number.isFinite(value) && value >= 0 && value <= 9999 ? Math.round(value * 10) / 10 : null;
+      metrics = { hr: metric(source.hr), rmssd: metric(source.rmssd), sdnn: metric(source.sdnn) };
+      [['Pulse', metrics.hr, 'bpm'], ['RMSSD', metrics.rmssd, 'ms'], ['SDNN', metrics.sdnn, 'ms']].forEach(([label, value, unit], index) => {
+        const x = 210 + index * 330;
+        ctx.font = '400 30px "DM Sans", sans-serif'; ctx.fillText(label, x, 1179);
+        ctx.font = '600 38px "DM Sans", sans-serif'; ctx.fillText(`${valueLabel(value)} ${unit}`, x, 1226);
+      });
+    } else {
+      ctx.font = '500 46px "DM Sans", sans-serif'; ctx.fillText(sceneName(state.scene), WIDTH / 2, 1202, WIDTH - 100);
+    }
+    ctx.font = '400 30px "DM Sans", sans-serif'; ctx.fillText('A landscape made from a real pulse.', WIDTH / 2, 1262, WIDTH - 100);
+    ctx.font = '500 34px "DM Sans", sans-serif'; ctx.fillText('pulsepainting.com · by ChatPPG', WIDTH / 2, 1315, WIDTH - 96);
+    const encode = quality => new Promise((resolve, reject) => {
+      const timeout = setTimeout(() => reject(new Error('Image preparation took too long. Please try again.')), 30000);
+      try { canvas.toBlob(blob => {
+        clearTimeout(timeout);
+        blob ? resolve(blob) : reject(new Error('The image could not be prepared. Please try again.'));
+      }, 'image/jpeg', quality); }
+      catch { clearTimeout(timeout); reject(new Error('The image could not be prepared. Please try again.')); }
+    });
+    let blob = await encode(.92);
+    if (blob.size > 2 * 1024 * 1024) blob = await encode(.82);
+    if (!current()) throw new Error('The report changed. Open your current painting to publish it.');
+    if (blob.size > 2 * 1024 * 1024) throw new Error('This image is too large to publish. Save it to your device instead.');
+    return { blob, metrics, width: WIDTH, height: HEIGHT, revision: state.revision };
+  }
+  window.PulsePortrait = Object.freeze({ mount, clear, getState, preparePublication });
 })();

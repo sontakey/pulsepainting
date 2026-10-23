@@ -343,9 +343,11 @@ export async function checkArtwork(page, output = process.env.PPG_ARTWORK_ARTIFA
     Object.defineProperty(navigator, 'canShare', { configurable: true, value: data => !!data.files?.length });
     Object.defineProperty(navigator, 'share', { configurable: true, value: async data => {
       const file = data.files[0];
+      const userActivation = navigator.userActivation.isActive;
       const digest = await crypto.subtle.digest('SHA-256', await file.arrayBuffer());
       window.__portraitShareCalls.push({
         keys: Object.keys(data).sort(), title: data.title, name: file.name, type: file.type, size: file.size,
+        userActivation,
         digest: [...new Uint8Array(digest)].map(value => value.toString(16).padStart(2, '0')).join(''),
       });
       await new Promise(resolve => { window.__portraitShareResolve = resolve; });
@@ -353,6 +355,10 @@ export async function checkArtwork(page, output = process.env.PPG_ARTWORK_ARTIFA
   });
   try {
     await page.getByRole('button', { name: 'Share artwork', exact: true }).click();
+    await page.waitForFunction(() => window.PulseShare?.getState().ready);
+    assert.equal(await page.locator('.pulse-share-sheet').isVisible(), true, 'report opens the artwork-first sharing screen');
+    assert.equal(await page.locator('.ps-art img').isVisible(), true, 'the shared image is previewed before choosing an app');
+    await page.locator('.ps-share').click();
     await page.waitForFunction(() => window.__portraitShareCalls.length === 1);
     const [shared] = await page.evaluate(() => window.__portraitShareCalls);
     assert.deepEqual(shared.keys, ['files', 'title'], 'native sharing contains only the requested artwork and title');
@@ -361,22 +367,24 @@ export async function checkArtwork(page, output = process.env.PPG_ARTWORK_ARTIFA
     assert.equal(shared.type, 'image/png');
     assert.equal(shared.size, png.length);
     assert.equal(shared.digest, hash(png), 'native sharing uses the same cached PNG as Save artwork');
-    assert.equal(await page.locator('#btn-share-artwork').isDisabled(), true, 'floating Share artwork is disabled while the native share operation is pending');
+    assert.equal(shared.userActivation, true, 'the prepared file is handed to native sharing in the user click');
+    assert.equal(await page.locator('.ps-share').isDisabled(), true, 'the share action is disabled while native sharing is pending');
     await page.evaluate(() => window.__portraitShareResolve());
-    await page.waitForFunction(() => document.querySelector('.portrait-status').textContent === 'Artwork shared.');
-    await page.waitForFunction(() => !document.querySelector('#btn-share-artwork').disabled);
+    await page.waitForFunction(() => document.querySelector('.ps-status').textContent.startsWith('Returned from sharing.'));
+    await page.waitForFunction(() => !document.querySelector('.ps-share').disabled);
 
     await page.evaluate(() => Object.defineProperty(navigator, 'share', { configurable: true, value: () => Promise.reject(new DOMException('Cancelled', 'AbortError')) }));
-    await page.getByRole('button', { name: 'Share artwork', exact: true }).click();
-    await page.waitForFunction(() => !document.querySelector('#btn-share-artwork').disabled && document.querySelector('.portrait-status').textContent === '');
-    assert.equal(await page.locator('.portrait-status').textContent(), '', 'cancelling the native share sheet is quiet');
+    await page.locator('.ps-share').click();
+    await page.waitForFunction(() => !document.querySelector('.ps-share').disabled && document.querySelector('.ps-status').textContent === '');
+    assert.equal(await page.locator('.ps-status').textContent(), '', 'cancelling the native share sheet is quiet');
 
     await page.evaluate(() => Object.defineProperty(navigator, 'canShare', { configurable: true, value: () => false }));
-    const [fallback] = await Promise.all([page.waitForEvent('download'), page.getByRole('button', { name: 'Share artwork', exact: true }).click()]);
+    const [fallback] = await Promise.all([page.waitForEvent('download'), page.locator('.ps-share').click()]);
     assert.equal(await fallback.failure(), null, 'unsupported native file sharing falls back to a downloadable artwork');
     assert.equal(hash(readFileSync(await fallback.path())), hash(png), 'fallback download preserves the artwork');
   } finally {
     await page.evaluate(() => {
+      window.PulseShare?.close();
       window.__portraitShareResolve?.();
       for (const name of ['canShare', 'share']) {
         const descriptor = window.__portraitShareOriginal[name];

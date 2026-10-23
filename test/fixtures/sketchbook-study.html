@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Exact ThreeUI Sketchbook integration study</title>
+<style>
+  html,body{margin:0;background:#fdfbf7;color:#183149;font-family:system-ui,sans-serif}
+  main{max-width:1100px;margin:auto;padding:20px}
+  h1{font-size:22px;font-weight:600}p{font-size:16px;line-height:1.5}
+  button{min-height:44px;padding:10px 18px;font:inherit}
+  #study{height:min(70vh,690px);min-height:300px;margin:20px 0;background:#ece7dc}
+</style>
+<main>
+  <h1>ThreeUI paper study</h1>
+  <p>Meng To’s original Singapore sketchbook. These authored illustrations are not pulse paintings.</p>
+  <button type="button" id="mount">Open original sketchbook</button>
+  <button type="button" id="destroy" disabled>Close sketchbook</button>
+  <div id="study"></div>
+</main>
+<script type="module">
+  let mounted=null,generation=0;
+  const mountButton=document.getElementById('mount'),destroyButton=document.getElementById('destroy');
+  mountButton.addEventListener('click',async()=>{
+    const ticket=++generation;mountButton.disabled=true;destroyButton.disabled=false;
+    const {mountSketchbook}=await import('/sketchbook-entry.js');
+    if(ticket!==generation)return;
+    mounted=mountSketchbook(document.getElementById('study'));
+  });
+  destroyButton.addEventListener('click',()=>{
+    generation++;mounted?.destroy();mounted=null;mountButton.disabled=false;destroyButton.disabled=true;
+  });
+</script>
+</html>

@@ -1,6 +1,26 @@
 # Pulse Painting handoff
 
-## Current production release
+## Community sharing candidate
+
+The current branch adds opt-in community publication, a social sharing sheet,
+server-rendered public painting pages and a personal ThreeUI paper sketchbook.
+The exact original source and seventeen authored assets are preserved;
+`src/pulse-sketchbook-*` contains the approved separate adaptation. Its three
+spreads use only the already prepared image. Default capture remains static and
+private; the book is lazy and the scientific library/renderer are unchanged.
+
+Real Neon and Blob integrations are provisioned. Development and production
+schemas are migrated. API integration and WebKit publication/removal checks
+use the isolated development branch; no QA paintings seed production. Required
+server variables and manual moderation/cleanup are in `db/README.md`. Production
+operator commands need `COMMUNITY_NAMESPACE=production` if their private env
+file omits `VERCEL_ENV`. Do not publish npm 0.3.1; it remains intentionally pending.
+
+See `docs/validation/community-sharing-2026-10-23.md` and
+`docs/design/threeui-sketchbook.md`. The prior production release below remains
+current until hosted preview, CI and the public deployment are verified.
+
+## Previous production release: mobile gallery
 
 The mobile gallery is live at https://www.pulsepainting.com/#landscapes.
 Phone visitors can tap **Explore the paintings** on the opening screen, browse
