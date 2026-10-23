@@ -78,6 +78,33 @@ thumbnail decoded. No image pixels or interface text were edited.
   covers Chromium/WebKit behavior, layout, history, retry and capture handoff.
   This screenshot is not physical-phone, native-share or performance evidence.
 
+## Sharing and personal sketchbook
+
+`pulse-painting-sharing.png` and `pulse-painting-sketchbook.png` were captured
+directly from the actual built app on `2026-10-23T15:28:30.307Z`, served locally
+by a fresh `tools/serve.mjs` process with the sandbox font CORS headers enabled.
+They use Chrome 155.0.8059.85 through Playwright, device scale factor 1, reduced
+motion and loaded local fonts. The phone viewport is 430 × 932 with touch and
+an emulated iPhone user agent; desktop is 1440 × 1100.
+
+The capture opened the labeled **Quiet lake** example through the real gallery
+UI, then passed its existing, unchanged `quiet-lake-share.jpg` to the actual
+`PulseShare.open` API. The example gallery's own Share button retains its native
+share/copy behavior; this API invocation is recorded explicitly rather than
+presented as that button's behavior. The image itself says it was made from a
+public pulse recording. No visitor recording or public submission was created.
+
+The desktop capture selected **Open your sketchbook** and scrolled only the
+outer dialog body to show the full book, caption, zoom controls and magnifier.
+All three book spreads come from that same prepared image. The captures were
+saved as direct PNGs with no pixel, interface or document-content edits. Both
+completed without runtime errors; actual-app dialog centering was also checked.
+
+Helper and detailed evidence are in ignored
+`.dream-loop/community-share/capture-readme.mjs` and `readme-capture.json`.
+These are browser presentation checks, not physical-phone, native-share,
+social-post delivery or sustained frame-rate evidence.
+
 ## Image integrity
 
 | File | Bytes | SHA-256 |
@@ -88,3 +115,5 @@ thumbnail decoded. No image pixels or interface text were edited.
 | `pulse-painting-capture.jpg` | 54988 | `39ffe97770307230c8a67fd97009d1fcf9be886e31c51da27a36f8a86b912cf9` |
 | `pulse-painting-report.jpg` | 65173 | `c2f8559f395c9d6ed8d36738f68a0df638aab51f30377e413e8966e1ce234f4c` |
 | `pulse-painting-mobile-gallery.png` | 469347 | `2f7f07374fb73399156555da8a86281d6b982db7714efe9a7bd2b4d4caa1889b` |
+| `pulse-painting-sharing.png` | 196999 | `882d6c79830173bd54366dd235f7477d8eb1484481638ca0f446dbf177e7ce04` |
+| `pulse-painting-sketchbook.png` | 533165 | `3a39ce8438a318de609cb2ef215e22b07ff9758e1abd86741d1f5f72afbdfb04` |

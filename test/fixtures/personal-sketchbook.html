@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Personal Pulse Painting sketchbook checks</title>
+<link rel="stylesheet" href="/app/share-sheet.css">
+<style>
+  @font-face{font-family:'Water Brush';src:url('/app/fonts/water-brush-latin.woff2')}
+  @font-face{font-family:'DM Sans';src:url('/app/fonts/dm-sans-latin.woff2')}
+  html,body{margin:0;background:#fdfbf7;font-family:'DM Sans',sans-serif}
+  main{padding:24px}button{min-height:44px;font:inherit;padding:10px 16px}
+</style>
+<main><button id="open" type="button" disabled>Share artwork</button><div id="direct-book"></div></main>
+<script>
+  // Instrument only browser boundaries. The tested composer, renderer and
+  // share hub are the built product code, with an already-public image file.
+  window.testURLs = new Map();
+  const create = URL.createObjectURL.bind(URL), revoke = URL.revokeObjectURL.bind(URL);
+  URL.createObjectURL = blob => { const url = create(blob); testURLs.set(url, {blob, revoked:false}); return url; };
+  URL.revokeObjectURL = url => { const item = testURLs.get(url); if(item)item.revoked=true; revoke(url); };
+  window.shareCalls = [];
+  Object.defineProperty(navigator,'canShare',{configurable:true,value:()=>true});
+  Object.defineProperty(navigator,'share',{configurable:true,value:data=>{
+    const call={file:data.files[0],active:navigator.userActivation?.isActive};shareCalls.push(call);
+    return Promise.reject(new DOMException('Cancelled','AbortError'));
+  }});
+</script>
+<script src="/app/share-sheet.js"></script>
+<script type="module">
+  window.sourceBlob = await (await fetch('/app/assets/gallery/quiet-lake-share.jpg')).blob();
+  window.openHub = async () => PulseShare.open({blob:sourceBlob,title:'Pulse Painting',fileName:'test-painting.jpg'}).ready;
+  const open = document.getElementById('open');
+  open.addEventListener('click',openHub);open.disabled=false;
+</script>
+</html>

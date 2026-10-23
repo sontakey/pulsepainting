@@ -77,6 +77,44 @@ choose Explore; shared scene links also open the collection. Thumbnails load
 lazily. Browser Back closes the artwork, then returns to the capture instructions.
 These remain labeled public-fixture examples, not uploads from other visitors.
 
+## Share a painting, or give it a public page
+
+**Share artwork** opens a paper-toned preview with a prominent image-share
+action and X, Instagram, TikTok, LinkedIn, Facebook and WhatsApp shortcuts.
+Native sharing hands the prepared image to the phone; unsupported browsers can
+save it. Link buttons share the app until the painting has its own public page.
+Nothing posts automatically.
+
+Publishing to **Community** is optional. Review a fresh public preview, choose
+an optional display name and optional summary measurements, then explicitly
+publish. Measurements start off. Raw recordings, session timestamps and renderer
+seeds are not uploaded. A private removal link lets the maker withdraw their
+painting; public links contain no removal key. The sixteen example landscapes
+remain a separate, labeled collection.
+
+**Open your sketchbook** puts the prepared painting into a personal paper book,
+with page curls, dragging, tilt, zoom and a magnifier adapted from ThreeUI's
+authored renderer. Its three spreads show the complete image, clearly labeled
+details of that image and a sharing invitation. It loads only when opened and
+receives none of the raw recording data. The exact ThreeUI source and complete
+Singapore asset set remain preserved separately, with all hashes verified at
+build time. See the [sharing design note](docs/design/community-sharing.md)
+and [source provenance](vendor/threeui-sketchbook/PROVENANCE.json).
+
+<p align="center">
+  <img src="docs/media/pulse-painting-sharing.png" width="250" alt="Paper-toned sharing screen with the painting, social destinations and a floating Share image button">
+  <img src="docs/media/pulse-painting-sketchbook.png" width="640" alt="The painting inside a personal paper sketchbook with page-turn and zoom controls">
+</p>
+
+Direct browser captures of the actual interface using the labeled Quiet Lake
+example; see [image provenance](docs/media/README.md). The book is a local
+presentation of the prepared image, not a second recording or a new landscape.
+
+Community persistence uses server-only Neon and Vercel Blob integrations.
+[Operations, privacy, migration and moderation](db/README.md) are documented
+separately from the static capture runtime. [HANDOFF.md](HANDOFF.md) records
+deployment status.
+
 ## Run locally
 
 Use Node.js 24 or later:
@@ -88,6 +126,11 @@ npm run dev
 
 Open `http://127.0.0.1:5173`. `npm run build` creates a complete static site in `dist/`. Actual capture needs a compatible phone, camera and flash permissions, and HTTPS or another secure context. Desktop visitors can browse the example gallery and use the painted QR invitation to open the hosted app on their phone. Phone visitors can open the same collection with **Explore the paintings** before starting capture.
 
+For the persistent gallery locally, use an isolated database branch and the
+server-only variables in [db/README.md](db/README.md), then run
+`node --env-file=.env.community.local tools/serve.mjs`. The static capture,
+private export and example gallery work without these credentials.
+
 ## What is implemented
 
 - Sixteen seeded landscape families made from accepted waveform paths, with curved terrain, flowing brush strokes and within-stroke gradients. Artistic mapping preserves the original samples; the original manuscript and computed report remain unchanged.
@@ -97,6 +140,8 @@ Open `http://127.0.0.1:5173`. `npm run build` creates a complete static site in 
 - Placement coaching, a small live finger preview, real-time pulse/RMSSD/SDNN, and floating mobile controls.
 - Report charts, a 1080 × 1350 shareable artwork, native file sharing with download fallback, and optional metrics on the artwork.
 - A full-screen desktop introduction and an on-demand mobile collection of sixteen public-fixture examples, with filters, swipe and keyboard navigation, user-initiated image sharing and scene deep links.
+- An artwork-first social share screen and optional public community gallery, with reviewed image/metrics consent, personal preview links, removal and reporting.
+- An optional personal paper sketchbook adapted from the ThreeUI page-turn renderer, isolated and loaded on demand; the exact original source and authored Singapore assets remain preserved separately.
 - Accessible supporting typography, one brush heading per screen, reduced motion, interruption recovery, and no recording credit for stale frames.
 
 The [landscape design contract](docs/design/pulse-painting-design.md) covers the sixteen families, data fidelity, density and recovery. Scene choice is random within an art-directed plan, not a health classification. The [mapping brief](docs/design/biometric-scene-mapping.md) distinguishes implemented source/quality/density mappings from future optional self-report ideas. The original manuscript remains available in the report menu.
@@ -118,6 +163,12 @@ npm run test:paint-performance
 npm run test:qr
 npm run test:gallery
 npm run test:mobile-gallery
+npm run test:community-api
+npm run test:community-sharing
+npm run test:share-sheet
+npm run test:sketchbook
+npm run test:personal-sketchbook
+npm run test:public-painting-page
 ```
 
 `npm test` covers actual app callbacks, accepted-data attribution, metrics, report glyph bounds, mobile layouts, export/share behavior, compositor fallback, and both gallery suites. Gallery checks require current renderer/image provenance and exercise all sixteen scenes, keyboard focus, sharing fallbacks, mobile deep links and failure recovery in Chromium and WebKit. The mobile gallery suite additionally checks on-demand loading, 320/390/430 px layouts, filters, synthetic touch swipes, browser history, floating controls, retry, and delayed requests during the real Start/cancel flow with mocked camera acquisition. The full session test runs real-time public-recording replay in WebKit with three interruptions and automatic completion. These checks mock camera input and sharing APIs; they do not establish physical iPhone camera, thermal, or native-share performance.
@@ -129,12 +180,15 @@ The QR suite uses Python OpenCV, Pillow, and NumPy for bounded image perturbatio
 - `app/`: ready, placement, capture, report, export, local fonts, and static QR assets.
 - `app/landscape.js`: scene planning, accepted-source coverage, pigment rendering and the live artwork camera.
 - `app/portrait.js`: same-scene export and native sharing with download fallback.
+- `app/share-sheet.js` and `app/community.js`: private sharing, optional publication, public browsing, removal and reporting.
+- `api/` and `server/`: persistent community endpoints and script-free public share pages; `db/` records schema and operator procedures.
+- `src/sketchbook-entry.tsx`, `src/pulse-sketchbook-document.js` and `src/pulse-sketchbook-spreads.js`: lazy personal book adaptation and local image composition; the exact ThreeUI reference is preserved in `vendor/threeui-sketchbook/`.
 - `app/gallery.js` and `app/gallery.css`: desktop introduction, on-demand mobile collection, public-example browsing and sharing; the existing capture lifecycle remains separate.
 - `app/assets/gallery/`: generated example thumbnails, full artworks, labeled share images and their provenance manifest.
 - `src/paint-gpu.js`: optional Three.js entry compositor source.
 - `tools/prepare-dist.mjs`: verify the pinned library and assemble the static app.
 - `tools/generate-gallery.mjs`: regenerate the sixteen examples from the actual renderer and public fixture after a renderer change.
-- `tools/serve.mjs`: local static preview.
+- `tools/serve.mjs`: local static preview and optional real community API.
 - `test/e2e/`: browser replay, graph, accessibility, export, interruption, and QR checks.
 - `docs/capture-and-artwork.md`: capture, rendering, and report behavior.
 - `vendor/`: an immutable library artifact with its original MIT license and provenance.

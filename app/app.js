@@ -553,6 +553,7 @@ document.addEventListener('visibilitychange',()=>{if(document.hidden)clearEntryT
 
 function showScreen(name, { brush } = {}) {
   const previous=document.getElementById('app').dataset.activeScreen;
+  if(name!=='summary') {window.PulseCommunity?.closePublication();window.PulseShare?.close();}
   if(name==='ready') {clearEntryTransition('ready');cancelLandscapeReveal();sessionStarting=false;}
   // Recovery coaching must remain immediately visible when a finger is lifted.
   if(name==='placement' && previous==='measuring')clearEntryTransition('recovery');
@@ -1192,13 +1193,24 @@ function mountLandscapeArtwork(header, td) {
     durationSec: elapsedMeasuringMs / 1000,
     startedAt: new Date(portraitStartedAt || Date.now()),
     metrics: { hr: td?.ok ? td.meanHR : null, rmssd: td?.ok ? td.rmssd : null, sdnn: td?.ok ? td.sdnn : null },
-  })).catch(() => {
+    onPublish: () => window.PulseCommunity?.openPublish({ container: host, preparePublication: options => window.PulsePortrait.preparePublication(options, host) }),
+  })).then(state => {
+    if(state && portraitHost===host && window.PulseCommunity) {
+      const invitation=document.createElement('button');
+      invitation.type='button';invitation.className='community-publish-invitation';
+      invitation.innerHTML='<span><strong>Add your painting to the gallery</strong><span>A shared moment. Only if you choose.</span></span><span aria-hidden="true">↗</span>';
+      invitation.addEventListener('click',()=>window.PulseCommunity.openPublish({container:host,preparePublication:options=>window.PulsePortrait.preparePublication(options,host)}));
+      host.append(invitation);
+    }
+    return state;
+  }).catch(() => {
     if (portraitHost === host) host.textContent = 'Your pulse strokes are saved in this session. Use Save manuscript in the menu.';
     return null;
   });
 }
 
 function renderReport(acceptedBeats, rmssdFloorMs, liveRespiration) {
+  window.PulseCommunity?.closePublication();
   const el = document.getElementById('report-content');
   reportChartObserver?.disconnect();
   cancelAnimationFrame(reportRedrawFrame);
@@ -1438,6 +1450,7 @@ function startSession() {
   // Ready-screen UI disable, so this can never be invoked (e.g. via the
   // console or a future button) on desktop and grab getUserMedia there.
   if (!isPhone || sessionStarting) return;
+  window.PulseCommunity?.closePublication();
   if (portraitHost) { window.PulsePortrait?.clear(portraitHost); portraitHost = null; }
   sessionStarting = true;
   const generation = ++sessionGeneration;
