@@ -25,8 +25,11 @@ renderer reached 7.0/10 in independent visual review, up from 6.6 for round9 and
 fjord, gives short forest recordings a complete background, and adds a natural
 pigment material. The subsequent absorption experiment regressed to 6.5 and
 was discarded; it exists only in ignored `.dream-loop/absorption-study/`.
-The best candidate is tracked, renderer SHA-256:
+That visual baseline had renderer SHA-256
 `878928ede818f9866dca9994506df2802570f2c6673c961310d9988a10866b1a`.
+The development renderer now includes the compositor-only correction described
+below, SHA-256 `a7807450f85972d3677e6bdc7830594525663c425a94bb7418cf441a4cfee25a`.
+Its geometry and materials retain that visual baseline.
 
 The prior whole-set dream-loop stalled after the absorption experiment. On
 October 22 the user chose **Perfect one scene first**. Production remains held
@@ -35,7 +38,8 @@ treatment across the other fifteen scenes. Broad iteration is no longer waiting
 on a style decision; work is intentionally scoped to one representative scene.
 Study code stays in ignored `.dream-loop/quiet-lake-study/`, with a generated
 visual target and prompt in `.dream-loop/quiet-lake-target/`. These are design
-studies; tracked runtime and the hosted preview retain the verified round11 build.
+studies; the tracked runtime retains round11 visuals with the compositor fix,
+while the hosted preview remains on its earlier verified build.
 
 Focused Quiet Lake review progressed from 4.0 to 7.1. After a finer-ripple
 regression, the user chose **Denser, crisper ripples closer to the target**.
@@ -87,22 +91,71 @@ Source/model checks pass and the other fifteen families remain pixel-exact.
 The fresh V14 review scored 7.0 dense and 6.9 sparse: waves are visible at
 390px, but water still reads as separate ribbons. Root showed the actual render
 and asked the user whether to rebuild water as overlapping pulse-shaped marks
-closer to the target or keep explicit bands. That visual question is pending;
-broad material transfer remains held. Original source knots, normalization,
-timestamps, quality and accepted counts remain unchanged.
+closer to the target or keep explicit bands. The user chose **option 1: overlapping
+pulse-shaped brushstrokes**, preserving recognizable PPG peaks with stronger
+foreground contours and softer distant ones. That resolves the visual checkpoint.
+The next pass is scoped to Quiet Lake before broad material transfer. Original
+source knots, normalization, timestamps, quality and accepted counts remain
+unchanged; no study has replaced the runtime renderer yet.
+
+That direction was implemented through V15–V18. V15 uses overlapping source-edge
+marks; V16 removes hanging polygon flaps; V17 broadens the pigment beneath each
+pulse. V18 makes a larger architectural change: cached small, irregular brush-tip
+impressions anchored to every original measured knot replace the water bands.
+Its frozen renderer SHA-256 is
+`e3dcc1c69a6bf0953a1f417abc0e9dd5f16150a211b1c2d7920f830013646bdd`.
+The independent full/short visual scores progress from 7.2/6.6 through 7.4/6.7
+and 7.5/6.9 to 7.6/6.9. V18 removes angular flaps and retains visible pulse peaks,
+but the water still reads as uniform soft cords and the sparse underwash remains
+too broad. The fresh reviewer identifies another dream-loop stall. Root has
+shown the actual working study and asked whether this paint treatment is natural
+enough or still too regular. Stop aesthetic iteration at this checkpoint until
+that feedback arrives; do not treat the earlier option-1 choice as still pending.
+
+V18 passes source/model/current-adapter and other-fifteen-family pixel checks.
+An independent stamp audit confirms exact original-knot ownership and exact
+cached-completion/forced-prefix pixels, but **fails strict retained-pigment
+coverage**: advancing prefixes lose up to sixteen alpha levels at raster edges.
+No criterion was relaxed. All evidence is in ignored
+`.dream-loop/quiet-lake-study/v18/`. No release is justified by these results.
+Follow-up diagnosis in `.dream-loop/retention-review/` shows that the original
+audit uses a read-frequency context and repeated readbacks, unlike runtime.
+Fresh default-context drawing histories preserve solid-mask coverage exactly;
+actual textured pigment still loses one alpha level at 800px in the bounded
+probe, and zero at 1080px. The strict-zero check remains failed. The original
+up-to-sixteen result does not demonstrate visible live flicker. No style or
+renderer workaround was made while the visual checkpoint is pending.
+
+The separate V18-plus-compositor study has SHA-256
+`3f61aab31f73cc4ae16c591160f441709ad124383342de650502239838f38e16`.
+Quiet Lake live/direct parity passes for three seeds, short/full records and
+early/late/complete states in Chromium and WebKit. The existing lifecycle
+assertions also pass against that exact study: pause/resume, reduced motion,
+continuous same-scene reveal, fragmented recordings and disposal. One twenty-
+second late-capture probe (desktop Chrome, mobile viewport, WebGL2 entry,
+4× CPU slowdown) measures 60 fps active paint, p95 16.7 ms, max 16.8 ms and
+submission p95 2.2 ms. This is a limited browser probe, not full-session or
+physical-phone acceptance. It does not resolve the independent retention failure
+or the older all-family WebKit diagnostic. The local review page offers three
+seeds, full/short input, reference comparison and zoom-out; its Chromium/WebKit
+desktop/mobile smoke checks pass. It lives in ignored `.dream-loop/quiet-lake-review/`.
 
 The new real-recording harness exposed a real actively-partial compositing
 defect: the live stroke blended against already-composed lower layers, while
 direct rendering blended against its transparent layer. Completed layer
-consumption also differed. A compositor-only scratch correction adds no canvas
+consumption also differed. The compositor-only correction adds no canvas
 or CPU readback and preserves round11 geometry/materials. Across all sixteen
 families, three seeds and short/full source records, Chromium is pixel-exact at
 all 288 checkpoints. WebKit still differs by up to three channel levels and
 fails eleven checkpoints against its newly defined two-level criterion. The
 precise native cause remains unproven; the criterion is not widened again.
-The scratch correction is not integrated. The stronger diagnostic is available
-as `test/e2e/landscape-parity.mjs`, separate from the existing `npm test` suite
-while the defect is open. See
+The correction is now integrated in the development app as a partial fix;
+gallery assets were regenerated from its exact hash. A focused real-recording
+regression is included in `npm test` and rejects the old renderer at max13.
+The corrected focused check passes at max0 in Chromium and max2 in WebKit.
+The default all-family invocation of `test/e2e/landscape-parity.mjs` remains
+separate and failed. Fresh observation controls did not remove its max3 residual.
+See
 [raster parity scope and results](docs/validation/landscape-raster-parity.md).
 Neither V13 nor V14 has final performance evidence.
 
@@ -120,7 +173,8 @@ previously verified versions. No study has been released.
 
 ## Current verification
 
-The retained candidate passed the existing `npm test` suite: model and source
+The compositor-corrected candidate passed the complete local `npm test` suite,
+including the new focused real-recording regression, model and source
 preservation, synthetic presentation-path checks, partial rendering,
 capture/report/export, GPU fallback, and Chromium/WebKit desktop-gallery checks.
 The older raster checks differ by at most one channel level with mean error
@@ -137,7 +191,19 @@ cancellation, mobile asset avoidance and failure recovery are tested in both
 engines. Round9 desktop screenshots remain historical evidence; current assets
 use the retained renderer hash above.
 
-The latest interrupted WebKit replay completed 180.387 seconds of active
+The compositor-corrected build completed a new full WebKit replay: 180.376 seconds
+of active measurement in 209.849 wall seconds. Camera-frame pause, main-thread
+stall and hidden-page interruption all recovered with zero first-resume credit
+for stale time. Active painting averaged 59.94 fps, p95 18 ms, maximum 97 ms.
+The deliberate 2.5-second main-thread stall remains included in the separately
+reported overall cadence. Report, same-scene export, normal zoom-out and both
+encoder/renderer retry checks pass; no runtime or first-party request errors.
+This uses a public fixture, including the explicitly documented recorded-tail
+extension, with mocked camera I/O. Evidence is in ignored
+`.dream-loop/compositor-integration/safari/`. It is browser replay, not physical
+iPhone, physiological-accuracy or native-sharing acceptance.
+
+The earlier pre-correction WebKit replay completed 180.387 seconds of active
 measurement in 209.833 wall seconds. Camera-frame pause, main-thread stall and
 hidden-page interruption recovered without recording credit for stale time.
 Active painting averaged 59.76 fps, p95 18 ms, with a 201 ms maximum interval.
@@ -146,7 +212,7 @@ uses replayed public camera data and does not establish physical iPhone camera,
 thermal or native-share performance. The corrected cadence measurement retains
 long active intervals; it no longer discards every gap over 100 ms.
 
-The source/build snapshot and latest timing outputs are in ignored
+The pre-correction source/build snapshot and timing outputs are in ignored
 `.dream-loop/landscape-round11-functional/`. All four 20-second Chrome cases
 (WebGPU/WebGL2 entry backends, 1×/4× CPU) passed at 60 fps active painting,
 p95 16.7–16.8 ms and maximum 16.8 ms. This is desktop Chrome on Apple M4 with

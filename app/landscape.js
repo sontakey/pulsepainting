@@ -646,6 +646,12 @@
       ctx.fillStyle=g;ctx.fillRect(0,0,WORLD,WORLD);
     }
   }
+  function publishLayer(output,layer){
+    // Consuming a layer between writes fixes the rasterization cadence. The
+    // existing output is repainted before a frame/export becomes visible.
+    output.save();output.setTransform(1,0,0,1,0,0);output.globalAlpha=1;
+    output.globalCompositeOperation='source-over';output.drawImage(layer,0,0);output.restore();
+  }
   function render(scene,canvas,options={}) {
     if(!scene||scene.version!==VERSION)throw new Error('Unsupported landscape version.');
     const ctx=canvas.getContext('2d');
@@ -659,13 +665,31 @@
       const item=canvas.ownerDocument?canvas.ownerDocument.createElement('canvas'):new global.OffscreenCanvas(width,height);
       item.width=width;item.height=height;
       const layer=item.getContext('2d');
-      layer.setTransform(scale,0,0,scale,(width-side)/2,(height-side)/2);
       return {canvas:item,ctx:layer};
     });
-    if(options.paper!==false)paper(layers[0].ctx,scene);
+    if(options.paper!==false){const back=layers[0].ctx;back.setTransform(scale,0,0,scale,(width-side)/2,(height-side)/2);paper(back,scene);back.setTransform(1,0,0,1,0,0);}
+    publishLayer(ctx,layers[0].canvas);
     const through=options.through??scene.strokes.length;
-    for(let i=0;i<Math.min(through,scene.strokes.length);i++)drawStroke(layers[scene.strokes[i].layer].ctx,scene,scene.strokes[i],i===through-1?(options.progress??1):1);
-    for(const layer of layers){ctx.drawImage(layer.canvas,0,0);layer.canvas.width=layer.canvas.height=1;}
+    const partial=options.progress!=null&&options.progress<1&&through>0&&through<=scene.strokes.length?scene.strokes[through-1]:null;
+    for(let i=0;i<Math.min(through,scene.strokes.length);i++){
+      if(partial&&i===through-1)break;
+      const layer=layers[scene.strokes[i].layer];
+      layer.ctx.setTransform(scale,0,0,scale,(width-side)/2,(height-side)/2);
+      drawStroke(layer.ctx,scene,scene.strokes[i],i===through-1?(options.progress??1):1);
+      layer.ctx.setTransform(1,0,0,1,0,0);publishLayer(ctx,layer.canvas);
+    }
+    ctx.clearRect(0,0,width,height);
+    if(partial){
+      // Match the live active-layer accumulation order as well as its blend
+      // target. Opposite equivalent orders can round translucent edges apart.
+      ctx.globalCompositeOperation='source-over';ctx.drawImage(layers[partial.layer].canvas,0,0);
+      ctx.save();ctx.setTransform(scale,0,0,scale,(width-side)/2,(height-side)/2);drawStroke(ctx,scene,partial,options.progress);ctx.restore();
+      ctx.globalCompositeOperation='destination-over';
+      for(let i=partial.layer-1;i>=0;i--)ctx.drawImage(layers[i].canvas,0,0);
+      ctx.globalCompositeOperation='source-over';
+      for(let i=partial.layer+1;i<layers.length;i++)ctx.drawImage(layers[i].canvas,0,0);
+      for(const layer of layers)layer.canvas.width=layer.canvas.height=1;
+    }else for(const layer of layers){ctx.drawImage(layer.canvas,0,0);layer.canvas.width=layer.canvas.height=1;}
     return canvas;
   }
   function createView(container,scene,options={}) {
@@ -686,9 +710,9 @@
     if(!reduced)camera.scale=target.scale=2.8;
     const stats=global.__pulseLandscapeStats={frames:0,active:false,revealing:false,frameMs:0,pixelBudget:pixels,cachedPixels:side*side*4,materialPixelBudget:INK_SIDE*INK_SIDE+2*INK_PIXEL_LIMIT,get materialPixels(){return INK_SIDE*INK_SIDE+2*pigmentAtlas(doc).pixels;},camera:{...camera},finished:false,strokes:0,painted:0};
     const ctx=canvas.getContext('2d'),cached=caches.map(item=>item.getContext('2d'));
-    function base() {const back=cached[0];back.setTransform(side/WORLD,0,0,side/WORLD,0,0);paper(back,scene);back.setTransform(1,0,0,1,0,0);}
+    function base() {const back=cached[0];back.setTransform(side/WORLD,0,0,side/WORLD,0,0);paper(back,scene);back.setTransform(1,0,0,1,0,0);publishLayer(ctx,caches[0]);}
     base();ctx.drawImage(caches[0],0,0);
-    function strokeIntoCache(stroke){const layer=cached[stroke.layer];layer.setTransform(side/WORLD,0,0,side/WORLD,0,0);drawStroke(layer,scene,stroke);layer.setTransform(1,0,0,1,0,0);}
+    function strokeIntoCache(stroke){const layer=cached[stroke.layer];layer.setTransform(side/WORLD,0,0,side/WORLD,0,0);drawStroke(layer,scene,stroke);layer.setTransform(1,0,0,1,0,0);publishLayer(ctx,caches[stroke.layer]);}
     function fitCamera(){return {x:540,y:540,scale:1};}
     function transform(){
       const size=Math.min(box.width,box.height),left=(box.width-size)/2,top=(box.height-size)/2;
@@ -697,11 +721,19 @@
       stats.camera={...camera};
     }
     function paintFrame(){
-      ctx.setTransform(1,0,0,1,0,0);ctx.clearRect(0,0,side,side);
+      ctx.setTransform(1,0,0,1,0,0);ctx.globalCompositeOperation='source-over';ctx.clearRect(0,0,side,side);
       const active=scene.strokes[painted];
-      for(let layer=0;layer<3;layer++){
-        ctx.drawImage(caches[layer],0,0);
-        if(active&&active.layer===layer&&progress>0){ctx.setTransform(side/WORLD,0,0,side/WORLD,0,0);drawStroke(ctx,scene,active,progress);ctx.setTransform(1,0,0,1,0,0);}
+      if(active&&progress>0){
+        // Accumulate the active pigment against its own transparent layer,
+        // as export does. Reuse the output canvas; no extra raster is needed.
+        ctx.drawImage(caches[active.layer],0,0);
+        ctx.setTransform(side/WORLD,0,0,side/WORLD,0,0);drawStroke(ctx,scene,active,progress);ctx.setTransform(1,0,0,1,0,0);
+        ctx.globalCompositeOperation='destination-over';
+        for(let layer=active.layer-1;layer>=0;layer--)ctx.drawImage(caches[layer],0,0);
+        ctx.globalCompositeOperation='source-over';
+        for(let layer=active.layer+1;layer<3;layer++)ctx.drawImage(caches[layer],0,0);
+      }else{
+        for(let layer=0;layer<3;layer++)ctx.drawImage(caches[layer],0,0);
       }
       if(active&&!reduced&&!paused&&!revealing){
         const p=active.points[Math.min(active.points.length-1,Math.max(0,Math.ceil(progress*active.points.length)-1))],point=worldPoint(p,active.transform);
@@ -731,7 +763,7 @@
         target=reduced?fitCamera():{x:point.x,y:point.y,scale:2.8};
         const damp=1-Math.exp(-delta/260);camera={x:mix(camera.x,target.x,damp),y:mix(camera.y,target.y,damp),scale:mix(camera.scale,target.scale,damp)};
         paintFrame();transform();
-        if(progress>=1){strokeIntoCache(active);painted++;progress=0;stats.painted=painted;if(finishing)beginReveal();}
+        if(progress>=1){strokeIntoCache(active);painted++;progress=0;stats.painted=painted;paintFrame();if(finishing)beginReveal();}
       }
       stats.frameMs=performance.now()-begin;stats.strokes=scene.strokes.length;
       if(!revealing&&painted>=scene.strokes.length)stats.active=false;

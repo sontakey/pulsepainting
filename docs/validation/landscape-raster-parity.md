@@ -58,10 +58,12 @@ performance, capture accuracy, native sharing, or production readiness.
 
 ## Current result: diagnostic still fails
 
-The compositor-only scratch candidate has SHA-256
+The compositor correction now in the development branch has SHA-256
 `a7807450f85972d3677e6bdc7830594525663c425a94bb7418cf441a4cfee25a`.
-It does not contain the Quiet Lake visual study and has not replaced the tracked
-renderer. The all-family matrix uses sixteen families, seeds 39293, 17 and 9991,
+It does not contain the Quiet Lake visual study. Integrating the established
+blend-target and consumption-order fix is a partial correction, not acceptance
+of the remaining WebKit discrepancy. The gallery was regenerated from this exact
+renderer. The existing all-family matrix uses sixteen families, seeds 39293, 17 and 9991,
 and six or thirty accepted segments: 96 cases and 288 checkpoints per engine.
 
 | Engine | Maximum channel difference | Maximum mean | Repeated exports | Result |
@@ -72,7 +74,8 @@ and six or thirty accepted segments: 96 cases and 288 checkpoints per engine.
 WebKit exceeds the frozen two-level limit at eleven checkpoints across Alpine
 Peaks, Coastal Cliffs, Sand Dunes, Desert Mesas and Forest Canopy. Source data
 remains exact and raster budgets remain bounded. The criterion has not been
-widened again. No compositor correction is integrated on the basis of this run.
+widened again. The correction removes the larger known defect but does not make
+this stronger diagnostic pass or establish release readiness.
 
 Raw results remain in ignored
 `.dream-loop/compositor-runtime/all-family-strict/{chromium,webkit}.json`.
@@ -82,9 +85,15 @@ criteria frozen above. The run predates the diagnostic's added summed-error and
 changed-channel fields. Those fields are available on future runs; they are not
 retroactively claimed for this matrix.
 
-The new diagnostic is intentionally separate from `npm test` while the known
-defect is open. A passing existing CI run does not mean this stronger check
-passes. A final diagnostic smoke check against the unchanged tracked renderer
+The default all-family diagnostic remains separate from `npm test` while the
+residual is open. A focused `--compositor-regression` mode now runs in
+`npm run test:landscape`: Quiet Lake, seed 39293, short/full accepted records,
+early/late/complete checkpoints and both engines, with the same frozen thresholds.
+This catches the established blend-target defect. The pre-fix renderer fails all
+six Chromium checkpoints; the corrected renderer passes in both engines. This
+focused pass does not stand in for the broader all-family result above.
+
+The earlier diagnostic smoke check against the pre-fix renderer
 confirmed that both engines write fresh results even when Chromium fails first:
 Quiet Lake short/full records fail at max13 in Chromium and max4 in WebKit,
 with exact source preservation. The process correctly exits nonzero. The
@@ -102,3 +111,17 @@ families, seeds, engines or artifact directory (`PPG_PARITY_FAMILIES`,
 tracked renderer, all families, seed 39293 and both engines. Use
 `PPG_PARITY_SEEDS=39293,17,9991` for the broader matrix. Failures exit nonzero and
 remain failures; this is a diagnostic checkpoint, not release acceptance.
+
+## Observation controls
+
+A later focused review tested whether earlier `getImageData` calls create the
+known WebKit max-three residual. Alpine Peaks seed39293 completion and Coastal
+Cliffs seed9991 late/completion retain that failure when earlier live reads or
+all earlier reads are removed. Their endpoint pixels remain identical. Omitting
+earlier export rendering slightly changes aggregate error, but still leaves one
+channel above two in each case. No criterion or renderer was changed for this
+diagnosis. Evidence is in ignored `.dream-loop/parity-observation-review/`.
+
+The Quiet Lake V18 study has a separate readback-sensitive paint-retention
+diagnostic. It is not part of this compositor or the tracked visual renderer;
+its results must not be conflated with these live/export differences.

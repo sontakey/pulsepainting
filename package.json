@@ -18,7 +18,7 @@
     "test:paint-performance": "node test/e2e/paint-performance.mjs",
     "test:paint-fallbacks": "node test/e2e/paint-fallback-checks.mjs",
     "test:qr": "node test/e2e/qr-checks.mjs",
-    "test:landscape": "node test/landscape-model.mjs && node test/e2e/landscape-view.mjs",
+    "test:landscape": "node test/landscape-model.mjs && node test/e2e/landscape-view.mjs && node test/e2e/landscape-parity.mjs --compositor-regression",
     "test:gallery": "node test/e2e/gallery-checks.mjs"
   },
   "devDependencies": {

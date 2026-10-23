@@ -9,6 +9,10 @@ import { chromium, webkit } from 'playwright';
 import { replayPublicFixture } from '../landscape-fixture.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
+// The focused CI regression catches the established active-layer blend bug.
+// The default invocation remains the broader all-family diagnostic, including
+// known WebKit residuals; a focused pass must not stand in for that result.
+const regression = process.argv.includes('--compositor-regression');
 const rendererPath = path.resolve(root, process.env.PPG_LANDSCAPE_RENDERER || 'app/landscape.js');
 const source = readFileSync(rendererPath, 'utf8');
 const marker = 'sync();return {sync,pause,finish,cancelFinish,dispose,canvas,';
@@ -18,10 +22,10 @@ const { segments } = replayPublicFixture(1, 0, 180);
 assert.ok(segments.length > 20, 'the recording supplies a full accepted session');
 const seeds = (process.env.PPG_PARITY_SEEDS || '39293').split(',').map(Number);
 assert.ok(seeds.every(Number.isFinite));
-const requestedFamilies = (process.env.PPG_PARITY_FAMILIES || '').split(',').filter(Boolean);
+const requestedFamilies = (process.env.PPG_PARITY_FAMILIES || (regression ? 'quiet-lake' : '')).split(',').filter(Boolean);
 const engines = (process.env.PPG_PARITY_ENGINES || 'chromium,webkit').split(',');
 assert.ok(engines.every(name => ['chromium', 'webkit'].includes(name)));
-const out = path.resolve(root, process.env.PPG_PARITY_ARTIFACTS || '.dream-loop/real-fixture-parity');
+const out = path.resolve(root, process.env.PPG_PARITY_ARTIFACTS || (regression ? '.dream-loop/compositor-regression' : '.dream-loop/real-fixture-parity'));
 mkdirSync(out, { recursive: true });
 const startedAt = new Date().toISOString();
 
@@ -30,7 +34,7 @@ for (const name of engines) {
   // See docs/validation/landscape-raster-parity.md. This new WebKit criterion
   // is distinct from the existing Chromium one-level gate, which is unchanged.
   const maxChannel = name === 'webkit' ? 2 : 1;
-  const result = { engine: name, startedAt, nodeVersion: process.version, rendererPath, rendererSha256: createHash('sha256').update(source).digest('hex'),
+  const result = { engine: name, mode: regression ? 'focused-compositor-regression' : 'all-family-diagnostic', startedAt, nodeVersion: process.version, rendererPath, rendererSha256: createHash('sha256').update(source).digest('hex'),
     scope: 'Public camera replay; stepped presentation correctness only, not mobile performance or physical-device validation.',
     thresholds: { maxChannel, meanExclusive: .001, repeatMax: 0 }, cases: [], errors: [], failures: [] };
   try {
