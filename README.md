@@ -6,7 +6,7 @@ Your pulse, made into a place.
 > watercolor landscapes, crisp measured pulse strokes, a pointed brush and soft
 > trailing pigment, a calm zoom-out reveal, and shareable artwork.
 > Browser replay and deployed-asset checks passed; physical-phone validation remains separate.
-> See [current release verification](docs/validation/simple-sharing-2026-10-23.md)
+> See [current release verification](docs/validation/keepsake-card-2026-10-23.md)
 > and [painting performance](docs/validation/slow-phone-2026-10-23.md).
 > The [mobile gallery](https://www.pulsepainting.com/#landscapes) is now live too;
 > see [mobile verification](docs/validation/mobile-gallery-2026-10-23.md).
@@ -22,7 +22,7 @@ Pulse Painting is a three-minute phone-camera capture experience by [ChatPPG](ht
   <img src="docs/media/pulse-painting-report.jpg" width="230" alt="Shareable Pulse Painting artwork and report">
 </p>
 
-The capture screenshot shows the compact LIVE/signal header and crisp pulse brush with forty seconds of the public recording preloaded through the actual app. The report image documents the earlier foreground release. Both use mocked camera input; see [capture provenance](docs/media/README.md). They are not physical-phone measurements or session benchmarks.
+The capture screenshot shows the compact LIVE/signal header and crisp pulse brush with forty seconds of the public recording preloaded through the actual app. The report shows the framed Glacial fjord keepsake, with summary metrics calculated from the public recording. Both use browser replay; see [capture provenance](docs/media/README.md). They are not physical-phone measurements or session benchmarks.
 
 The primary destination is [pulsepainting.com](https://www.pulsepainting.com/), a separate Vercel project connected to this repository. The apex domain redirects to www. The simple library demo remains at [ChatPPG](https://chatppg.com/ppg-js-demo). Release and public verification status are tracked in [HANDOFF.md](HANDOFF.md).
 
@@ -86,6 +86,12 @@ lazily. Browser Back closes the artwork, then returns to the capture instruction
 These remain labeled public-fixture examples, not uploads from other visitors.
 
 ## Share a painting, or give it a public page
+
+Finished keepsakes use a warm paper frame around the complete card, padded brush
+lettering, a cursive landscape name, and a date/website footer. Pulse, RMSSD and
+SDNN appear by default in personal exports; **Show pulse and HRV metrics** hides
+them without changing the painting. Unavailable measurements remain dashes.
+All sixteen labeled gallery share images use the same frame.
 
 **Share artwork** opens a large paper-toned painting preview with a primary
 **Share image** action, **Save image**, and **Copy painting link** (or

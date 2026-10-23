@@ -135,9 +135,21 @@ export async function checkArtwork(page, output = process.env.PPG_ARTWORK_ARTIFA
     const originalLoad = Object.getOwnPropertyDescriptor(fonts, 'load');
     const shareButton = document.createElement('button');
     const saveButton = document.createElement('button');
+    const textLayout = [];
+    const originalFillText = CanvasRenderingContext2D.prototype.fillText;
     let releaseFonts;
     const fontGate = new Promise(resolve => { releaseFonts = resolve; });
     try {
+      CanvasRenderingContext2D.prototype.fillText = function (text, x, y, maxWidth) {
+        if (this.canvas === host.querySelector('.portrait-preview canvas')) {
+          const measured = this.measureText(text);
+          const scale = maxWidth && measured.width > maxWidth ? maxWidth / measured.width : 1;
+          textLayout.push({ text, x, y, font: this.font, align: this.textAlign,
+            left: x - measured.actualBoundingBoxLeft * scale, right: x + measured.actualBoundingBoxRight * scale,
+            top: y - measured.actualBoundingBoxAscent, bottom: y + measured.actualBoundingBoxDescent });
+        }
+        return originalFillText.apply(this, arguments);
+      };
       Object.defineProperty(fonts, 'load', { configurable: true, value: () => fontGate });
       const mounting = PulsePortrait.mount(host, {
         landscape,
@@ -146,6 +158,7 @@ export async function checkArtwork(page, output = process.env.PPG_ARTWORK_ARTIFA
         durationSec: elapsedMeasuringMs / 1000,
         startedAt: new Date(portraitStartedAt || Date.now()),
         pigmentAt,
+        metrics: { hr: NaN, rmssd: Infinity, sdnn: null },
         shareButton, saveButton,
         paintRows: (canvas, rowIndices) => paintManuscriptRaster(canvas, false, true, null, true, { rowIndices }),
       });
@@ -154,14 +167,18 @@ export async function checkArtwork(page, output = process.env.PPG_ARTWORK_ARTIFA
       releaseFonts([]);
       const state = await mounting;
       const enabledWhenReady = !checkbox.disabled && !shareButton.disabled && !saveButton.disabled && PulsePortrait.getState(host).ready;
+      const initialTextLayout = [...textLayout];
+      const initialMetrics = checkbox.checked && PulsePortrait.getState(host).includeMetrics;
       checkbox.click();
       const disabledWhileRegenerating = shareButton.disabled && saveButton.disabled;
       await state.ready;
       const enabledAfterRegenerating = !shareButton.disabled && !saveButton.disabled && PulsePortrait.getState(host).ready;
       PulsePortrait.clear(host);
       const disabledAfterClear = shareButton.disabled && saveButton.disabled;
-      return { disabledWhilePreparing, enabledWhenReady, disabledWhileRegenerating, enabledAfterRegenerating, disabledAfterClear };
+      return { disabledWhilePreparing, enabledWhenReady, disabledWhileRegenerating, enabledAfterRegenerating, disabledAfterClear, initialMetrics, textLayout: initialTextLayout,
+        sceneName: PulseLandscape.FAMILIES.find(family => family.id === landscape.family)?.name || 'Your landscape' };
     } finally {
+      CanvasRenderingContext2D.prototype.fillText = originalFillText;
       releaseFonts([]);
       if (originalLoad) Object.defineProperty(fonts, 'load', originalLoad); else delete fonts.load;
       PulsePortrait.clear(host);
@@ -173,6 +190,18 @@ export async function checkArtwork(page, output = process.env.PPG_ARTWORK_ARTIFA
   assert.equal(preparation.disabledWhileRegenerating, true, 'external artwork actions wait for regenerated PNG pixels');
   assert.equal(preparation.enabledAfterRegenerating, true, 'external artwork actions become available after regeneration');
   assert.equal(preparation.disabledAfterClear, true, 'clearing a portrait disables its external artwork controls');
+  assert.equal(preparation.initialMetrics, true, 'local artwork includes its metric band by default');
+  const title = preparation.textLayout.find(item => item.text === 'Pulse Painting');
+  const sceneTitle = preparation.textLayout.find(item => item.text === preparation.sceneName);
+  const footerURL = preparation.textLayout.find(item => item.text === 'PulsePainting.com');
+  const footerDate = preparation.textLayout.find(item => /\b\d{4}\b/.test(item.text));
+  assert.ok(title && title.top >= 36 && title.bottom < 190, 'brush brand title has real paper padding above and below');
+  assert.ok(sceneTitle && /Water Brush/.test(sceneTitle.font) && sceneTitle.top > 1070 && sceneTitle.bottom < 1160, 'cursive landscape name remains visible above the metric band');
+  assert.ok(footerDate && Math.abs(footerDate.left - 72) < .1 && footerDate.top >= 1275 && footerDate.bottom <= 1309, 'recording date sits at the bottom left');
+  assert.ok(footerURL && Math.abs(footerURL.right - 1008) < .1 && footerURL.top >= 1275 && footerURL.bottom <= 1309, 'website sits at the bottom right');
+  assert.ok(footerDate.right < footerURL.left, 'date and website have distinct nonoverlapping footer areas');
+  assert.ok(preparation.textLayout.every(item => item.left >= 36 && item.right <= 1044 && item.top >= 36 && item.bottom <= 1314), 'all exported labels remain inside the paper frame');
+  assert.deepEqual(preparation.textLayout.filter(item => item.top >= 1194 && item.bottom <= 1238).map(item => item.text), ['—', '—', '—'], 'unavailable values stay visibly unavailable instead of showing NaN, Infinity or fabricated zeroes');
   const recovery = await page.evaluate(async () => {
     const outcomes=[];
     for (const mode of ['encoder', 'renderer']) {
@@ -258,21 +287,31 @@ export async function checkArtwork(page, output = process.env.PPG_ARTWORK_ARTIFA
     const exact = document.createElement('canvas'); exact.width = exact.height = 1080;
     PulseLandscape.render(landscape, exact);
     const portraitCanvas=document.querySelector('.portrait-preview canvas');
+    const {x, y, width, height} = state.artworkBounds;
     // Use the portrait's exact destination coordinates for both render paths.
     // Comparing a copied crop against an origin-aligned resample adds a second
     // backend-dependent rounding step that is unrelated to scene preservation.
     const expectedArt = document.createElement('canvas'); expectedArt.width=1080;expectedArt.height=1350;
-    expectedArt.getContext('2d').drawImage(exact,40,146,1000,1000);
-    const a=portraitCanvas.getContext('2d').getImageData(40,146,1000,1000).data,b=expectedArt.getContext('2d').getImageData(40,146,1000,1000).data;
-    const portraitArt=document.createElement('canvas');portraitArt.width=portraitArt.height=1000;
-    portraitArt.getContext('2d').drawImage(portraitCanvas,40,146,1000,1000,0,0,1000,1000);
-    let maxArtDelta=0, artDelta=0, deltaBounds={minY:1000,maxY:0,minX:1000,maxX:0};for(let i=0;i<a.length;i++){const d=Math.abs(a[i]-b[i]);maxArtDelta=Math.max(maxArtDelta,d);artDelta+=d;if(d>2){const pixel=Math.floor(i/4),x=pixel%1000,y=Math.floor(pixel/1000);deltaBounds.minX=Math.min(deltaBounds.minX,x);deltaBounds.maxX=Math.max(deltaBounds.maxX,x);deltaBounds.minY=Math.min(deltaBounds.minY,y);deltaBounds.maxY=Math.max(deltaBounds.maxY,y);}}
+    expectedArt.getContext('2d').drawImage(exact,x,y,width,height);
+    // Observe a 1:1 copy, never read back the live export canvas. Repeated
+    // getImageData calls can trigger a Chromium GPU-to-CPU backend switch
+    // before its next draw and change resampling solely because of the test.
+    const observed=document.createElement('canvas');observed.width=1080;observed.height=1350;
+    observed.getContext('2d').drawImage(portraitCanvas,0,0);
+    const originalPixels=observed.getContext('2d').getImageData(0,0,1080,1350).data;
+    const a=new Uint8ClampedArray(width*height*4),b=expectedArt.getContext('2d').getImageData(x,y,width,height).data;
+    for(let row=0;row<height;row++)a.set(originalPixels.subarray(((row+y)*1080+x)*4,((row+y)*1080+x+width)*4),row*width*4);
+    const portraitArt=document.createElement('canvas');portraitArt.width=width;portraitArt.height=height;
+    portraitArt.getContext('2d').drawImage(portraitCanvas,x,y,width,height,0,0,width,height);
+    let maxArtDelta=0, artDelta=0, deltaBounds={minY:height,maxY:0,minX:width,maxX:0};for(let i=0;i<a.length;i++){const d=Math.abs(a[i]-b[i]);maxArtDelta=Math.max(maxArtDelta,d);artDelta+=d;if(d>2){const pixel=Math.floor(i/4),x=pixel%width,y=Math.floor(pixel/width);deltaBounds.minX=Math.min(deltaBounds.minX,x);deltaBounds.maxX=Math.max(deltaBounds.maxX,x);deltaBounds.minY=Math.min(deltaBounds.minY,y);deltaBounds.maxY=Math.max(deltaBounds.maxY,y);}}
+    const border = [[20,20],[1060,20],[20,1330],[1060,1330],[20,650],[1060,650],[540,20],[540,1330]].map(([x,y]) => [...originalPixels.subarray((y*1080+x)*4,(y*1080+x)*4+4)]);
+    window.__artworkDefaultPixels = originalPixels;
 
     return {
       state, expectedDuration: elapsedMeasuringMs / 1000,
       scene: { family: landscape.family, seed: landscape.seed, version: landscape.version, strokeCount: landscape.strokes.length, usableSeconds: landscape.usableSeconds },
       sourceUnchanged: sceneBefore === JSON.stringify(landscape),
-      art: portraitArt.toDataURL(), maxArtDelta, meanArtDelta:artDelta/a.length, deltaBounds,
+      art: portraitArt.toDataURL(), maxArtDelta, meanArtDelta:artDelta/a.length, deltaBounds, border,
       image: document.querySelector('.portrait-preview canvas').toDataURL(),
       accessibleDescription: document.querySelector('.portrait-preview canvas').getAttribute('aria-label'),
     };
@@ -280,8 +319,10 @@ export async function checkArtwork(page, output = process.env.PPG_ARTWORK_ARTIFA
   assert.equal(captured.state.width, 1080, 'share artwork width');
   assert.equal(captured.state.height, 1350, 'share artwork height');
   assert.equal(captured.state.durationSec, captured.expectedDuration, 'portrait uses actual active capture duration, including early finishes');
-  assert.equal(captured.state.includeMetrics, false, 'numeric metrics are excluded from shared artwork by default');
-  assert.equal(await checkbox.isChecked(), false, 'metrics inclusion starts unchecked');
+  assert.deepEqual(captured.state.artworkBounds, { x:100, y:190, width:880, height:880 }, 'complete scene has equal generous side borders and padded title space');
+  assert.ok(captured.border.every(([r,g,b,a]) => r >= 245 && g >= 240 && b >= 230 && r > b && a === 255), 'warm opaque paper surrounds the entire card');
+  assert.equal(captured.state.includeMetrics, true, 'numeric metrics are included in the local shared artwork by default');
+  assert.equal(await checkbox.isChecked(), true, 'local metrics inclusion starts checked');
   assert.match(captured.accessibleDescription, /landscape|pulse/i, 'artwork has an accessible description');
   for (const key of ['family', 'seed', 'version', 'strokeCount', 'usableSeconds'])
     assert.equal(captured.state[key], captured.scene[key], `portrait retains capture scene ${key}`);
@@ -324,17 +365,32 @@ export async function checkArtwork(page, output = process.env.PPG_ARTWORK_ARTIFA
   if (output) { mkdirSync(output, {recursive:true}); writeFileSync(`${output}/portrait.png`, png); }
   assert.equal(hash(png), hash(Buffer.from(captured.image.split(',')[1], 'base64')), 'export uses the exact preview pixels');
 
-  await checkbox.check();
-  await page.waitForFunction(() => PulsePortrait.getState().ready && PulsePortrait.getState().includeMetrics);
-  assert.notEqual(hash(await canvas.evaluate(node => node.toDataURL())), hash(captured.image), 'explicit metric opt-in changes the shared portrait');
-  const metricsArt = await canvas.evaluate(node => {
-    const crop = document.createElement('canvas'); crop.width = crop.height = 1000;
-    crop.getContext('2d').drawImage(node, 40, 146, 1000, 1000, 0, 0, 1000, 1000);
-    return crop.toDataURL();
-  });
-  assert.equal(hash(metricsArt), hash(captured.art), 'metric opt-in only changes the footer and leaves every landscape pixel unchanged');
   await checkbox.uncheck();
   await page.waitForFunction(() => PulsePortrait.getState().ready && !PulsePortrait.getState().includeMetrics);
+  assert.notEqual(hash(await canvas.evaluate(node => node.toDataURL())), hash(captured.image), 'turning metrics off changes the shared portrait');
+  const toggled = await canvas.evaluate(node => {
+    const {x,y,width,height} = PulsePortrait.getState().artworkBounds;
+    const crop = document.createElement('canvas'); crop.width = width; crop.height = height;
+    crop.getContext('2d').drawImage(node,x,y,width,height,0,0,width,height);
+    const observed=document.createElement('canvas');observed.width=1080;observed.height=1350;
+    observed.getContext('2d').drawImage(node,0,0);
+    const pixels = observed.getContext('2d').getImageData(0,0,1080,1350).data, original = window.__artworkDefaultPixels;
+    let outsideBandChanges = 0, metricBandChanges = 0, maxOutsideDelta = 0;
+    for(let offset=0;offset<pixels.length;offset+=4) {
+      if(![0,1,2,3].some(channel=>pixels[offset+channel]!==original[offset+channel]))continue;
+      const y=Math.floor(offset/4/1080);
+      if(y>=1150&&y<1240)metricBandChanges++;else {outsideBandChanges++;for(let channel=0;channel<4;channel++)maxOutsideDelta=Math.max(maxOutsideDelta,Math.abs(pixels[offset+channel]-original[offset+channel]));}
+    }
+    delete window.__artworkDefaultPixels;
+    return {art:crop.toDataURL(),outsideBandChanges,metricBandChanges,maxOutsideDelta,image:node.toDataURL()};
+  });
+  console.log('PORTRAIT_METRIC_TOGGLE',JSON.stringify({outsideBandChanges:toggled.outsideBandChanges,metricBandChanges:toggled.metricBandChanges,maxOutsideDelta:toggled.maxOutsideDelta}));
+  if (output) writeFileSync(`${output}/portrait-without-metrics.png`, Buffer.from(toggled.image.split(',')[1], 'base64'));
+  assert.equal(hash(toggled.art), hash(captured.art), 'metrics toggle leaves every landscape pixel unchanged');
+  assert.equal(toggled.outsideBandChanges, 0, 'metrics toggle cannot move or erase the title, landscape name, date, website or paper frame');
+  assert.ok(toggled.metricBandChanges > 0, 'metrics toggle removes only its numeric summary band');
+  await checkbox.check();
+  await page.waitForFunction(() => PulsePortrait.getState().ready && PulsePortrait.getState().includeMetrics);
   assert.equal(hash(await canvas.evaluate(node => node.toDataURL())), hash(captured.image), 'regenerating the default portrait preserves its exact seeded composition');
 
   await page.evaluate(() => {

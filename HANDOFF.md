@@ -1,6 +1,21 @@
 # Pulse Painting handoff
 
-## Current production release: simple sharing and mobile capture polish
+## Current candidate: framed keepsake cards
+
+Finished artwork has a full warm ochre frame, padded brand lettering, a cursive
+scene name, a stable summary-metrics band and left date/right website footer.
+Personal metrics start on and can be hidden; the separate public-gallery review
+still starts with metrics off and omits the private session date. The requested
+generic landscape tagline is removed. Sixteen gallery share JPEGs use the same
+card renderer; all landscape and thumbnail pixels remain unchanged. Legacy
+book detail crops use the intersection of old and new artwork rectangles.
+
+Local Chromium/WebKit artwork, export, mobile-layout and privacy checks pass;
+final source checks and hosted deployment verification are in progress. See
+`docs/validation/keepsake-card-2026-10-23.md`. No camera, acceptance, waveform,
+landscape or live-animation behavior changed. npm publication remains pending.
+
+## Previous production release: simple sharing and mobile capture polish
 
 PR #8 replaces the sharing book/platform picker with a large painting preview,
 Share image, Save image, an accurate painting/app link and optional Caption/Add

@@ -89,8 +89,10 @@ primary floating actions are Share artwork and Measure again. Save artwork,
 Save manuscript, Save report and debug-log actions remain in the menu.
 
 The portrait PNG is 1080 × 1350. Its square painting comes from the same scene as
-capture, with typography outside the scene. Summary metrics are opt-in and change
-only the footer; they never crop or move the painting. Prepared files allow native
+capture, with typography outside the scene. Summary metrics are shown by default
+on personal artwork and can be hidden; toggling them never crops or moves the
+painting. Public gallery publishing has a separate metrics choice, off by default,
+and requires explicit consent to the public preview. Prepared files allow native
 sharing directly within the tap; unsupported sharing falls back to downloading.
 Cancellation returns quietly, and errors retain the scene/report.
 

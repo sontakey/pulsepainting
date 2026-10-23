@@ -20,10 +20,10 @@
   width: 100%;
   height: auto;
   aspect-ratio: 4 / 5;
-  border: 1px solid rgba(44, 64, 94, .12);
-  border-radius: 6px;
-  box-shadow: 0 8px 30px rgba(43, 51, 76, .07);
-  background: #fdfbf7;
+  border: 1px solid #ded0ad;
+  border-radius: 3px;
+  box-shadow: 0 12px 34px rgba(83, 69, 39, .09);
+  background: #fbf8f0;
 }
 .portrait-preview figcaption {
   margin: 14px 0 0;
@@ -47,6 +47,14 @@
   height: 24px;
   margin: 0;
   accent-color: #2855ff;
+}
+.portrait-options small {
+  display: block;
+  margin-top: 4px;
+  color: #526971;
+  font-size: 14px;
+  line-height: 1.5;
+  font-weight: 400;
 }
 .portrait-status {
   min-height: 24px;

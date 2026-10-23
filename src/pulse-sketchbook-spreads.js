@@ -122,10 +122,11 @@ export async function createPulseSketchbookSpreads(blob, { signal } = {}) {
         footer(ctx, 1, 'Your complete painting · nothing cropped');
       } else if (index === 1) {
         title = 'A closer look'; place = 'Details from the same painting';
-        // Known 4:5 Pulse Painting exports reserve this square for the artwork.
+        // This square lies inside both legacy and keepsake 4:5 artwork bounds.
+        // Keep their names, measurements and other card text out of details.
         // Other aspect ratios use a central detail; no new marks are generated.
         const known = Math.abs(source.width / source.height - .8) < .005;
-        const region = known ? { x: source.width * 40 / 1080, y: source.height * 146 / 1350, w: source.width * 1000 / 1080, h: source.height * 1000 / 1350 }
+        const region = known ? { x: source.width * 100 / 1080, y: source.height * 190 / 1350, w: source.width * 880 / 1080, h: source.height * 880 / 1350 }
           : { x: 0, y: 0, w: source.width, h: source.height };
         const size = Math.min(region.w, region.h) * .62;
         const cropHeight = size * 440 / 600;

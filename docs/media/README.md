@@ -1,8 +1,9 @@
 # Pulse Painting screenshots
 
 These are direct browser captures of the actual static app. The capture image
-was refreshed on October 23, 2026 for the compact capture header and adaptive scenic raster cadence. Report and desktop
-images retain the October 22 foreground release. Ready and QR retain their
+was refreshed on October 23, 2026 for the compact capture header and adaptive scenic raster cadence. The report and sharing
+images show the October 23 framed keepsake card. The desktop image retains the
+October 22 foreground release. Ready and QR retain their
 unchanged first-release images.
 The mobile gallery PNG documents the separately tested October 23 build
 described below. Its release was subsequently verified on the public site;
@@ -45,15 +46,16 @@ checks in [the optimization validation record](../validation/slow-phone-2026-10-
   **71 bpm, 62 ms RMSSD, 51 ms SDNN** while the normal close-up painting runs.
   The earlier capture used the first pass's mid-water camera position; the crisp
   brush image above has now replaced that capture.
-- The actual **Finish painting** button starts the animated zoom-out. The report
-  screenshot waits for the same-scene export to become ready. Report values are
+- The actual **Finish painting** button starts the animated zoom-out. The earlier
+  report screenshot waited for the same-scene export to become ready. Its values were
   **71 bpm, 52.8 ms RMSSD and 46.8 ms SDNN**. A separate PNG export was also checked.
 - The desktop background is the earlier public-fixture gallery example: the
   same seed, replay through 180 seconds, 148.9 usable seconds. The desktop and
-  report images came from the final screenshot pass at
+  earlier report images came from the final screenshot pass at
   `2026-10-23T04:21:11.940Z` and `2026-10-23T04:21:30.194Z`.
 - Both screenshot passes completed without runtime errors. Helper and raw
   evidence are in ignored `.dream-loop/foreground-pulse/screens/`.
+  The framed keepsake capture below has replaced that report image.
 
 Renderer and served `dist/landscape.js` SHA-256:
 
@@ -101,22 +103,49 @@ thumbnail decoded. No image pixels or interface text were edited.
   covers Chromium/WebKit behavior, layout, history, retry and capture handoff.
   This screenshot is not physical-phone, native-share or performance evidence.
 
-## Simple painting sharing
+## Framed keepsake report and sharing
 
-`pulse-painting-sharing.png` was refreshed on October 23, 2026 at 22:44:05 UTC.
-It is the direct 390 × 844 browser capture of the actual built app with loaded
-fonts, Chrome 155.0.8059.85, DPR 1, iPhone 13 emulation and reduced motion. No screenshot pixels were
-edited. The real report's Share artwork button opened this dialog.
+`pulse-painting-report.jpg` and `pulse-painting-sharing.png` were captured directly
+from the rebuilt app at `2026-10-23T23:33:00.090Z` and
+`2026-10-23T23:33:00.215Z`. Chrome 155.0.8059.85 through Playwright 1.63.0 used
+iPhone 13 emulation, a 390 × 844 CSS-pixel viewport, DPR 1, reduced motion and
+loaded local fonts. Both images are 390 × 844 pixels. The report is the browser's
+native JPEG at quality 92; sharing is its native PNG. No image pixels or UI
+values were edited after capture.
 
 The public fixture was processed through `replayPublicFixture(1, 0, 180)` and
-its accepted segments rendered as Quiet Lake, seed 39293. The report harness
-used a fixed October 23 timestamp and 180-second capture duration. Native-share
-availability was mocked to show the phone's Share image action; no camera,
-native share delivery, visitor recording or public submission was involved.
+the actual accepted-window adapter. Its 30 accepted segments, 59 strokes and
+148.9 usable seconds were rendered as Glacial Fjord, seed 39293. The real report
+received 175 accepted, HRV-valid beat timestamps from the pinned signal engine.
+Computed values are 70.9365 bpm, 53.5937 ms RMSSD and 47.5821 ms SDNN; the keepsake
+rounds these to **71 bpm, 54 ms and 48 ms**. Metrics remained on by default. The
+card date is fixed at October 23, with a 180-second capture duration; no samples
+or measurements were substituted.
 
-The same built-app layout passed Chromium and WebKit at 320, 390, 887 and
-1440 CSS pixels, including expanded caption access above the mobile footer.
-Evidence and capture helper are in ignored `.dream-loop/simple-sharing/`.
+The real report's **Share artwork** button opened the sharing dialog after the
+PNG was ready; the screenshot waited for the preview image to decode.
+`navigator.canShare` was stubbed to return true so the **Share image** action is
+visible. `navigator.share` was never invoked. Neither capture used a camera,
+uploaded a file, published a painting or created a visitor recording. Both
+completed without runtime errors.
+
+Source and served `dist/portrait.js` SHA-256:
+`1e14f115e5236880ec16a39fcdc8aacb87e293facc8241d0d71e6b923223fb9b`.
+Source and served `dist/portrait.css` SHA-256:
+`a03aaa9bee8a27487a220a303fc97a3e8501db78441befc8c62548a11dbc46ed`.
+The renderer remains
+`2e7e417aeffe1cfef835bfbf49d80e49029de02314a00591a3366aa18d0df794`.
+
+The same frozen build passed 96 card exports across all 16 scenes, full and
+short recordings, unavailable metrics, Chromium and WebKit. It also passed
+18 report captures at 320, 390 and 1440 CSS pixels, 12 exact-file downloads and
+12 local public-export preparations. Hiding metrics preserved every painting
+pixel. These are browser presentation checks, separate from physical-phone,
+native-share, physiological-accuracy and performance validation.
+
+Capture helper, exact file copies and metadata are in ignored
+`.dream-loop/keepsake-cards/readme.mjs` and `.dream-loop/keepsake-cards/readme/`.
+The complete visual matrix is in `.dream-loop/keepsake-cards/final/result.json`.
 
 ## Earlier sharing and personal sketchbook
 
@@ -153,7 +182,7 @@ social-post delivery or sustained frame-rate evidence.
 | `pulse-painting-qr.jpg` | 81054 | `56374f21d8c42f2edc94165adb7b06a762b95fae80e95c147e157f7038c52898` |
 | `pulse-painting-ready.jpg` | 51933 | `1da91b18ec49b70eebb09af1fcea4dff9f87078637b8ffcc70adf00e375a1ddf` |
 | `pulse-painting-capture.jpg` | 249074 | `e5aa4cc9195b77e495e7ae8755259cd429c8f9c323a1c8df5ca6f02eb952fbe4` |
-| `pulse-painting-report.jpg` | 65173 | `c2f8559f395c9d6ed8d36738f68a0df638aab51f30377e413e8966e1ce234f4c` |
+| `pulse-painting-report.jpg` | 72429 | `00bf687a8592d16f0848eebf5bc756dee6e90191fba23b052715274f2c6eff93` |
 | `pulse-painting-mobile-gallery.png` | 469347 | `2f7f07374fb73399156555da8a86281d6b982db7714efe9a7bd2b4d4caa1889b` |
-| `pulse-painting-sharing.png` | 121071 | `125d0fbf8cdb8d49b85a592191e2835ffd4ece6101e9d2ed3f18299d79845fc9` |
+| `pulse-painting-sharing.png` | 112629 | `2108b3314600dcda8a89d8e1aa0fe9b19e550fece694c7abfca10ec26ff664d3` |
 | `pulse-painting-sketchbook.png` | 533165 | `3a39ce8438a318de609cb2ef215e22b07ff9758e1abd86741d1f5f72afbdfb04` |

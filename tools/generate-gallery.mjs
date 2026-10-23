@@ -14,9 +14,10 @@ const output=path.resolve(root,option('--out')||'app/assets/gallery');
 const rendererPath=path.resolve(root,option('--renderer')||'app/landscape.js');
 const fixturePath=path.join(root,'test/fixtures/iphone-200s.json');
 const hash=value=>createHash('sha256').update(value).digest('hex');
-const [fixtureBytes,renderer,appSource,vendor,font]=await Promise.all([
+const [fixtureBytes,renderer,appSource,vendor,font,portrait,sans]=await Promise.all([
   readFile(fixturePath),readFile(rendererPath,'utf8'),readFile(path.join(root,'app/app.js'),'utf8'),
   readFile(path.join(root,'vendor/ppg-js/0.3.1/ppg.global.js'),'utf8'),readFile(path.join(root,'app/fonts/water-brush-latin.woff2')),
+  readFile(path.join(root,'app/portrait.js'),'utf8'),readFile(path.join(root,'app/fonts/dm-sans-latin.woff2')),
 ]);
 const adapter=appSource.slice(appSource.indexOf('function acceptPaintWindow(metrics)'),appSource.indexOf('function paintManuscript(canvas'));
 assert.ok(adapter.startsWith('function acceptPaintWindow(metrics)'),'actual app window adapter is available');
@@ -32,16 +33,17 @@ await mkdir(output,{recursive:true});
 const browser=await chromium.launch(process.platform==='darwin'?{channel:'chrome'}:{});
 try{
  const page=await browser.newPage({viewport:{width:1200,height:1200}});
- await page.setContent('<!doctype html><html><body></body></html>');await page.addScriptTag({content:renderer});
+ await page.setContent('<!doctype html><html><body></body></html>');await page.addScriptTag({content:renderer});await page.addScriptTag({content:portrait});
  await page.evaluate(async encoded=>{const font=new FontFace('Water Brush',`url(data:font/woff2;base64,${encoded})`);await font.load();document.fonts.add(font);},font.toString('base64'));
+ await page.evaluate(async encoded=>{const font=new FontFace('DM Sans',`url(data:font/woff2;base64,${encoded})`,{weight:'100 1000'});await font.load();document.fonts.add(font);},sans.toString('base64'));
  const rendered=await page.evaluate(segments=>{
   const scenes=[];
   for(const family of PulseLandscape.FAMILIES){
    const scene=PulseLandscape.create({seed:39293,family:family.id});segments.forEach(segment=>PulseLandscape.append(scene,segment));
    const full=document.createElement('canvas');full.width=full.height=1080;PulseLandscape.render(scene,full);
    const thumb=document.createElement('canvas');thumb.width=thumb.height=640;thumb.getContext('2d').drawImage(full,0,0,640,640);
-   const share=document.createElement('canvas');share.width=1080;share.height=1350;const x=share.getContext('2d');
-   x.fillStyle='#fdfbf7';x.fillRect(0,0,1080,1350);x.fillStyle='#193b4b';x.textAlign='center';x.font='104px "Water Brush"';x.fillText('Pulse Painting',540,94);x.drawImage(full,40,146,1000,1000);x.font='34px sans-serif';x.fillText(family.name,540,1202);x.fillStyle='#567079';x.font='23px sans-serif';x.fillText('An example from a public pulse recording',540,1248);x.font='24px sans-serif';x.fillText('pulsepainting.com · by ChatPPG',540,1293);
+   const share=document.createElement('canvas');share.width=1080;share.height=1350;
+   PulsePortrait.paintCard(share,{art:full,name:family.name,footerLeft:'Example · public recording'});
    scenes.push({id:family.id,name:family.name,seed:scene.seed,usableSeconds:scene.usableSeconds,strokeCount:scene.strokes.length,image:full.toDataURL('image/webp',.91),thumbnail:thumb.toDataURL('image/webp',.86),shareImage:share.toDataURL('image/jpeg',.92)});
   }
   const hero=scenes.find(scene=>scene.id==='quiet-lake');
@@ -62,7 +64,7 @@ try{
   x.fillStyle='#193f4b';x.font='96px "Water Brush"';x.fillText('Pulse Painting',62,200);x.font='38px sans-serif';x.fillText('Your pulse,',67,285);x.fillText('made into a place.',67,335);x.font='23px sans-serif';x.fillStyle='#4c6a71';x.fillText('Three quiet minutes. Entirely you.',67,410);x.font='20px sans-serif';x.fillText('pulsepainting.com · by ChatPPG',67,556);x.font='14px sans-serif';x.fillText('Example from a public pulse recording',67,585);return c.toDataURL('image/jpeg',.9);
  },rendered.scenes.find(scene=>scene.id===rendered.hero).image);
  const socialBytes=Buffer.from(social.split(',')[1],'base64');await writeFile(path.join(output,'social.jpg'),socialBytes);
- const manifest={schema:1,kind:'public-fixture-examples',rendererVersion:rendered.version,rendererSha256:hash(renderer),fixture:'test/fixtures/iphone-200s.json',fixtureSha256:hash(fixtureBytes),engineSha256:hash(vendor),adapterSha256:hash(adapter),seed:39293,recordingReplaySeconds:180,acceptedSegments:segments.length,description:'All examples are actual Pulse Painting renders of one already-public recording. They are not a community feed or private visitor recordings.',scenes:records,social:{file:'social.jpg',width:1200,height:630,bytes:socialBytes.length,sha256:hash(socialBytes)}};
+ const manifest={schema:1,kind:'public-fixture-examples',rendererVersion:rendered.version,rendererSha256:hash(renderer),cardRendererSha256:hash(portrait),fixture:'test/fixtures/iphone-200s.json',fixtureSha256:hash(fixtureBytes),engineSha256:hash(vendor),adapterSha256:hash(adapter),seed:39293,recordingReplaySeconds:180,acceptedSegments:segments.length,description:'All examples are actual Pulse Painting renders of one already-public recording. They are not a community feed or private visitor recordings.',scenes:records,social:{file:'social.jpg',width:1200,height:630,bytes:socialBytes.length,sha256:hash(socialBytes)}};
  await writeFile(path.join(output,'manifest.json'),JSON.stringify(manifest,null,2)+'\n');
  console.log(JSON.stringify({examples:records.length,rendererSha256:manifest.rendererSha256,usableSeconds:records[0].usableSeconds,imageBytes:records.reduce((n,s)=>n+s.imageBytes+s.thumbnailBytes,0),output:path.relative(root,output)}));
 }finally{await browser.close();}

@@ -93,6 +93,56 @@ async function sourceProjection(page){
   },PERSONAL_BOOK_PORTRAIT);
 }
 
+async function detailLayoutCompatibility(page){
+  const layouts=await page.evaluate(async rect=>{
+    const {createPulseSketchbookSpreads}=await import('/src/pulse-sketchbook-spreads.js');
+    const art=new Image();art.src='/app/assets/gallery/quiet-lake.webp';await art.decode();
+    const checks=[];
+    for(const [layout,bounds,scale]of[
+      ['legacy',{x:40,y:146,w:1000,h:1000},1],
+      ['keepsake',{x:100,y:190,w:880,h:880},1],
+      ['keepsake-half-size',{x:100,y:190,w:880,h:880},.5],
+    ]){
+      const source=document.createElement('canvas');source.width=1080*scale;source.height=1350*scale;
+      const ctx=source.getContext('2d');
+      // Saturated magenta marks all card text/margins, while the artwork is the
+      // actual public Quiet Lake image. A crop that reaches a footer must fail.
+      ctx.fillStyle='#ff00ff';ctx.fillRect(0,0,source.width,source.height);
+      ctx.drawImage(art,bounds.x*scale,bounds.y*scale,bounds.w*scale,bounds.h*scale);
+      const blob=await new Promise(resolve=>source.toBlob(resolve,'image/png'));
+      const spreads=await createPulseSketchbookSpreads(blob);
+      try{
+        const plates=[];
+        for(const item of spreads.pages){const image=new Image();image.src=item.url;await image.decode();plates.push(image);}
+        const detail=document.createElement('canvas');detail.width=1760;detail.height=1240;
+        const detailCtx=detail.getContext('2d');detailCtx.drawImage(plates[1],0,0);
+        const marginPixels=[184,974].map(x=>{
+          const pixels=detailCtx.getImageData(x,402,600,440).data;let count=0;
+          for(let i=0;i<pixels.length;i+=4)if(pixels[i]>240&&pixels[i+1]<20&&pixels[i+2]>240)count++;
+          return count;
+        });
+        const expected=document.createElement('canvas');expected.width=rect.w;expected.height=rect.h;
+        const expectedCtx=expected.getContext('2d');expectedCtx.drawImage(source,0,0,rect.w,rect.h);
+        const expectedPixels=expectedCtx.getImageData(0,0,rect.w,rect.h).data;
+        const fullMeanDelta=[0,2].map(index=>{
+          detailCtx.clearRect(0,0,detail.width,detail.height);detailCtx.drawImage(plates[index],0,0);
+          const actual=detailCtx.getImageData(rect.x,rect.y,rect.w,rect.h).data;let total=0;
+          for(let i=0;i<actual.length;i++)total+=Math.abs(actual[i]-expectedPixels[i]);
+          return total/actual.length;
+        });
+        checks.push({layout,pages:plates.length,marginPixels,fullMeanDelta});
+      }finally{spreads.dispose();}
+    }
+    return checks;
+  },PERSONAL_BOOK_PORTRAIT);
+  for(const result of layouts){
+    assert.equal(result.pages,3);
+    assert.deepEqual(result.marginPixels,[0,0],`${result.layout}: details stay inside artwork, clear of card names and metrics`);
+    assert.ok(result.fullMeanDelta.every(delta=>delta<1),`${result.layout}: first and third plates retain the complete supplied card`);
+  }
+  return layouts;
+}
+
 try{
   const engines=[['chromium',chromium],['webkit',webkit]].filter(([name])=>!process.env.PPG_PERSONAL_SKETCHBOOK_BROWSER||name===process.env.PPG_PERSONAL_SKETCHBOOK_BROWSER);
   for(const [name,engine]of engines){
@@ -132,6 +182,7 @@ try{
       // Browser canvas paths can round a resampled JPEG by a channel value.
       // The complete projected rectangle still has to match within 1/255.
       for(const p of projection.projections){assert.equal(p.width,1760);assert.equal(p.height,1240);assert.ok(p.meanDelta<1,`full source portrait stays intact on page ${p.index+1}: ${p.meanDelta}`);}
+      const detailLayouts=label==='desktop'?await detailLayoutCompatibility(page):undefined;
       if(out)await page.screenshot({path:path.join(out,`${name}-${label}-first.png`),fullPage:true});
       // The adaptation fixes pointer capture only in its derived document.
       await frame.locator('#sbRight').click();await waitTitle(frame,nextTitle);
@@ -184,7 +235,7 @@ try{
       assert.equal(requests.some(url=>url.startsWith('http')&&!url.startsWith(base)),false,'personal preparation sends no remote requests');
       assert.equal(requests.some(url=>new URL(url).pathname.startsWith('/api/')),false,'opening the book never publishes an image');
       assert.deepEqual(errors,[]);assert.deepEqual(failed,[]);
-      results.push({browser:name,label,projection,layout,initialBounds,dragInput,tilt,loupeDrag,loupeHidden,sourceHash:after.hash,sketchbookRequests,passed:true});await context.close();
+      results.push({browser:name,label,projection,detailLayouts,layout,initialBounds,dragInput,tilt,loupeDrag,loupeHidden,sourceHash:after.hash,sketchbookRequests,passed:true});await context.close();
     }
 
     // Exercise the component's own asynchronous cancellation and failure paths.
