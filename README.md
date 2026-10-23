@@ -9,9 +9,9 @@ Your pulse, made into a place.
 > See [current release verification](docs/validation/slow-phone-2026-10-23.md).
 > The [mobile gallery](https://www.pulsepainting.com/#landscapes) is now live too;
 > see [mobile verification](docs/validation/mobile-gallery-2026-10-23.md).
-> Community publishing, social sharing and personal sketchbooks are live;
+> Community publishing and artwork sharing are live;
 > see [sharing release checks](docs/validation/community-sharing-2026-10-23.md).
-> Shareable sketchbook links are live; see [recipient-page checks](docs/validation/shareable-sketchbooks-2026-10-23.md).
+> Existing sketchbook links remain supported; see [recipient-page checks](docs/validation/shareable-sketchbooks-2026-10-23.md).
 
 Pulse Painting is a three-minute phone-camera capture experience by [ChatPPG](https://chatppg.com), powered by [ppg-js](https://github.com/sontakey/ppg-js). Accepted pulse waveforms paint one of sixteen landscapes, with layered watercolor washes and recognizable pulse contours. A close-up follows the brush during capture, then pulls back to reveal the same painting, ready to share alongside an expandable HRV report.
 
@@ -86,11 +86,12 @@ These remain labeled public-fixture examples, not uploads from other visitors.
 
 ## Share a painting, or give it a public page
 
-**Share artwork** opens a paper-toned preview with a prominent image-share
-action and X, Instagram, TikTok, LinkedIn, Facebook and WhatsApp shortcuts.
-Native sharing hands the prepared image to the phone; unsupported browsers can
-save it. Link buttons share the app until the painting has its own public page.
-Nothing posts automatically.
+**Share artwork** opens a large paper-toned painting preview with a primary
+**Share image** action, **Save image**, and **Copy painting link** (or
+**Copy app link** while private). Native sharing hands the prepared image to
+the phone, where the visitor chooses an app; unsupported browsers can save it.
+An optional caption and **Add to gallery** stay separate from these actions.
+Nothing posts or uploads automatically.
 
 Publishing to **Community** is optional. Review a fresh public preview, choose
 an optional display name and optional summary measurements, then explicitly
@@ -100,31 +101,18 @@ painting; public links contain no removal key. Clearly labeled public-recording 
 eight real paintings are available. Actual publications appear first; the
 complete sixteen-scene example collection remains available separately.
 
-**Open your sketchbook** puts the prepared painting into a personal paper book,
-with page curls, dragging, tilt, zoom and a magnifier adapted from ThreeUI's
-authored renderer. Its three spreads show the complete image, clearly labeled
-details of that image and a sharing invitation. It loads only when opened and
-receives none of the raw recording data. The exact ThreeUI source and complete
-Singapore asset set remain preserved separately, with all hashes verified at
-build time. See the [sharing design note](docs/design/community-sharing.md)
-and [source provenance](vendor/threeui-sketchbook/PROVENANCE.json).
-
 <p align="center">
-  <img src="docs/media/pulse-painting-sharing.png" width="250" alt="Paper-toned sharing screen with the painting, social destinations and a floating Share image button">
-  <img src="docs/media/pulse-painting-sketchbook.png" width="640" alt="The painting inside a personal paper sketchbook with page-turn and zoom controls">
+  <img src="docs/media/pulse-painting-sharing.png" width="390" alt="Simple painting preview with Share image, Save image and Copy link actions">
 </p>
 
-Direct browser captures of the actual interface using the labeled Quiet Lake
-example; see [image provenance](docs/media/README.md). The book is a local
-presentation of the prepared image, not a second recording or a new landscape.
+Direct browser capture of the actual report-sharing interface, using a Quiet Lake
+painting rendered from the public replay fixture; see [image provenance](docs/media/README.md).
 
-**Share sketchbook link** opens the published painting directly as a flip-through
-book at `/book/<painting-id>`. Recipients need no recording or account; the page
-shows the already-published image, supports page turns and zoom, and offers a
-native link share or a selectable copy fallback. Private paintings first show
-**Create a sketchbook link**, which opens the publication preview and consent
-step. Creating a public link also adds that painting to the community gallery.
-Removing the publication disables both its painting page and sketchbook link.
+Previously shared `/book/<painting-id>` links still open their published painting
+with the adapted page-turn renderer. The main sharing flow now uses the painting
+itself. The exact ThreeUI reference and its asset hashes remain preserved; see
+[source provenance](vendor/threeui-sketchbook/PROVENANCE.json). Removing a
+publication disables its public painting and existing sketchbook links together.
 
 Community persistence uses server-only Neon and Vercel Blob integrations.
 [Operations, privacy, migration and moderation](db/README.md) are documented
@@ -158,7 +146,7 @@ private export and example gallery work without these credentials.
 - Report charts, a 1080 × 1350 shareable artwork, native file sharing with download fallback, and optional metrics on the artwork.
 - A full-screen desktop introduction and an on-demand mobile collection of sixteen public-fixture examples, with filters, swipe and keyboard navigation, user-initiated image sharing and scene deep links.
 - An artwork-first social share screen and optional public community gallery, with reviewed image/metrics consent, personal preview links, removal and reporting.
-- An optional personal paper sketchbook adapted from the ThreeUI page-turn renderer, isolated and loaded on demand; the exact original source and authored Singapore assets remain preserved separately.
+- Simple image and link sharing, with compatible recipient pages for existing sketchbook links. The exact ThreeUI reference remains preserved separately.
 - Accessible supporting typography, one brush heading per screen, reduced motion, interruption recovery, and no recording credit for stale frames.
 
 The [landscape design contract](docs/design/pulse-painting-design.md) covers the sixteen families, data fidelity, density and recovery. Scene choice is random within an art-directed plan, not a health classification. The [mapping brief](docs/design/biometric-scene-mapping.md) distinguishes implemented source/quality/density mappings from future optional self-report ideas. The original manuscript remains available in the report menu.

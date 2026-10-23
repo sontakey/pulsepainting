@@ -1,5 +1,17 @@
 # Pulse Painting handoff
 
+## Prepared release: simple sharing and mobile capture polish
+
+PR #8 replaces the sharing book/platform picker with a large painting preview,
+Share image, Save image, an accurate painting/app link and optional Caption/Add
+to gallery. Existing public book links retain compatibility. Mobile capture uses
+SVG icons, centered placement title, Finding signal guidance and Cancel reading
+with resource cleanup and stale-callback isolation. Full WebKit interruption
+replay passed; the renderer remains unchanged. Current-source browser checks and
+actual-app visual review pass. CI and hosted promotion are still pending.
+See `docs/validation/simple-sharing-2026-10-23.md`. The new continuous-brush
+motion discussed from the user's video is a proposed next step, not implemented.
+
 ## Current production release: adaptive painting and gallery polish
 
 The app keeps the crisp real PPG contour, pointed

@@ -1,7 +1,7 @@
-# Personal sketchbook, with an exact preserved reference
+# Preserved sketchbook renderer and existing recipient links
 
-The sharing sheet keeps the visitor's actual pulse artwork as its initial,
-primary preview. **Open your sketchbook** lazily opens a book made from that
+The main sharing sheet now uses a simple painting preview and image/link
+actions. Existing public `/book/<id>` pages retain a book made from the
 same prepared image. Sharing stays available outside the book with no extra
 export step. The book never receives recording samples, metric objects,
 display names, publication capabilities or other session data.

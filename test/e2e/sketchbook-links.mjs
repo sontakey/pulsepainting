@@ -1,4 +1,6 @@
-// Browser integration with a mocked publication API/native share destination.
+// Artwork-publication integration with mocked API/native-share destinations.
+// The historical filename remains in npm scripts; public book compatibility has
+// its own public-sketchbook suite and is no longer part of the share sheet.
 // No real paintings are published and this does not certify physical phones.
 import assert from 'node:assert/strict';
 import {createServer} from 'node:http';
@@ -23,9 +25,9 @@ const server=createServer((req,res)=>{
 await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));
 const url=`http://127.0.0.1:${server.address().port}/`;
 const id='12345678-1234-4234-8234-123456789abc',lease='22345678-1234-4234-8234-123456789abc';
-const canonical='https://www.pulsepainting.com',publicURL=`${canonical}/p/${id}`,bookURL=`${canonical}/book/${id}`;
+const canonical='https://www.pulsepainting.com',publicURL=`${canonical}/p/${id}`;
 const blobOrigin='https://hnexw2ri5lomm3rg.public.blob.vercel-storage.com';
-const makePainting=body=>({id:body.id,displayName:body.displayName||'Anonymous',metrics:body.metrics,imageURL:`${blobOrigin}/community/book-test/${body.id}/${lease}/painting.jpg`,thumbnailURL:`${blobOrigin}/community/book-test/${body.id}/${lease}/thumbnail.webp`,url:`${canonical}/p/${body.id}`,createdAt:'2026-10-23T12:00:00.000Z'});
+const makePainting=body=>({id:body.id,displayName:body.displayName||'Anonymous',metrics:body.metrics,imageURL:`${blobOrigin}/community/publication-test/${body.id}/${lease}/painting.jpg`,thumbnailURL:`${blobOrigin}/community/publication-test/${body.id}/${lease}/thumbnail.webp`,url:`${canonical}/p/${body.id}`,createdAt:'2026-10-23T12:00:00.000Z'});
 const results=[];
 async function readyPublisher(page){await page.waitForFunction(()=>{const image=document.querySelector('.community-publish-preview img');return image?.complete&&image.naturalWidth===1080&&!document.querySelector('.community-publish-status').textContent.includes('Preparing');});}
 async function report(page){
@@ -39,9 +41,9 @@ async function report(page){
   },replay.segments);
   await page.locator('#btn-share-artwork').waitFor({state:'visible'});
 }
-async function privateBookPublisher(page){
+async function privateArtworkPublisher(page){
   await page.locator('#btn-share-artwork').click();await page.waitForFunction(()=>PulseShare.getState().ready);
-  await page.locator('.ps-book-link').click();await readyPublisher(page);
+  await page.locator('.ps-publish').click();await readyPublisher(page);
 }
 let browser;
 try{
@@ -49,8 +51,8 @@ try{
     if(process.env.PPG_BOOK_LINK_BROWSER&&process.env.PPG_BOOK_LINK_BROWSER!==name)continue;
     browser=await engine.launch(name==='chromium'&&process.platform==='darwin'?{channel:'chrome'}:{});
     const context=await browser.newContext({...devices['iPhone 13'],viewport:{width:390,height:844},deviceScaleFactor:1,reducedMotion:'reduce'});
-    const page=await context.newPage(),errors=[],posts=[],held=[];let postMode='success';
-    page.on('pageerror',error=>errors.push(error.message));
+    const page=await context.newPage(),errors=[],posts=[],held=[],requests=[];let postMode='success';
+    page.on('pageerror',error=>errors.push(error.message));page.on('request',request=>requests.push(request.url()));
     await page.route('**/api/paintings**',async route=>{
       if(route.request().method()!=='POST'){await route.fulfill({json:{paintings:[],nextCursor:null}});return;}
       const body=route.request().postDataJSON();posts.push(body);
@@ -65,84 +67,86 @@ try{
       Object.defineProperty(navigator,'canShare',{configurable:true,value:()=>true});
       Object.defineProperty(navigator,'share',{configurable:true,value:nativeShare});
       Object.defineProperty(navigator,'clipboard',{configurable:true,value:{writeText:value=>{copyCalls.push(value);return Promise.reject(new DOMException('Blocked','NotAllowedError'));}}});
+      document.execCommand=()=>false;
       window.testBlob=await(await fetch('/assets/gallery/quiet-lake-share.jpg')).blob();
       window.openTestHub=extra=>PulseShare.open({blob:testBlob,...extra});
     });
 
-    // A public book URL is derived only from a validated public painting link.
-    await page.evaluate(async publicURL=>{await openTestHub({publicURL}).ready;},publicURL);
-    assert.equal(await page.locator('.ps-book-link').innerText(),'Share sketchbook link');
-    await page.locator('.ps-book-link').click();await page.waitForFunction(()=>!PulseShare.getState().sharing);
-    assert.deepEqual(await page.evaluate(()=>shareCalls.at(-1)),{keys:['text','title','url'],url:bookURL,files:undefined,active:true});
+    // Native sharing is a prepared image gesture. Public links are a separate,
+    // allowlisted action; sharing never silently publishes a private painting.
+    await page.evaluate(async publicURL=>{await openTestHub({publicURL,openBook:true}).ready;},publicURL);
+    assert.equal(await page.locator('[data-action="copy-link"]').innerText(),'Copy painting link');
+    assert.equal(await page.locator('.ps-paper-toggle,.ps-book-link,iframe').count(),0,'legacy book options do not mount optional sharing UI');
     await page.locator('.ps-share').click();await page.waitForFunction(()=>!PulseShare.getState().sharing);
     const imageCall=await page.evaluate(()=>shareCalls.at(-1));assert.deepEqual(imageCall.keys,['files','title']);assert.equal(imageCall.files,1);assert.equal(imageCall.active,true,'image sharing remains a trusted file share');
-    await page.evaluate(()=>{shareMode='cancel';});await page.locator('.ps-book-link').click();await page.waitForFunction(()=>!PulseShare.getState().sharing);
-    assert.equal(await page.locator('.ps-status').innerText(),'','native cancellation is quiet');assert.equal(await page.locator('.ps-book-url').isVisible(),false);
+    await page.evaluate(()=>{shareMode='cancel';});await page.locator('.ps-share').click();await page.waitForFunction(()=>!PulseShare.getState().sharing);
+    assert.equal(await page.locator('.ps-status').innerText(),'','native cancellation is quiet');assert.equal(posts.length,0);
 
-    // Clipboard failure leaves the actual book link selectable, even without
-    // opening the optional sketchbook. The painting-page caption is not a fallback.
-    await page.evaluate(()=>{Object.defineProperty(navigator,'share',{configurable:true,value:undefined});});
-    await page.locator('.ps-book-link').click();await page.locator('.ps-book-url').waitFor({state:'visible'});
-    assert.equal(await page.locator('.ps-book-url').inputValue(),bookURL);assert.equal(await page.locator('.ps-book-url').getAttribute('readonly'),'');
-    assert.equal(await page.evaluate(()=>copyCalls.at(-1)),bookURL);
+    // Clipboard failure exposes the exact safe painting link in the optional
+    // Caption disclosure, preserving a usable manual fallback without a book UI.
+    await page.locator('[data-action="copy-link"]').click();
+    await page.waitForFunction(()=>document.querySelector('.ps-caption').open);
+    assert.equal(await page.evaluate(()=>copyCalls.at(-1)),publicURL);
+    assert.ok((await page.locator('.ps-caption p').innerText()).includes(publicURL));
+    assert.match(await page.locator('.ps-status').innerText(),/Select.*Caption/i);
     for(const width of[320,390,430]){
       await page.setViewportSize({width,height:844});
-      const layout=await page.locator('.ps-book-url').evaluate(el=>({documentWidth:document.documentElement.scrollWidth,viewport:innerWidth,box:el.getBoundingClientRect().toJSON(),font:parseFloat(getComputedStyle(el).fontSize)}));
-      assert.equal(layout.documentWidth,width);assert.ok(layout.box.width<=width&&layout.box.height>=44);assert.ok(layout.font>=14);
+      const layout=await page.locator('.ps-caption').evaluate(el=>({documentWidth:document.documentElement.scrollWidth,viewport:innerWidth,box:el.getBoundingClientRect().toJSON(),font:parseFloat(getComputedStyle(el.querySelector('p')).fontSize)}));
+      assert.equal(layout.documentWidth,width);assert.ok(layout.box.width<=width);assert.ok(layout.font>=14);
     }
     await page.setViewportSize({width:390,height:844});
     if(out)await page.screenshot({path:path.join(out,`${name}-copy-fallback.png`)});
     for(const invalid of[`${publicURL}?owner=secret`,`${publicURL}#remove=${'a'.repeat(64)}`,`${canonical}/book/${id}`,`https://evil.example/p/${id}`,`https://user:secret@www.pulsepainting.com/p/${id}`,`${publicURL}/`]){
       await page.evaluate(async publicURL=>{await openTestHub({publicURL}).ready;},invalid);
       assert.equal(await page.evaluate(()=>PulseShare.getState().published),false,`invalid public URL stays private: ${invalid}`);
-      assert.equal(await page.locator('.ps-book-links').isVisible(),false,'an invalid URL cannot produce a book link');
+      assert.equal(await page.locator('[data-action="copy-link"]').innerText(),'Copy app link');
+      await page.locator('[data-action="copy-link"]').click();await page.waitForFunction(()=>document.querySelector('.ps-caption').open);
+      assert.equal(await page.evaluate(()=>copyCalls.at(-1)),canonical+'/');
+      const caption=await page.locator('.ps-caption p').innerText();assert.ok(caption.includes(canonical+'/'));assert.equal(caption.includes(invalid),false,'private capabilities and unsupported URLs do not enter the fallback caption');
     }
+    await page.evaluate(()=>{shareMode='success';PulseShare.close();});
 
-    await page.evaluate(async publicURL=>{shareMode='success';Object.defineProperty(navigator,'share',{configurable:true,value:nativeShare});await openTestHub({publicURL,openBook:true}).ready;},publicURL);
-    await page.locator('iframe').waitFor();
-    await page.waitForFunction(()=>document.querySelector('.ps-paper-status').textContent.startsWith('Drag or tap'));
-    await page.locator('.ps-paper-link').click();await page.waitForFunction(()=>!PulseShare.getState().sharing);
-    assert.equal(await page.evaluate(()=>shareCalls.at(-1).url),bookURL);assert.equal(await page.evaluate(()=>shareCalls.at(-1).active),true);
-    await page.locator('.ps-book-copy').click();assert.equal(await page.locator('.ps-book-url').inputValue(),bookURL);
-    await page.locator('.ps-close').click();assert.equal(await page.locator('iframe').count(),0);
-
-    // A private maker follows the real report -> hub -> consent flow. Sharing
-    // a book never bypasses public preview, metric opt-in or explicit publication.
+    // Report -> sharing -> Add to gallery opens the real consent form. An
+    // existing private export preference never opts in public summary metrics.
     await report(page);await page.locator('.portrait-options input').check();await page.waitForFunction(()=>PulsePortrait.getState().ready);
-    await privateBookPublisher(page);
-    assert.equal(await page.locator('#community-publish-title').innerText(),'Share your sketchbook.');
-    assert.match(await page.locator('.community-publish-intro').innerText(),/community gallery/);
+    await privateArtworkPublisher(page);
+    assert.equal(await page.locator('#community-publish-title').innerText(),'A place in the gallery.');
     assert.equal(await page.evaluate(()=>PulseShare.getState().open),false);
     assert.equal(await page.locator('#community-include-metrics').isChecked(),false,'private export metrics do not opt in public metrics');
     assert.equal(await page.locator('#community-public-consent').isChecked(),false);assert.equal(await page.locator('.community-publish-submit').isDisabled(),true);assert.equal(posts.length,0);
     await page.locator('.community-publish-cancel').click();assert.equal(posts.length,0);
     await page.locator('.community-publish-invitation').click();await readyPublisher(page);
-    assert.equal(await page.locator('#community-publish-title').innerText(),'A place in the gallery.','book intent belongs to the current view, not the reusable draft');
-    await page.locator('.community-publish-cancel').click();await privateBookPublisher(page);
+    assert.equal(await page.locator('#community-publish-title').innerText(),'A place in the gallery.');
+    assert.equal(await page.locator('#community-public-consent').isChecked(),false);
+    await page.locator('.community-publish-cancel').click();await privateArtworkPublisher(page);
     await page.locator('#community-display-name').fill('Ada & friends');await page.locator('#community-public-consent').check();
     const beforePublicationCalls=await page.evaluate(()=>shareCalls.length);
     await page.locator('.community-publish-submit').click();await page.locator('.community-publish-success').waitFor({state:'visible'});
     assert.equal(posts.length,1);assert.equal(posts[0].displayName,'Ada & friends');assert.equal(posts[0].includeMetrics,false);assert.equal(posts[0].metrics,null);
+    assert.deepEqual(Object.keys(posts[0]).sort(),['consentVersion','displayName','id','image','includeMetrics','metrics','ownerToken'],'publication sends only the reviewed raster, optional fields and private receipt capability, never a raw recording');
     assert.equal(await page.evaluate(()=>shareCalls.length),beforePublicationCalls,'POST completion does not attempt native sharing');
     assert.equal(await page.evaluate(()=>PulseShare.getState().open),false,'POST completion leaves success actions for a new trusted click');
-    const publishedBook=`${canonical}/book/${posts[0].id}`;
-    assert.equal(await page.locator('.community-publish-success a').first().getAttribute('href'),publishedBook);
+    const publishedPage=`${canonical}/p/${posts[0].id}`;
+    assert.equal(await page.locator('.community-publish-success').getByRole('link',{name:'View your painting',exact:true}).getAttribute('href'),publishedPage);
     const successLinks=await page.locator('.community-publish-success a').evaluateAll(nodes=>nodes.map(n=>n.href));
     assert.equal(successLinks.some(link=>link.includes(posts[0].ownerToken)),false,'removal capability never appears in public links');
-    await page.locator('.community-publish-success').getByRole('button',{name:'Preview & share sketchbook',exact:true}).click();
-    await page.waitForFunction(()=>PulseShare.getState().ready);await page.locator('iframe').waitFor();
+    assert.equal(successLinks.some(link=>new URL(link).pathname.startsWith('/book/')),false,'publication success promotes the painting rather than a book');
+    await page.locator('.community-publish-success').getByRole('button',{name:'Share painting',exact:true}).click();
+    await page.waitForFunction(()=>PulseShare.getState().ready);
     assert.equal(await page.locator('.community-publish-dialog').isVisible(),false,'only the active share dialog remains open');
     const sharedRaster=await page.locator('.ps-preview img').evaluate(async img=>{const blob=await(await fetch(img.src)).blob();return await new Promise(resolve=>{const reader=new FileReader();reader.onload=()=>resolve(String(reader.result).split(',')[1]);reader.readAsDataURL(blob);});});
-    assert.equal(sharedRaster,posts[0].image,'public book uses the exact consented raster, not the metrics-bearing private export');
-    assert.equal(await page.evaluate(()=>shareCalls.length),beforePublicationCalls,'opening the book is not a native share');
-    await page.locator('.ps-paper-link').click();await page.waitForFunction(()=>!PulseShare.getState().sharing);
-    assert.equal(await page.evaluate(()=>shareCalls.at(-1).url),publishedBook);assert.equal(await page.evaluate(()=>shareCalls.at(-1).active),true);
+    assert.equal(sharedRaster,posts[0].image,'sharing uses the exact consented raster, not the metrics-bearing private export');
+    assert.equal(await page.evaluate(()=>shareCalls.length),beforePublicationCalls,'opening sharing is not a native share');
+    await page.locator('[data-action="copy-link"]').click();assert.equal(await page.evaluate(()=>copyCalls.at(-1)),publishedPage);
+    assert.equal(await page.locator('.ps-publish').isVisible(),false,'already public artwork does not offer another publication');
+    await page.locator('.ps-share').click();await page.waitForFunction(()=>!PulseShare.getState().sharing);
+    assert.deepEqual(await page.evaluate(()=>shareCalls.at(-1).keys),['files','title']);assert.equal(await page.evaluate(()=>shareCalls.at(-1).active),true);
     await page.locator('.ps-close').click();await page.locator('.community-publish-invitation').click();await page.locator('.community-publish-success').waitFor({state:'visible'});
     assert.equal(posts.length,1,'opening an existing publication does not create another');await page.locator('.community-publish-cancel').click();
 
-    // A delayed publication keeps the owner receipt but cannot reopen either
-    // dialog, a book or native sharing after the maker leaves the report.
-    await report(page);await privateBookPublisher(page);await page.locator('#community-include-metrics').check();
+    // A delayed publication retains the owner receipt but cannot reopen a
+    // dialog or launch native sharing after the maker leaves the report.
+    await report(page);await privateArtworkPublisher(page);await page.locator('#community-include-metrics').check();
     await page.waitForFunction(()=>document.querySelector('.community-publish-metrics dd'));
     assert.equal(await page.locator('#community-public-consent').isChecked(),false);
     await page.locator('#community-public-consent').check();postMode='hold';await page.locator('.community-publish-submit').click();
@@ -156,8 +160,9 @@ try{
     assert.equal(await page.locator('.community-publish-dialog').isVisible(),false);assert.equal(await page.evaluate(()=>PulseShare.getState().open),false);
     assert.equal(await page.locator('iframe').count(),0);assert.equal(await page.locator('#screen-ready').isVisible(),true);
     assert.equal(await page.evaluate(()=>shareCalls.length),nativeCallsBeforeLate);
-    assert.deepEqual(errors,[]);results.push({browser:name,passed:true,scope:'URL/file share separation, trusted clicks, cancellation, selectable fallback, strict URLs, public raster consent, metric opt-in, private removal keys, delayed response'});
-    await context.close();await browser.close();browser=null;console.log(`SKETCHBOOK_LINKS_PASS ${name}`);
+    assert.ok(requests.every(request=>!new URL(request).pathname.includes('sketchbook')&&!new URL(request).pathname.includes('react')),'sharing/publication never load optional book or React assets');
+    assert.deepEqual(errors,[]);results.push({browser:name,passed:true,scope:'Prepared image sharing, strict copy links, caption fallback, explicit public consent, exact consented raster, metric opt-in, private removal keys, delayed response, no optional book loads'});
+    await context.close();await browser.close();browser=null;console.log(`PUBLICATION_LINKS_PASS ${name}`);
   }
   if(out)writeFileSync(path.join(out,'result.json'),JSON.stringify(results,null,2));
 }finally{await browser?.close();await new Promise(resolve=>server.close(resolve));}

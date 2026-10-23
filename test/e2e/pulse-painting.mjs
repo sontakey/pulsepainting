@@ -55,6 +55,8 @@ try {
         this.currentMetrics = { fingerState: 'NO_FINGER' };
         this.i = 0;
         this.metricUpdates = [];
+        this.stopCalls = 0;
+        this.destroyCalls = 0;
         const update = this.options.onQualityUpdate;
         this.options.onQualityUpdate = metrics => {
           update(metrics);
@@ -66,8 +68,8 @@ try {
         };
       }
       async start() { this.options.onReady({ torchSupported: true }); }
-      stop() {}
-      destroy() {}
+      stop() { this.stopCalls++; }
+      destroy() { this.destroyCalls++; }
       getMetrics() { return this.currentMetrics; }
       getSessionSummary() { return this.engine.getSessionSummary(); }
       getTachogram(options = {}) { return this.engine.getTachogram(options); }
@@ -144,19 +146,65 @@ try {
   assert.equal(follow.stable, true, 'new accepted strokes preserve all earlier placements and materials');
   assert.ok(follow.stats.cachedPixels <= follow.stats.pixelBudget, 'live landscape cache stays within its pixel budget');
   await page.emulateMedia({ reducedMotion: 'reduce' });
-  const captureCount = await page.evaluate(() => manuscript.segments.length);
-  const beforePauseUpdates = await page.evaluate(() => monitor.metricUpdates.length);
-  await page.getByRole('button', { name: 'Pause artwork', exact: true }).click();
-  const pausedImage = await page.locator('.landscape-canvas').evaluate(canvas => canvas.toDataURL());
+  await page.evaluate(() => {
+    window.__cancelledMonitor = monitor;
+    window.__cancelledLandscapeStats = __pulseLandscapeStats;
+    window.__cancelledCanvas = landscapeView.canvas;
+  });
+  await page.getByRole('button', { name: 'Cancel reading', exact: true }).click();
+  const cancelled = await page.evaluate(() => ({
+    screen: document.getElementById('app').dataset.activeScreen,
+    stopCalls: __cancelledMonitor.stopCalls, destroyCalls: __cancelledMonitor.destroyCalls,
+    detached: monitor === null && landscape === null && landscapeView === null,
+    timerStopped: sessionTimerId === null && measuringStartedAt === null && lastMeasuringFrame === null,
+    elapsed: elapsedMeasuringMs, segments: manuscript.segments.length, pending: manuscript.pending.length,
+    lastWindow: manuscript.lastWindow, metricsCleared: lastMetrics === null && portraitStartedAt === null,
+    waveCleared: [...waveBuf, ...placementWaveBuf].every(value => value === 0),
+    rasterReleased: __cancelledCanvas.width === 1 && __cancelledCanvas.height === 1 && __cancelledLandscapeStats.cachedPixels === 4,
+    active: __cancelledLandscapeStats.active,
+    overlayHidden: document.getElementById('entry-pigment').hidden,
+  }));
+  assert.deepEqual(cancelled, { screen: 'ready', stopCalls: 1, destroyCalls: 1, detached: true, timerStopped: true,
+    elapsed: 0, segments: 0, pending: 0, lastWindow: -1, metricsCleared: true, waveCleared: true,
+    rasterReleased: true, active: false, overlayHidden: true }, 'cancel releases capture and artwork resources, clears retained reading data, and returns to ready');
+  await page.evaluate(() => {
+    // Exercise callbacks retained by a stopped camera, including its real
+    // engine adapter. Neither Ready nor a later reading may adopt that data.
+    window.__checkCancelledDelivery = seconds => {
+      const snapshot = () => JSON.stringify({
+        screen: document.getElementById('app').dataset.activeScreen,
+        cancelledMonitorActive: monitor === __cancelledMonitor,
+        manuscript, landscape, lastMetrics, elapsedMeasuringMs, lastMeasuringFrame,
+        measuringStartedAt, portraitStartedAt, sessionTimerId, waveBuf, placementWaveBuf,
+        readings: ['hr-value', 'rmssd-value', 'sdnn-value', 'quality-text', 'painting-state', 'session-countdown'].map(id => document.getElementById(id).textContent),
+        torchHidden: document.getElementById('torch-note').hidden,
+      });
+      const before = snapshot(), oldAlert = window.alert, alerts = [];
+      window.alert = message => alerts.push(String(message));
+      try {
+        __cancelledMonitor.options.onReady({ torchSupported: false });
+        __cancelledMonitor.options.onQualityUpdate({ ...__cancelledMonitor.getMetrics(), t: seconds + 1, fingerState: 'MEASURING' });
+        __cancelledMonitor.options.onSignalUpdate({ time: seconds + 1, value: .123, isProcessing: true });
+        __cancelledMonitor.options.onError({ guidance: 'Cancelled camera callback' });
+        __cancelledMonitor.feedUntil(seconds);
+      } finally { window.alert = oldAlert; }
+      return { unchanged: snapshot() === before, alerts };
+    };
+  });
+  assert.deepEqual(await page.evaluate(() => __checkCancelledDelivery(80)), { unchanged: true, alerts: [] }, 'late cancelled callbacks cannot restart capture, retain data, or display an error on Ready');
+  await page.getByRole('button', { name: 'Begin pulse capture', exact: true }).click();
+  const fresh = await page.evaluate(() => ({
+    newMonitor: monitor !== __cancelledMonitor, sampleIndex: monitor.i,
+    segments: manuscript.segments.length, pending: manuscript.pending.length, strokes: landscape.strokes.length,
+    elapsed: elapsedMeasuringMs, lastWindow: manuscript.lastWindow, lastMetrics,
+    beats: monitor.getTachogram().length,
+  }));
+  assert.deepEqual(fresh, { newMonitor: true, sampleIndex: 0, segments: 0, pending: 0, strokes: 0, elapsed: 0, lastWindow: -1, lastMetrics: null, beats: 0 }, 'restart begins with a new engine and no cancelled samples, strokes, metrics, or elapsed time');
   await page.evaluate(() => monitor.feedUntil(80));
-  assert.ok(await page.evaluate(() => manuscript.segments.length) > captureCount, 'paused presentation retains newly accepted source data');
-  assert.equal(fingerprint(await page.locator('.landscape-canvas').evaluate(canvas => canvas.toDataURL())), fingerprint(pausedImage), 'paused artwork pixels remain frozen');
-  const pausedUpdates = await page.evaluate(start => monitor.metricUpdates.slice(start), beforePauseUpdates);
-  assert.ok(pausedUpdates.length >= 4 && pausedUpdates.some(update => update.good), 'quality-gated metrics continue once a second while artwork is paused');
-  assert.ok(pausedUpdates.every(update => update.values.join() === update.expected.join()), 'paused-art readouts still match computed metrics');
-  assert.ok(new Set(pausedUpdates.filter(update => update.good).map(update => update.values.join())).size > 1, 'real estimates visibly change while artwork is paused');
-  assert.match(await page.locator('#pause-note').innerText(), /Recording continues/i);
-  await page.getByRole('button', { name: 'Resume artwork', exact: true }).click();
+  assert.equal(await page.locator('#screen-measuring').isVisible(), true, 'a fresh reading can enter capture');
+  assert.ok(await page.evaluate(() => manuscript.segments.length > 0 && landscape.strokes.length > 0), 'fresh accepted signal paints after cancellation');
+  assert.deepEqual(await page.evaluate(() => __checkCancelledDelivery(90)), { unchanged: true, alerts: [] }, 'late callbacks and replay from the cancelled monitor cannot mutate the new reading');
+  assert.equal(await page.getByRole('button', { name: 'Cancel reading', exact: true }).isVisible(), true);
   // Keep this export/manual-finish check below automatic completion; the
   // dedicated WebKit session test exercises the full 180 active seconds.
   await page.evaluate(() => monitor.feedUntil(180));
@@ -250,7 +298,7 @@ try {
     const malformed = { usableSeconds:landscape.usableSeconds, strokes:landscape.strokes.length,
       bridgesHole:landscape.strokes.some(stroke=>stroke.points.some((point,i)=>i>0&&stroke.points[i-1].t<1&&point.t>1)),
       finite:landscape.strokes.every(stroke=>stroke.points.every(point=>Number.isFinite(point.t)&&Number.isFinite(point.v))) };
-    document.getElementById('pause-note').textContent = 'Artwork paused. Your 3-minute measurement continues.';
+    document.getElementById('pause-note').textContent = 'Old recording notice';
     resetManuscript();
     const liveRegions=['painting-state','quality-text'].map(id=>{
       const region=document.getElementById(id).closest('[role="status"]');
@@ -264,7 +312,7 @@ try {
   assert.ok(attribution.malformed.strokes>=2&&attribution.malformed.finite,'valid portions survive a malformed sample as separate finite source runs');
   assert.equal(attribution.malformed.bridgesHole,false,'app adapter never connects across a nonfinite filtered sample');
   assert.ok(Math.abs(attribution.malformed.usableSeconds-1.7)<1e-7,'nonfinite sample hole contributes no accepted source duration');
-  assert.doesNotMatch(attribution.resetNote, /paused/i);
+  assert.equal(attribution.resetNote, '3-minute recording · Not a medical device', 'a fresh manuscript restores the recording notice');
   assert.deepEqual(attribution.liveRegions,Array(2).fill({role:'status',live:'polite',atomic:'true'}),'painting state and camera signal remain accessible live statuses');
   assert.equal(attribution.countdownAnnounced,false,'timer updates do not repeatedly announce the capture header');
 
@@ -286,7 +334,7 @@ try {
   await checkEmptyArtworkActions(page);
   assert.deepEqual(errors, [], 'no runtime errors');
   await checkCaptureEntry(browser, url);
-  console.log('PASS: Pulse Painting capture, quality attribution, pause, report, exports, responsive layouts and unavailable-data handling');
+  console.log('PASS: Pulse Painting capture, cancellation/restart, stale callback isolation, quality attribution, report, exports, responsive layouts and unavailable-data handling');
 } finally {
   await browser?.close();
   await new Promise(resolve => server.close(resolve));

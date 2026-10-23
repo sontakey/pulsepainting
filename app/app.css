@@ -1,5 +1,8 @@
 * { margin: 0; padding: 0; box-sizing: border-box; }
 
+/* Authored vector icons never depend on a platform emoji font. */
+.ui-arrow { display:inline-block; flex:none; vertical-align:-.12em; pointer-events:none; }
+
 /* The artwork camera moves inside its frame; controls and live readings stay
    in the page layout. The original manuscript remains an export/fallback. */
 #screen-measuring #manuscript[hidden], #landscape-view[hidden] { display: none; }
@@ -7,7 +10,7 @@
 #screen-measuring.is-revealing .capture-camera { opacity: .45; }
 #screen-measuring.is-revealing .capture-camera figcaption { visibility: hidden; }
 #screen-measuring.is-revealing .quality-dot { background: #2855ff; }
-#screen-measuring.is-revealing #btn-pause { opacity: .65; }
+#screen-measuring.is-revealing #btn-cancel-reading { opacity: .65; }
 
 /* !important here because the ppg-monitor.min.js bundle injects its own
    `body { background:#f3f3f3 }` stylesheet at runtime (it bundles the
@@ -1038,7 +1041,7 @@ h1,.capture-title{font-size:clamp(54px,9vw,92px);line-height:.92;letter-spacing:
   flex:none;
 }
 #screen-ready.desktop-ready { justify-content:flex-start; }
-#screen-placement > .placement-title { text-align:left; }
+#screen-placement > .placement-title { text-align:center; }
 #screen-measuring .capture-topline {
   display:grid;
   grid-template-columns:minmax(0,1fr) 94px;

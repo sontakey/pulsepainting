@@ -68,8 +68,11 @@ try {
       for (const selector of ['meta[property="og:title"]', 'meta[name="twitter:title"]']) assert.equal(await page.locator(selector).getAttribute('content'), `${hostileName}’s Pulse Painting`);
       for (const selector of ['meta[property="og:image"]', 'meta[name="twitter:image"]']) assert.equal(await page.locator(selector).getAttribute('content'), imageURL);
       assert.equal(await page.locator('link[rel="canonical"]').getAttribute('href'), `${origin}/p/${id}`);
+      assert.equal(await page.locator('.actions a').count(), 2, 'public painting keeps its make and explore actions');
       assert.equal(await page.locator('.actions a').first().getAttribute('href'), `${origin}/`);
       assert.equal(await page.locator('.actions a').last().getAttribute('href'), `${origin}/?painting=${id}#landscapes`);
+      assert.equal(await page.locator('a[href*="/book/"]').count(), 0, 'the painting arrival page does not promote a sketchbook');
+      assert.doesNotMatch(await page.locator('main').innerText(), /sketchbook/i, 'public painting copy stays focused on the artwork');
       const layout = await page.evaluate(() => {
         const actions = document.querySelector('.actions'), rect = actions.getBoundingClientRect();
         return { width: innerWidth, height: innerHeight, scrollWidth: document.documentElement.scrollWidth, actions: rect.toJSON(), position: getComputedStyle(actions).position, fonts: { brush: document.fonts.check('48px Brush'), sans: document.fonts.check('17px DM') }, controls: [...document.querySelectorAll('a')].map(el => ({ text: el.textContent, width: el.getBoundingClientRect().width, height: el.getBoundingClientRect().height })), csp: cspViolations };
