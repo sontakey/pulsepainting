@@ -112,6 +112,14 @@ Direct browser captures of the actual interface using the labeled Quiet Lake
 example; see [image provenance](docs/media/README.md). The book is a local
 presentation of the prepared image, not a second recording or a new landscape.
 
+**Share sketchbook link** opens the published painting directly as a flip-through
+book at `/book/<painting-id>`. Recipients need no recording or account; the page
+shows the already-published image, supports page turns and zoom, and offers a
+native link share or a selectable copy fallback. Private paintings first show
+**Create a sketchbook link**, which opens the publication preview and consent
+step. Creating a public link also adds that painting to the community gallery.
+Removing the publication disables both its painting page and sketchbook link.
+
 Community persistence uses server-only Neon and Vercel Blob integrations.
 [Operations, privacy, migration and moderation](db/README.md) are documented
 separately from the static capture runtime. [HANDOFF.md](HANDOFF.md) records
@@ -171,6 +179,8 @@ npm run test:share-sheet
 npm run test:sketchbook
 npm run test:personal-sketchbook
 npm run test:public-painting-page
+npm run test:sketchbook-links
+npm run test:public-sketchbook
 ```
 
 `npm test` covers actual app callbacks, accepted-data attribution, metrics, report glyph bounds, mobile layouts, export/share behavior, compositor fallback, and both gallery suites. Gallery checks require current renderer/image provenance and exercise all sixteen scenes, keyboard focus, sharing fallbacks, mobile deep links and failure recovery in Chromium and WebKit. The mobile gallery suite additionally checks on-demand loading, 320/390/430 px layouts, filters, synthetic touch swipes, browser history, floating controls, retry, and delayed requests during the real Start/cancel flow with mocked camera acquisition. The full session test runs real-time public-recording replay in WebKit with three interruptions and automatic completion. These checks mock camera input and sharing APIs; they do not establish physical iPhone camera, thermal, or native-share performance.
@@ -183,7 +193,8 @@ The QR suite uses Python OpenCV, Pillow, and NumPy for bounded image perturbatio
 - `app/landscape.js`: scene planning, accepted-source coverage, pigment rendering and the live artwork camera.
 - `app/portrait.js`: same-scene export and native sharing with download fallback.
 - `app/share-sheet.js` and `app/community.js`: private sharing, optional publication, public browsing, removal and reporting.
-- `api/` and `server/`: persistent community endpoints and script-free public share pages; `db/` records schema and operator procedures.
+- `api/` and `server/`: persistent community endpoints, script-free painting pages and public sketchbook pages; `db/` records schema and operator procedures.
+- `app/public-sketchbook.js` and `app/public-sketchbook.css`: standalone recipient book, public-image validation, native link sharing and copy fallback.
 - `src/sketchbook-entry.tsx`, `src/pulse-sketchbook-document.js` and `src/pulse-sketchbook-spreads.js`: lazy personal book adaptation and local image composition; the exact ThreeUI reference is preserved in `vendor/threeui-sketchbook/`.
 - `app/gallery.js` and `app/gallery.css`: desktop introduction, on-demand mobile collection, public-example browsing and sharing; the existing capture lifecycle remains separate.
 - `app/assets/gallery/`: generated example thumbnails, full artworks, labeled share images and their provenance manifest.

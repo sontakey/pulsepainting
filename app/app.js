@@ -1193,7 +1193,7 @@ function mountLandscapeArtwork(header, td) {
     durationSec: elapsedMeasuringMs / 1000,
     startedAt: new Date(portraitStartedAt || Date.now()),
     metrics: { hr: td?.ok ? td.meanHR : null, rmssd: td?.ok ? td.rmssd : null, sdnn: td?.ok ? td.sdnn : null },
-    onPublish: () => window.PulseCommunity?.openPublish({ container: host, preparePublication: options => window.PulsePortrait.preparePublication(options, host) }),
+    onPublish: request => window.PulseCommunity?.openPublish({ container: host, intent: request?.intent, preparePublication: options => window.PulsePortrait.preparePublication(options, host) }),
   })).then(state => {
     if(state && portraitHost===host && window.PulseCommunity) {
       const invitation=document.createElement('button');
