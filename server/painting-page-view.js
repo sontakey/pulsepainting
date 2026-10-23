@@ -25,8 +25,8 @@ figure{margin:0}img{display:block;width:100%;height:auto;border:1px solid #e3ded
 <p class="brand">Pulse Painting</p><h1>A shared moment.</h1><p class="byline">Painted by a pulse. Shared by <strong>${esc(name)}</strong>.</p>
 <figure><img src="${esc(painting.imageURL)}" width="1080" height="1350" alt="A pulse painting shared by ${esc(name)}"><figcaption>A little of someone’s world, for you to discover.</figcaption></figure>
 <p class="invite">What would your pulse paint?</p><div class="actions"><a class="button" href="${origin}/">Make your own painting</a><a class="button secondary" href="${appURL}">Explore this painting</a></div>
-<a class="gallery" href="${origin}/book/${painting.id}">Open the sketchbook ↗</a><br>
-<a class="gallery" href="${origin}/?collection=community#landscapes">Wander through the gallery ↗</a>
+<a class="gallery" href="${origin}/book/${painting.id}">Open the sketchbook <svg class="ui-arrow" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M5 19 19 5M5 5h14v14"/></svg></a><br>
+<a class="gallery" href="${origin}/?collection=community#landscapes">Wander through the gallery <svg class="ui-arrow" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M5 19 19 5M5 5h14v14"/></svg></a>
 <p class="footer">A project by <a href="https://chatppg.com/">ChatPPG</a>. Powered by <a href="https://github.com/sontakey/ppg-js">ppg-js</a>.</p>
 </main></body></html>`;
 }
@@ -54,7 +54,7 @@ export function sketchbookPage(painting, origin) {
 <figure id="public-book-fallback"><img src="${esc(painting.imageURL)}" width="1080" height="1350" alt="A pulse painting shared by ${esc(name)}"><figcaption>The complete painting, waiting to become a little book.</figcaption></figure>
 </section>
 <div class="book-guidance"><p id="public-book-status" role="status" aria-live="polite">Opening this sketchbook…</p><button id="public-book-retry" type="button" hidden>Try opening again</button><p class="book-attribution">Page-turning adapted from <a href="https://threeui.com/css/sketchbook" target="_blank" rel="noopener noreferrer">ThreeUI by Meng To</a>.</p></div>
-<div class="book-actions"><button id="share-public-book" class="book-button" type="button" hidden>Share sketchbook <span aria-hidden="true">↗</span></button><a class="book-button secondary" href="${origin}/">Make your own</a></div>
+<div class="book-actions"><button id="share-public-book" class="book-button" type="button" hidden>Share sketchbook <span aria-hidden="true"><svg class="ui-arrow" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M5 19 19 5M5 5h14v14"/></svg></span></button><a class="book-button secondary" href="${origin}/">Make your own</a></div>
 <section id="book-copy-fallback" hidden aria-label="Copy sketchbook link"><label for="book-link">Your link to this sketchbook</label><div class="book-copy-row"><input id="book-link" type="text" readonly value="${url}" aria-label="Sketchbook link"><button id="copy-public-book" type="button">Copy link</button></div><p id="book-share-status" role="status" aria-live="polite"></p></section>
 <nav class="book-footer" aria-label="More paintings"><a href="${esc(painting.url)}">View the full painting</a><span aria-hidden="true">·</span><a href="${origin}/?collection=community#landscapes">Explore the gallery</a></nav>
 <p class="book-credit">A project by <a href="https://chatppg.com/">ChatPPG</a>, powered by <a href="https://github.com/sontakey/ppg-js">ppg-js</a>.</p>
