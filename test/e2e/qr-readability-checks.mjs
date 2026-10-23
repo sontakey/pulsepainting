@@ -26,7 +26,7 @@ try {
     });
     const text = await page.evaluate(() => {
       const selectors = ['.phone-panel-kicker', '#phone-panel-title', '.phone-panel-copy > p:not(.phone-panel-kicker)',
-        '.phone-panel-code figcaption', '.phone-panel-link', '.phone-panel-disclaimer'];
+        '.phone-panel-code figcaption', '.phone-panel-disclaimer'];
       return selectors.flatMap(selector => [...document.querySelectorAll(selector)].map(el => {
         const style = getComputedStyle(el);
         const fontSize = parseFloat(style.fontSize);

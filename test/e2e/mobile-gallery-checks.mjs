@@ -141,7 +141,7 @@ try{
     assert.equal(await linked.locator('.gallery-lightbox h2').innerText(),'Quiet lake','browser Forward reopens the same scene');
     await closeButton(linked).click();await linked.locator('.gallery-lightbox').waitFor({state:'hidden'});await waitGallery(linked);
     await linked.getByRole('button',{name:'Open Quiet lake example',exact:true}).click();
-    await linked.getByRole('button',{name:'Make a painting of your own ↗',exact:true}).click();await waitReady(linked);
+    await linked.getByRole('button',{name:'Make a painting of your own',exact:true}).click();await waitReady(linked);
     assert.equal(await linked.evaluate(()=>document.activeElement.id),'btn-start');await linked.close();
 
     // Slow data must not reopen the gallery after Back or cover camera setup.

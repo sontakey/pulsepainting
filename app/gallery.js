@@ -57,6 +57,9 @@ function readyURL() {
 function communityURL(id=null){
   const url=routeURL();url.searchParams.set('collection','community');if(id)url.searchParams.set('painting',id);return url;
 }
+function sceneURL(scene){
+  const url=routeURL(scene);if(activeCollection==='community')url.searchParams.set('collection','community');return url;
+}
 function selectCollection(value){
   activeCollection=value;
   exampleContent.hidden=value!=='examples';communityContent.hidden=value!=='community';
@@ -64,9 +67,19 @@ function selectCollection(value){
   if(value==='community'){++openRequest;galleryAPI?.dismiss();}
   else window.PulseCommunity?.hide();
 }
-function presentCommunity(id=null,opener=null){
+function presentCommunity(id=null,opener=null,sceneId=null){
   if(ready.hidden)return;
   selectCollection('community');window.PulseCommunity?.show({paintingId:id,opener});
+  if(sceneId&&!id)presentCommunityExample(sceneId,null,{historyMode:'none'});
+}
+async function presentCommunityExample(sceneId,opener,{historyMode='push'}={}){
+  const request=++openRequest;
+  try{
+    const api=await loadGallery();
+    if(request!==openRequest||ready.hidden||activeCollection!=='community'||(!desktop&&!mobileShown))return;
+    const index=api.scenes.findIndex(scene=>scene.id===sceneId);
+    if(index>=0)api.open(index,opener||document.querySelector(`[data-example="${sceneId}"]`)||communityTab,{historyMode});
+  }catch{/* The community's inline retry remains available. */}
 }
 function writeRoute(mode, view, url) {
   history[mode+'State']({...history.state,pulsePaintingGallery:view},'',url);
@@ -133,6 +146,22 @@ function returnToCapture({focusStart=false}={}) {
   if(focusStart){start.focus({preventScroll:true});window.scrollTo({top:0,behavior:'instant'});}
 }
 if(desktop){
+  // Walkthrough artwork is decorative and desktop-only. Keeping URLs off the
+  // hidden phone markup avoids image downloads during capture and gallery use.
+  const loadStepArt=image=>{
+    const name=image.dataset.stepArt;
+    image.addEventListener('load',()=>image.classList.add('is-ready'),{once:true});
+    image.sizes='(max-width: 749px) calc(100vw - 52px), (max-width: 1100px) 28vw, 430px';
+    image.srcset=[480,960].map(width=>`${new URL(`./assets/how-it-works/${name}-${width}.webp`,import.meta.url)} ${width}w`).join(', ');
+    image.src=new URL(`./assets/how-it-works/${name}-960.webp`,import.meta.url).href;
+  };
+  const stepImages=panel.querySelectorAll('[data-step-art]');
+  if('IntersectionObserver' in window){
+    const observer=new IntersectionObserver(entries=>{
+      entries.forEach(entry=>{if(entry.isIntersecting){loadStepArt(entry.target);observer.unobserve(entry.target);}});
+    },{rootMargin:'320px'});
+    stepImages.forEach(image=>observer.observe(image));
+  }else stepImages.forEach(loadStepArt);
   const title=ready.querySelector(':scope > h1');title.id='desktop-hero-title';
   title.replaceChildren(document.createTextNode('Your pulse,'),document.createElement('br'),document.createTextNode('made into a place.'));
   document.getElementById('desktop-title-slot').append(title);
@@ -144,7 +173,8 @@ if(desktop){
   if(requestedPainting||requestedCollection==='community'){
     writeRoute('replace','gallery',communityURL());
     if(requestedPainting)writeRoute('push','painting',communityURL(requestedPainting));
-    presentCommunity(requestedPainting);
+    else if(requestedScene){const url=communityURL();url.searchParams.set('scene',requestedScene);writeRoute('push','scene',url);}
+    presentCommunity(requestedPainting,null,requestedScene);
     document.getElementById('landscapes').scrollIntoView({behavior:'instant'});
   }else presentGallery(requestedScene);
 }else{
@@ -166,7 +196,8 @@ if(desktop){
   if(requestedPainting||requestedCollection==='community'){
     writeRoute('replace',null,readyURL());writeRoute('push','gallery',communityURL());showMobileGallery();
     if(requestedPainting)writeRoute('push','painting',communityURL(requestedPainting));
-    presentCommunity(requestedPainting);
+    else if(requestedScene){const url=communityURL();url.searchParams.set('scene',requestedScene);writeRoute('push','scene',url);}
+    presentCommunity(requestedPainting,null,requestedScene);
   }else if(requestedScene){
     // Keep the normal ready action usable while a deep-link manifest loads.
     const request=++openRequest;
@@ -188,6 +219,10 @@ retry.addEventListener('click',()=>presentGallery(new URL(location.href).searchP
 exampleTab.addEventListener('click',()=>{if(ready.hidden)return;writeRoute('replace','gallery',routeURL());selectCollection('examples');presentGallery();});
 communityTab.addEventListener('click',()=>{if(ready.hidden)return;writeRoute('replace','gallery',communityURL());presentCommunity();});
 window.PulseCommunity?.configure({
+  loadExamples:async()=>{
+    const api=await loadGallery();if(desktop)api.mount();return api.communityExamples;
+  },
+  openExample:presentCommunityExample,
   openPainting:(id,opener,{replace=false}={})=>{
     if(ready.hidden)return;writeRoute(replace?'replace':'push','painting',communityURL(id));presentCommunity(id,opener);
   },
@@ -201,7 +236,7 @@ window.addEventListener('popstate',()=>{
   const url=new URL(location.href),scene=url.searchParams.get('scene'),painting=url.searchParams.get('painting');
   if(url.hash==='#landscapes'||scene||painting){
     showMobileGallery();
-    if(painting||url.searchParams.get('collection')==='community')presentCommunity(painting);
+    if(painting||url.searchParams.get('collection')==='community')presentCommunity(painting,null,scene);
     else {selectCollection('examples');if(!scene)galleryAPI?.dismiss();presentGallery(scene);}
   }else if(!desktop)hideMobileGallery();else {window.PulseCommunity?.hide();selectCollection('examples');galleryAPI?.dismiss();}
 });
@@ -222,7 +257,7 @@ async function initGallery() {
   let activeIndex=0, previousFocus=null, activeFilter='all', shareFile=null, sharePreparation=null, generation=0;
   const dialog=document.createElement('dialog');
   dialog.className='gallery-lightbox';dialog.setAttribute('role','dialog');dialog.setAttribute('aria-labelledby','gallery-dialog-title');dialog.setAttribute('aria-describedby','gallery-dialog-note');
-  dialog.innerHTML=`<button class="gallery-dialog-close" type="button" aria-label="Close landscape">×</button><div class="gallery-lightbox-art"><img id="gallery-dialog-image" width="1080" height="1080" alt=""></div><div class="gallery-lightbox-copy"><p class="gallery-eyebrow">A Pulse Painting example</p><h2 id="gallery-dialog-title"></h2><p class="gallery-lightbox-description"></p><p id="gallery-dialog-note" class="gallery-lightbox-note">An example made from a public pulse recording. Your painting comes from your own rhythm.</p><button class="gallery-share" type="button">Share this landscape</button><button class="gallery-copy-link" type="button">Copy example link</button><p class="gallery-share-status" role="status" aria-live="polite"></p><button class="gallery-dialog-paint" type="button">Make a painting of your own ↗</button><div class="gallery-lightbox-navigation"><span id="gallery-dialog-position" aria-live="polite"></span><button type="button" data-gallery-step="-1" aria-label="Previous landscape">←</button><button type="button" data-gallery-step="1" aria-label="Next landscape">→</button></div></div>`;
+  dialog.innerHTML=`<button class="gallery-dialog-close" type="button" aria-label="Close landscape">×</button><div class="gallery-lightbox-art"><img id="gallery-dialog-image" width="1080" height="1080" alt=""></div><div class="gallery-lightbox-copy"><p class="gallery-eyebrow">A Pulse Painting example</p><h2 id="gallery-dialog-title"></h2><p class="gallery-lightbox-description"></p><p id="gallery-dialog-note" class="gallery-lightbox-note">An example made from a public pulse recording. Your painting comes from your own rhythm.</p><button class="gallery-share" type="button">Share this landscape</button><button class="gallery-copy-link" type="button">Copy example link</button><p class="gallery-share-status" role="status" aria-live="polite"></p><button class="gallery-dialog-paint" type="button"><span>Make a painting of your own</span><span aria-hidden="true">↗</span></button><div class="gallery-lightbox-navigation"><span id="gallery-dialog-position" aria-live="polite"></span><button type="button" data-gallery-step="-1" aria-label="Previous landscape">←</button><button type="button" data-gallery-step="1" aria-label="Next landscape">→</button></div></div>`;
   if(!desktop){
     dialog.classList.add('mobile-gallery-viewer');
     const navigation=dialog.querySelector('.gallery-lightbox-navigation');
@@ -238,7 +273,7 @@ async function initGallery() {
     image.src=assets(scene.image);image.alt=`${scene.name}: an example generated from the public pulse recording`;
     dialog.querySelector('#gallery-dialog-position').textContent=`${activeIndex+1} / ${scenes.length}`;
     status.textContent='';
-    if(!desktop && dialog.open)writeRoute('replace','scene',routeURL(scene));
+    if(!desktop && dialog.open)writeRoute('replace','scene',sceneURL(scene));
     sharePreparation?.abort();sharePreparation=new AbortController();shareFile=null;
     const current=++generation,button=dialog.querySelector('.gallery-share');
     button.disabled=true;button.textContent='Preparing image…';
@@ -255,7 +290,7 @@ async function initGallery() {
   };
   const open = (index,opener=document.activeElement,{historyMode='push'}={}) => {
     previousFocus=opener;
-    if(!desktop && historyMode==='push')writeRoute('push','scene',routeURL(scenes[index]));
+    if(!desktop && historyMode==='push')writeRoute('push','scene',sceneURL(scenes[index]));
     update(index);
     if (!dialog.open) dialog.showModal();
     dialog.querySelector('.gallery-dialog-close').focus({preventScroll:true});
@@ -267,7 +302,15 @@ async function initGallery() {
   dialog.addEventListener('cancel',event=>{event.preventDefault();close();});
   dialog.querySelector('.gallery-dialog-close').addEventListener('click',close);
   dialog.addEventListener('click',event=>{if(event.target===dialog){const r=dialog.getBoundingClientRect();if(event.clientX<r.left||event.clientX>r.right||event.clientY<r.top||event.clientY>r.bottom)close();}});
-  dialog.addEventListener('close',()=>{generation++;sharePreparation?.abort();sharePreparation=null;shareFile=null;if(!ready.hidden&&previousFocus instanceof HTMLElement&&previousFocus.getClientRects().length)previousFocus.focus({preventScroll:true});});
+  dialog.addEventListener('close',()=>{
+    generation++;sharePreparation?.abort();sharePreparation=null;shareFile=null;
+    if(ready.hidden)return;
+    let target=previousFocus instanceof HTMLElement&&previousFocus.isConnected&&previousFocus.getClientRects().length?previousFocus:null;
+    if(!target&&activeCollection==='community'&&!communityContent.hidden){
+      target=[...communityContent.querySelectorAll('.community-card,.community-example-card')].find(card=>card.getClientRects().length)||communityTab;
+    }
+    if(target?.getClientRects().length)target.focus({preventScroll:true});
+  });
   dialog.addEventListener('keydown',event=>{
     if(event.key==='Tab'){
       const controls=[...dialog.querySelectorAll('button:not(:disabled),a[href]')].filter(node=>node.getClientRects().length);
@@ -346,5 +389,8 @@ async function initGallery() {
     const dx=event.clientX-gesture.x,dy=event.clientY-gesture.y;gesture=null;
     if(Math.abs(dx)>44&&Math.abs(dx)>Math.abs(dy)*1.5)update(activeIndex+(dx<0?1:-1));
   });
-  return {scenes,mount,open,dismiss:()=>{if(dialog.open)dialog.close();}};
+  const communityExamples=['quiet-lake','alpine-peaks','aurora-night','sand-dunes','coastal-cliffs','forest-canopy','desert-mesas','open-ocean'].map(id=>{
+    const scene=scenes.find(item=>item.id===id);return {id:scene.id,name:scene.name,thumbnailURL:assets(scene.thumbnail)};
+  });
+  return {scenes,communityExamples,mount,open,dismiss:()=>{if(dialog.open)dialog.close();}};
 }

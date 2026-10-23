@@ -796,8 +796,6 @@ h1,.capture-title{font-size:clamp(54px,9vw,92px);line-height:.92;letter-spacing:
 .phone-qr-paper::after { content:none; }
 .phone-qr-paper img { display:block; position:relative; width:100%; height:auto; border-radius:1px; }
 .phone-panel-code figcaption { color:#193553; font-size:12px; margin-top:25px; line-height:1.5; }
-.phone-panel-link { justify-self:start; color:#193553; font-size:13px; text-decoration-color:#58769e; text-underline-offset:4px; overflow-wrap:anywhere; }
-.phone-panel-link span { margin-left:8px; }
 .phone-panel-disclaimer { grid-column:1/-1; font-size:11px; color:#193553; line-height:1.6; text-align:center; margin:36px 0 0; }
 @keyframes phone-paint-in { from { clip-path:inset(0 100% 0 0); opacity:.25; } to { clip-path:inset(0 -3% 0 -3%); opacity:1; } }
 @keyframes qr-wash-in {
@@ -810,7 +808,6 @@ h1,.capture-title{font-size:clamp(54px,9vw,92px);line-height:.92;letter-spacing:
   #screen-ready.desktop-ready h1 { font-size:68px; }
   .phone-panel { grid-template-columns:1fr; padding:34px 24px 22px; gap:22px; }
   .phone-panel-code { width:228px; max-width:100%; justify-self:center; }
-  .phone-panel-link { justify-self:center; }
   .phone-panel-disclaimer { margin-top:24px; }
 }
 @media(prefers-reduced-motion:reduce) { .phone-panel::before, .phone-panel::after, .phone-qr-paper::before, .phone-qr-paper::after { animation:none; } }
@@ -820,10 +817,14 @@ h1,.capture-title{font-size:clamp(54px,9vw,92px);line-height:.92;letter-spacing:
 #app[data-active-screen="placement"] > .project-attribution,
 #app[data-active-screen="measuring"] > .project-attribution { display:none; }
 .debug-menu-trigger {
-  position:static; z-index:auto; flex:none; width:44px; height:44px; min-height:44px;
-  border:1px solid var(--line); border-radius:6px; color:#52627c;
-  background:transparent; font-size:22px; cursor:pointer;
+  position:static; z-index:auto; flex:none; width:auto; height:44px; min-height:44px;
+  display:inline-flex; align-items:center; justify-content:center; gap:8px; padding:0 14px;
+  border:1px solid #cbd7d2; border-radius:24px; color:#375962;
+  background:#fdfbf7; font-family:inherit; font-size:14px; font-weight:500; line-height:1;
+  white-space:nowrap; cursor:pointer; touch-action:manipulation;
 }
+.debug-menu-trigger svg { display:block; flex:none; width:20px; height:20px; fill:currentColor; }
+.debug-menu-trigger:hover { background:#e6eee8; border-color:#a8bfb5; color:#163c47; filter:none; }
 .project-attribution .debug-menu-trigger { margin-left:4px; }
 .camera-feed { background:#edf1f8; overflow:hidden; }
 .camera-feed:empty::before {
@@ -915,7 +916,7 @@ h1,.capture-title{font-size:clamp(54px,9vw,92px);line-height:.92;letter-spacing:
 .placement-signal > span { color:#60718e; font-size:11px; }
 .placement-signal .wave-canvas-small { display:block; height:42px; width:100%; margin:4px 0 0; opacity:1; }
 .placement-reassurance { color:#60718e; font-size:12px; line-height:1.5; text-align:center; }
-.placement-actions { display:grid; grid-template-columns:1fr 44px; gap:10px; align-items:center; }
+.placement-actions { display:grid; grid-template-columns:minmax(0,1fr) auto; gap:10px; align-items:center; }
 .placement-actions #btn-cancel-placement { min-height:44px; font-size:15px; }
 #screen-placement .torch-note { font-size:12px; padding:10px 12px; background:#faf3e7; border-radius:6px; max-width:none; }
 @media(max-width:380px) {
@@ -953,7 +954,6 @@ h1,.capture-title{font-size:clamp(54px,9vw,92px);line-height:.92;letter-spacing:
 .project-attribution,
 .phone-panel-kicker,
 .phone-panel-code figcaption,
-.phone-panel-link,
 .phone-panel-disclaimer,
 .camera-feed:empty::before,
 .metric-label,
@@ -1029,37 +1029,76 @@ h1,.capture-title{font-size:clamp(54px,9vw,92px);line-height:.92;letter-spacing:
   .quality-facts > span + span { padding-left:10px; }
 }
 
-/* Every screen opens with a title across the page. Camera and status share
-   the next row, leaving the handwriting room to wrap naturally. */
+/* The capture title stays quiet beside the live camera. Signal quality belongs
+   immediately beneath that preview; recording state and time sit with the title. */
 #screen-ready > h1,
-#screen-placement > .placement-title,
-#screen-measuring .capture-topline,
-#screen-measuring .capture-heading {
+#screen-placement > .placement-title {
   width:100%;
   min-width:0;
   flex:none;
 }
 #screen-ready.desktop-ready { justify-content:flex-start; }
 #screen-placement > .placement-title { text-align:left; }
-#screen-measuring .capture-topline { display:block; }
-#screen-measuring .capture-heading .capture-title {
+#screen-measuring .capture-topline {
+  display:grid;
+  grid-template-columns:minmax(0,1fr) 94px;
+  align-items:start;
+  gap:16px;
   width:100%;
-  font-size:clamp(48px,13vw,68px);
-  white-space:normal;
-  text-wrap:balance;
-  line-height:1.1;
+}
+#screen-measuring .capture-heading { width:auto; min-width:0; padding-top:2px; }
+#screen-measuring .capture-heading .capture-title {
+  font-size:clamp(30px,9.2vw,44px);
+  line-height:1.12;
+  white-space:nowrap;
+  margin:0;
+  padding:0 .06em .16em 0;
 }
 #screen-measuring .painting-status {
-  display:grid;
-  grid-template-columns:minmax(0,1fr) auto 60px;
-  column-gap:12px;
-  align-items:center;
+  display:flex;
+  flex-wrap:wrap;
+  justify-content:flex-start;
+  align-items:baseline;
+  gap:4px 12px;
+  min-height:0;
+  margin-top:6px;
 }
-#screen-measuring .quality-pill { justify-self:start; }
-#screen-measuring .capture-camera { justify-self:end; }
+#screen-measuring #painting-state {
+  color:#52627c;
+  font-size:14px;
+  font-weight:400;
+  line-height:1.5;
+}
+#screen-measuring .capture-time { display:flex; align-items:baseline; gap:5px; margin:0; }
+#screen-measuring .session-countdown {
+  color:#304b7a;
+  font-size:16px;
+  font-weight:500;
+  font-variant-numeric:tabular-nums;
+  line-height:1.4;
+}
+.countdown-label { color:#626b7b; font-size:14px; line-height:1.5; }
+.capture-monitor { display:grid; justify-items:end; align-content:start; gap:6px; min-width:0; }
+#screen-measuring .capture-camera { width:60px; height:60px; }
+#screen-measuring .quality-pill {
+  justify-content:flex-end;
+  align-items:baseline;
+  gap:6px;
+  width:100%;
+  min-width:0;
+  text-align:right;
+}
+#screen-measuring .quality-pill #quality-text {
+  min-width:0;
+  font-size:14px;
+  line-height:1.4;
+  overflow-wrap:anywhere;
+}
+#screen-measuring .quality-dot { flex:none; align-self:start; margin-top:6px; }
 #screen-measuring.capture-screen { min-height:700px; }
 @media(max-width:380px) {
-  #screen-measuring .painting-status { grid-template-columns:minmax(0,1fr) auto 52px; column-gap:10px; }
+  #screen-measuring .capture-topline { column-gap:12px; }
+  #screen-measuring .capture-camera { width:54px; height:54px; }
 }
 
 /* A small paper dock keeps the next action within thumb reach. Its measured
@@ -1097,11 +1136,11 @@ h1,.capture-title{font-size:clamp(54px,9vw,92px);line-height:.92;letter-spacing:
   #app .mobile-action-dock .btn-secondary { border:1px solid #d5dfef; background:#fffaf7; }
   #app .mobile-action-dock .btn-primary { background:#2855ff; color:#fff; }
   #app .mobile-action-dock button:focus-visible { outline-offset:2px; }
-  #app .mobile-action-dock .debug-menu-trigger { width:48px; padding:0; font-size:22px; }
+  #app .mobile-action-dock .debug-menu-trigger { width:auto; min-height:48px; padding-inline:14px; font-size:14px; }
   #app .painting-actions, #app .summary-actions { grid-template-columns:minmax(0,1fr) minmax(0,1.12fr); gap:6px; }
   #app .summary-actions #btn-share-artwork { grid-column:auto; }
   #app .summary-actions #btn-again { border:1px solid #d5dfef; }
-  #app .placement-actions { grid-template-columns:minmax(0,1fr) 48px; gap:6px; }
+  #app .placement-actions { grid-template-columns:minmax(0,1fr) auto; gap:6px; }
   #app .ready-actions { padding:5px 12px; }
   #screen-ready #btn-start.paint-start { min-height:56px; margin:0; background:transparent; }
   #screen-ready:not(.desktop-ready) { min-height:calc(100dvh - 72px - var(--mobile-dock-reserve)); }

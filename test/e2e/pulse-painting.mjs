@@ -252,7 +252,12 @@ try {
       finite:landscape.strokes.every(stroke=>stroke.points.every(point=>Number.isFinite(point.t)&&Number.isFinite(point.v))) };
     document.getElementById('pause-note').textContent = 'Artwork paused. Your 3-minute measurement continues.';
     resetManuscript();
-    return { match, rejected, malformed, resetNote: document.getElementById('pause-note').textContent, liveRegion: document.getElementById('painting-state').parentElement.getAttribute('role') };
+    const liveRegions=['painting-state','quality-text'].map(id=>{
+      const region=document.getElementById(id).closest('[role="status"]');
+      return {role:region?.getAttribute('role'),live:region?.getAttribute('aria-live'),atomic:region?.getAttribute('aria-atomic')};
+    });
+    return { match, rejected, malformed, resetNote: document.getElementById('pause-note').textContent, liveRegions,
+      countdownAnnounced:!!document.getElementById('session-countdown').closest('[role="status"],[aria-live="polite"],[aria-live="assertive"]') };
   });
   assert.equal(attribution.match, true, 'geometry and pigment quality use the selected analysis channel');
   assert.equal(attribution.rejected, true, 'bad windows add no paint and never recolor captured segments');
@@ -260,7 +265,8 @@ try {
   assert.equal(attribution.malformed.bridgesHole,false,'app adapter never connects across a nonfinite filtered sample');
   assert.ok(Math.abs(attribution.malformed.usableSeconds-1.7)<1e-7,'nonfinite sample hole contributes no accepted source duration');
   assert.doesNotMatch(attribution.resetNote, /paused/i);
-  assert.equal(attribution.liveRegion, 'status');
+  assert.deepEqual(attribution.liveRegions,Array(2).fill({role:'status',live:'polite',atomic:'true'}),'painting state and camera signal remain accessible live statuses');
+  assert.equal(attribution.countdownAnnounced,false,'timer updates do not repeatedly announce the capture header');
 
   const timing = await page.evaluate(() => {
     measuringStartedAt = 1; elapsedMeasuringMs = 0; lastMeasuringFrame = null;

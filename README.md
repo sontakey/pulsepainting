@@ -6,7 +6,7 @@ Your pulse, made into a place.
 > watercolor landscapes, crisp measured pulse strokes, a pointed brush and soft
 > trailing pigment, a calm zoom-out reveal, and shareable artwork.
 > Browser replay and deployed-asset checks passed; physical-phone validation remains separate.
-> See [current release verification](docs/validation/crisp-brush-2026-10-23.md).
+> See [current release verification](docs/validation/slow-phone-2026-10-23.md).
 > The [mobile gallery](https://www.pulsepainting.com/#landscapes) is now live too;
 > see [mobile verification](docs/validation/mobile-gallery-2026-10-23.md).
 > Community publishing, social sharing and personal sketchbooks are live;
@@ -21,7 +21,7 @@ Pulse Painting is a three-minute phone-camera capture experience by [ChatPPG](ht
   <img src="docs/media/pulse-painting-report.jpg" width="230" alt="Shareable Pulse Painting artwork and report">
 </p>
 
-The capture screenshot shows the crisp pulse brush with forty seconds of the public recording preloaded through the actual app. The report image documents the earlier foreground release. Both use mocked camera input; see [capture provenance](docs/media/README.md). They are not physical-phone measurements or session benchmarks.
+The capture screenshot shows the compact LIVE/signal header and crisp pulse brush with forty seconds of the public recording preloaded through the actual app. The report image documents the earlier foreground release. Both use mocked camera input; see [capture provenance](docs/media/README.md). They are not physical-phone measurements or session benchmarks.
 
 The primary destination is [pulsepainting.com](https://www.pulsepainting.com/), a separate Vercel project connected to this repository. The apex domain redirects to www. The simple library demo remains at [ChatPPG](https://chatppg.com/ppg-js-demo). Release and public verification status are tracked in [HANDOFF.md](HANDOFF.md).
 
@@ -31,7 +31,10 @@ The desktop experience opens with a full-screen landscape, a painted invitation
 to begin on your phone, and a gallery of all sixteen scene families. Browse
 water, land and sky, open an artwork at full size, then share its labeled example
 image or copy a link. Keyboard navigation, reduced motion and a stationary QR
-keep the gallery and phone handoff accessible.
+keep the gallery and phone handoff accessible. A three-illustration watercolor
+walkthrough explains fingertip placement, painting and keeping the artwork.
+These [editorial illustrations](docs/design/how-it-works-illustrations.md) load
+only near the desktop walkthrough; they are not generated from a recording.
 
 ![Desktop experience with the Quiet lake background and phone QR invitation](docs/media/pulse-painting-desktop-candidate.jpg)
 
@@ -93,8 +96,9 @@ Publishing to **Community** is optional. Review a fresh public preview, choose
 an optional display name and optional summary measurements, then explicitly
 publish. Measurements start off. Raw recordings, session timestamps and renderer
 seeds are not uploaded. A private removal link lets the maker withdraw their
-painting; public links contain no removal key. The sixteen example landscapes
-remain a separate, labeled collection.
+painting; public links contain no removal key. Clearly labeled public-recording examples fill unused Community spaces until
+eight real paintings are available. Actual publications appear first; the
+complete sixteen-scene example collection remains available separately.
 
 **Open your sketchbook** puts the prepared painting into a personal paper book,
 with page curls, dragging, tilt, zoom and a magnifier adapted from ThreeUI's
