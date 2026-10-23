@@ -141,7 +141,10 @@ try{
     assert.equal(await page.locator('#community-status').innerText(),'');
     await page.locator('.community-example-card').first().click();await page.locator('.gallery-lightbox').waitFor({state:'visible'});
     assert.match(await page.locator('#gallery-dialog-note').innerText(),/public pulse recording/);assert.equal(new URL(page.url()).searchParams.get('collection'),'community');
-    await page.goBack();await page.locator('.gallery-lightbox').waitFor({state:'hidden'});assert.equal(await page.locator('#gallery-tab-community').getAttribute('aria-pressed'),'true');assert.equal(await page.locator('.community-example-card').first().evaluate(el=>el===document.activeElement),true,'example close restores its community opener');
+    await page.goBack();await page.locator('.gallery-lightbox').waitFor({state:'hidden'});assert.equal(await page.locator('#gallery-tab-community').getAttribute('aria-pressed'),'true');
+    // Hiding the dialog precedes its queued close event and focus restoration.
+    await page.waitForFunction(()=>document.querySelector('.community-example-card')===document.activeElement,null,{timeout:2000});
+    assert.equal(await page.locator('.community-example-card').first().evaluate(el=>el===document.activeElement),true,'example close restores its community opener');
     await page.goForward();await page.locator('.gallery-lightbox').waitFor({state:'visible'});await page.locator('.gallery-dialog-close').click();await page.locator('.gallery-lightbox').waitFor({state:'hidden'});
     const widths=[];for(const width of[320,390,430])widths.push(await layout(page,width,'#community-gallery'));
     await page.setViewportSize({width:390,height:844});await shot(page,`${name}-community-examples`);
