@@ -1,6 +1,32 @@
 # Pulse Painting handoff
 
-## Current production release: community sharing
+## Current production release: shareable sketchbooks
+
+Published paintings now open directly at `/book/<uuid>` in the existing
+three-spread paper sketchbook. Private report sharing offers **Create a
+sketchbook link**, then the existing reviewed public preview/consent flow.
+Creating a link also publishes the painting to Community. Recipients need no
+account or capture; native URL sharing and a visible copy fallback are provided.
+Removing the publication disables both painting and book links. Raw recordings
+and private removal keys never enter recipient pages.
+
+PR #5 merged as `5c3d91fbaeb1a25837978f1713a474e2dbbc0ef9` after full Linux CI
+`40001581765` passed source `ecb16f8556815be3365160a0b09328cb4aab3a80`.
+Real preview publication, 390/1440px Chromium/WebKit recipient interactions,
+metadata, removal and Blob cleanup passed. Local recipient checks also cover
+320px, keyboard, denied clipboard, cached-script retry, timeout, UUIDv7 and
+BFCache restoration. Production `dpl_DSFTBAKkMLjuxkdueBuAksU969aq` is READY.
+At `2026-10-23T18:25:40.740Z`, all 101 public files matched the tested build.
+Anonymous production app/sharing/book controls and route checks passed in
+Chromium/WebKit. No production test paintings were created; the gallery was
+empty, so the complete published-recipient flow was tested on the real preview.
+See `docs/validation/shareable-sketchbooks-2026-10-23.md`. Book HTML uses no-store;
+existing `/p` HTML remains script-free. Exact ThreeUI source, painting renderer
+and capture processing are unchanged. Physical-phone native-share delivery is
+still a separate user check. Later documentation-only commits can change the
+production deployment ID without changing the verified assets.
+
+## Previous production release: community sharing
 
 The live release adds opt-in community publication, a social sharing sheet,
 server-rendered public painting pages and a personal ThreeUI paper sketchbook.
