@@ -4,19 +4,19 @@ Your pulse, made into a place.
 
 > Landscape release candidate: the Quiet Lake paint treatment is approved and integrated across all sixteen scenes.
 > Final release checks are in progress; physical-device validation remains separate.
-> The public site and phone screenshots below currently show the earlier manuscript app.
-> The landscape gallery images are actual renders from the current candidate, not a deployed release.
+> The phone screenshots, desktop screenshot and gallery examples below show the current local candidate.
+> These captures do not establish a production release.
 > See [HANDOFF.md](HANDOFF.md) for the visual review and deployment status.
 
-Pulse Painting is a three-minute phone-camera capture experience by [ChatPPG](https://chatppg.com), powered by [ppg-js](https://github.com/sontakey/ppg-js). Accepted pulse waveforms paint one of sixteen landscapes, with organic cobalt, iris, and teal gradients. A close-up follows the brush during capture, then pulls back to reveal the same painting, ready to share alongside an expandable HRV report.
+Pulse Painting is a three-minute phone-camera capture experience by [ChatPPG](https://chatppg.com), powered by [ppg-js](https://github.com/sontakey/ppg-js). Accepted pulse waveforms paint one of sixteen landscapes, with layered watercolor washes and recognizable pulse contours. A close-up follows the brush during capture, then pulls back to reveal the same painting, ready to share alongside an expandable HRV report.
 
 <p align="center">
   <img src="docs/media/pulse-painting-ready.jpg" width="230" alt="Pulse Painting phone capture instructions">
-  <img src="docs/media/pulse-painting-capture.jpg" width="230" alt="Painted pulse strokes, live metrics, and floating capture controls">
+  <img src="docs/media/pulse-painting-capture.jpg" width="230" alt="Quiet Lake painting, live metrics, and floating capture controls">
   <img src="docs/media/pulse-painting-report.jpg" width="230" alt="Shareable Pulse Painting artwork and report">
 </p>
 
-The screenshots use browser replay with mocked camera input; see [capture provenance](docs/media/README.md). They are not new physical-phone measurements.
+The current screenshots use a real-time replay of the public recording with mocked camera input and reduced motion enabled; see [capture provenance](docs/media/README.md). They are not new physical-phone measurements.
 
 The primary destination is [pulsepainting.com](https://www.pulsepainting.com/), a separate Vercel project connected to this repository. The apex domain redirects to www. The simple library demo remains at [ChatPPG](https://chatppg.com/ppg-js-demo). Release and public verification status are tracked in [HANDOFF.md](HANDOFF.md).
 
