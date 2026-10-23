@@ -10,8 +10,15 @@ sixteen-family app; the previous pending-style notes below are historical.
 The accepted renderer SHA-256 is
 `3f61aab31f73cc4ae16c591160f441709ad124383342de650502239838f38e16`.
 The study is a separate static Vercel project, not the main product release.
-Final renderer integration, rendering consistency, gallery regeneration,
-mobile browser checks and production deployment remain in progress.
+The treatment is now integrated across all sixteen families and the gallery is
+regenerated. Final runtime SHA-256:
+`a84ebe6772a518e2e9d44e6db5d2f30392a75e488884bbfa4e606765a78384d8`.
+Independent visual review passed at 8/10. GitHub CI is green on `b9c1b29`.
+The real-time three-minute interrupted WebKit session passed at 59.85 fps active
+painting; dense Chromium capture measured approximately 60 fps (57 fps at 4×
+CPU throttling). Final broad raster checks and production deployment are pending.
+See `docs/validation/landscape-accepted-2026-10-22.md` for current evidence.
+The older study and hold notes below are historical, not a new style checkpoint.
 
 Pulse Painting is the art application extracted from ppg-js source commit
 `732e1ef51f76bce9145bb7f666f92a30be5e0181`. The scientific library and its simple
