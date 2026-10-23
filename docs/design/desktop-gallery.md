@@ -5,6 +5,14 @@ uses a full-width atmospheric version of an actual generated landscape, a single
 brush heading, a stationary painted QR on paper, and an image-first gallery.
 The phone's existing capture, floating controls and report flow are unchanged.
 
+The October 23 mobile extension adds an explicit **Explore the paintings**
+entrance to this same collection. See the [mobile gallery design](mobile-gallery.md)
+and [browser verification](../validation/mobile-gallery-2026-10-23.md).
+The renderer and generated example pixels are unchanged by that extension.
+The desktop checkpoints below retain their original source and test scope;
+current image provenance lives in [the media note](../media/README.md), and
+release status lives in [HANDOFF.md](../../HANDOFF.md).
+
 ## References inspected on Mobbin
 
 - [Cosmos gallery](https://mobbin.com/screens/f13e59e2-a482-431e-a756-e544a2a1a27e): image-first browsing, open spacing, quiet controls. Adopted the emphasis on images rather than enclosing every work in a dashboard card. Kept square, uncropped artworks rather than its mixed-ratio masonry.
@@ -46,8 +54,10 @@ The gallery opens a native modal dialog with keyboard focus containment,
 Escape to close, previous/next buttons and arrow-key navigation. Opening the viewer prepares one labeled example JPEG in memory; navigation or
 close aborts preparation and clears the cached file. Sharing starts only after
 a click, using native file sharing where supported and a canonical example-link
-or copy-link fallback otherwise. Deep-linked examples can be opened on phones without replacing their
-capture screen; closing returns to the existing mobile onboarding.
+or copy-link fallback otherwise. On phones, shared scene links open the mobile
+collection behind the viewer. Closing the viewer returns to that collection;
+Back returns to capture instructions. The explicit **Make a painting of your
+own** action also returns to the instructions without starting the camera.
 
 Examples are explicitly identified as renders of a public recording. There are
 no invented users, likes, views, testimonials or claims of community activity.
@@ -58,7 +68,7 @@ There is no full-screen rendering loop. Default mobile capture does not fetch
 the gallery manifest or images. Reduced motion removes decorative transitions;
 the QR pixels remain stationary and retain their unpainted quiet zone.
 
-## Desktop checks and current candidate imagery
+## Historical desktop checks and candidate imagery
 
 The initial isolated desktop build used the frozen round5 renderer for layout QA only.
 `test/e2e/gallery-checks.mjs` passed Chromium and WebKit at
@@ -127,9 +137,9 @@ server was left untouched. These screenshots are user-facing candidate previews,
 not approval of the renderer's visual style or evidence of deployment. No
 production status is changed here.
 
-### Current candidate: natural pigment and revised geometry
+### Historical round11 candidate: natural pigment and revised geometry
 
-The current renderer SHA-256 is
+At this checkpoint the renderer SHA-256 was
 `878928ede818f9866dca9994506df2802570f2c6673c961310d9988a10866b1a`.
 All sixteen gallery examples have been regenerated from this exact source,
 using the same 148.9 seconds of usable public-fixture waveform. The source and

@@ -51,6 +51,30 @@ signal-engine, accepted-window adapter and image hashes. All sixteen examples
 are regenerated from the current renderer. Default mobile capture
 does not download gallery imagery.
 
+## Mobile gallery
+
+Tap **Explore the paintings** on the phone's opening screen to browse the same
+sixteen examples. A featured Quiet lake leads into a two-column collection;
+filter by Water, Land or Sky, then open an artwork and swipe between scenes.
+The floating **Back** and **Start painting** controls keep capture within reach.
+Start uses the existing capture button and camera-permission flow.
+
+<p align="center">
+  <img src="docs/media/pulse-painting-mobile-gallery.png" width="300" alt="Mobile Pulse Painting gallery with a Quiet lake artwork, landscape filters, and floating Back and Start painting buttons">
+</p>
+
+**Tested mobile gallery candidate.** Direct WebKit browser capture at 390 × 844.
+This image documents the local implementation, not a production or physical-phone
+test. See [image provenance](docs/media/README.md), the
+[mobile design note](docs/design/mobile-gallery.md), and
+[browser verification](docs/validation/mobile-gallery-2026-10-23.md).
+[HANDOFF.md](HANDOFF.md) records deployment status.
+
+The default phone screen downloads no gallery manifest or artwork until you
+choose Explore; shared scene links also open the collection. Thumbnails load
+lazily. Browser Back closes the artwork, then returns to the capture instructions.
+These remain labeled public-fixture examples, not uploads from other visitors.
+
 ## Run locally
 
 Use Node.js 24 or later:
@@ -60,7 +84,7 @@ npm ci
 npm run dev
 ```
 
-Open `http://127.0.0.1:5173`. `npm run build` creates a complete static site in `dist/`. Actual capture needs a compatible phone, camera and flash permissions, and HTTPS or another secure context. Desktop visitors can browse the example gallery and use the painted QR invitation to open the hosted app on their phone.
+Open `http://127.0.0.1:5173`. `npm run build` creates a complete static site in `dist/`. Actual capture needs a compatible phone, camera and flash permissions, and HTTPS or another secure context. Desktop visitors can browse the example gallery and use the painted QR invitation to open the hosted app on their phone. Phone visitors can open the same collection with **Explore the paintings** before starting capture.
 
 ## What is implemented
 
@@ -70,7 +94,7 @@ Open `http://127.0.0.1:5173`. `npm run build` creates a complete static site in 
 - Optional WebGPU/WebGL2 painted entry transitions and an independent Canvas2D landscape compositor.
 - Placement coaching, a small live finger preview, real-time pulse/RMSSD/SDNN, and floating mobile controls.
 - Report charts, a 1080 × 1350 shareable artwork, native file sharing with download fallback, and optional metrics on the artwork.
-- A full-screen desktop introduction and sixteen public-fixture examples, with filters, a keyboard-accessible viewer, user-initiated image sharing and phone deep links.
+- A full-screen desktop introduction and an on-demand mobile collection of sixteen public-fixture examples, with filters, swipe and keyboard navigation, user-initiated image sharing and scene deep links.
 - Accessible supporting typography, one brush heading per screen, reduced motion, interruption recovery, and no recording credit for stale frames.
 
 The [landscape design contract](docs/design/pulse-painting-design.md) covers the sixteen families, data fidelity, density and recovery. Scene choice is random within an art-directed plan, not a health classification. The [mapping brief](docs/design/biometric-scene-mapping.md) distinguishes implemented source/quality/density mappings from future optional self-report ideas. The original manuscript remains available in the report menu.
@@ -91,9 +115,10 @@ npm run test:safari-session
 npm run test:paint-performance
 npm run test:qr
 npm run test:gallery
+npm run test:mobile-gallery
 ```
 
-`npm test` covers actual app callbacks, accepted-data attribution, metrics, report glyph bounds, mobile layouts, export/share behavior, compositor fallback, and the desktop gallery. Gallery checks require current renderer/image provenance and exercise all sixteen scenes, keyboard focus, sharing fallbacks, mobile deep links and failure recovery in Chromium and WebKit. The full session test runs real-time public-recording replay in WebKit with three interruptions and automatic completion. These checks mock camera input and sharing APIs; they do not establish physical iPhone camera, thermal, or native-share performance.
+`npm test` covers actual app callbacks, accepted-data attribution, metrics, report glyph bounds, mobile layouts, export/share behavior, compositor fallback, and both gallery suites. Gallery checks require current renderer/image provenance and exercise all sixteen scenes, keyboard focus, sharing fallbacks, mobile deep links and failure recovery in Chromium and WebKit. The mobile gallery suite additionally checks on-demand loading, 320/390/430 px layouts, filters, synthetic touch swipes, browser history, floating controls, retry, and delayed requests during the real Start/cancel flow with mocked camera acquisition. The full session test runs real-time public-recording replay in WebKit with three interruptions and automatic completion. These checks mock camera input and sharing APIs; they do not establish physical iPhone camera, thermal, or native-share performance.
 
 The QR suite uses Python OpenCV, Pillow, and NumPy for bounded image perturbations; the static QR itself ships no encoder dependency. Optional `PPG_PYTHON` selects a prepared Python environment. Test artifacts stay in ignored `.dream-loop/`.
 
@@ -102,7 +127,7 @@ The QR suite uses Python OpenCV, Pillow, and NumPy for bounded image perturbatio
 - `app/`: ready, placement, capture, report, export, local fonts, and static QR assets.
 - `app/landscape.js`: scene planning, accepted-source coverage, pigment rendering and the live artwork camera.
 - `app/portrait.js`: same-scene export and native sharing with download fallback.
-- `app/gallery.js` and `app/gallery.css`: desktop introduction, public-example browsing and sharing; separate from phone capture.
+- `app/gallery.js` and `app/gallery.css`: desktop introduction, on-demand mobile collection, public-example browsing and sharing; the existing capture lifecycle remains separate.
 - `app/assets/gallery/`: generated example thumbnails, full artworks, labeled share images and their provenance manifest.
 - `src/paint-gpu.js`: optional Three.js entry compositor source.
 - `tools/prepare-dist.mjs`: verify the pinned library and assemble the static app.

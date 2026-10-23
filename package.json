@@ -12,14 +12,15 @@
     "build": "node tools/prepare-dist.mjs && tsup",
     "dev": "npm run build && node tools/serve.mjs",
     "serve": "node tools/serve.mjs",
-    "test": "npm run build && npm run test:landscape && npm run test:app && npm run test:paint-fallbacks && npm run test:gallery",
+    "test": "npm run build && npm run test:landscape && npm run test:app && npm run test:paint-fallbacks && npm run test:gallery && npm run test:mobile-gallery",
     "test:app": "node test/e2e/pulse-painting.mjs",
     "test:safari-session": "node test/e2e/safari-session.mjs",
     "test:paint-performance": "node test/e2e/paint-performance.mjs",
     "test:paint-fallbacks": "node test/e2e/paint-fallback-checks.mjs",
     "test:qr": "node test/e2e/qr-checks.mjs",
     "test:landscape": "node test/landscape-model.mjs && node test/e2e/landscape-view.mjs && node test/e2e/landscape-parity.mjs --compositor-regression",
-    "test:gallery": "node test/e2e/gallery-checks.mjs"
+    "test:gallery": "node test/e2e/gallery-checks.mjs",
+    "test:mobile-gallery": "node test/e2e/mobile-gallery-checks.mjs"
   },
   "devDependencies": {
     "playwright": "1.63.0",
