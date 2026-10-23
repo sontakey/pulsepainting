@@ -1,6 +1,6 @@
 # Pulse Painting handoff
 
-## Current candidate and release status
+## Current production release
 
 The user accepted the hosted Quiet Lake V18-combined paint treatment with
 **Keep** after reviewing the public study at
@@ -20,14 +20,20 @@ CPU throttling). The final full macOS matrix passed 96 cases / 288 checkpoints
 per engine; Linux WebKit passed 32 cases / 96 checkpoints. Every live/export and
 repeated-export comparison was pixel-exact. The separate transparent-prefix
 zero-alpha diagnostic still fails and is documented; source data is unchanged.
-Production deployment remains pending.
+The landscape release is now public at https://www.pulsepainting.com/.
+Deployment `dpl_BTQ7ht7H9XUbd7dmTRJAjJSkm7Kk` is READY; anonymous verification at
+`2026-10-23T03:53:55.163Z` matched all 73 served files to the tested build.
+The apex returns 308 to www. Hosted WebKit app checks and the complete Chromium /
+WebKit gallery suite passed. PR #1 merged as `3ddae4e20f294a0d53a7669c4927235a42e4d764`;
+final pre-merge source `5c3b247` passed CI run `39897117567`.
+ChatPPG's landing/migration update is being released separately.
 See `docs/validation/landscape-accepted-2026-10-22.md` for current evidence.
 The older study and hold notes below are historical, not a new style checkpoint.
 
 Pulse Painting is the art application extracted from ppg-js source commit
 `732e1ef51f76bce9145bb7f666f92a30be5e0181`. The scientific library and its simple
-ChatPPG demo remain separate. The landscape candidate has not replaced the
-verified manuscript release on production.
+ChatPPG demo remain separate. The landscape release replaces the earlier manuscript presentation on the
+standalone site; the original measured waveform manuscript remains in its menu.
 
 The retained candidate uses all sixteen scene families, usable-time density,
 organic terrain mapping of the actual accepted samples, a close-up artwork

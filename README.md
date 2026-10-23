@@ -2,11 +2,10 @@
 
 Your pulse, made into a place.
 
-> Landscape release candidate: the Quiet Lake paint treatment is approved and integrated across all sixteen scenes.
-> Final release checks are in progress; physical-device validation remains separate.
-> The phone screenshots, desktop screenshot and gallery examples below show the current local candidate.
-> These captures do not establish a production release.
-> See [HANDOFF.md](HANDOFF.md) for the visual review and deployment status.
+> Live at [pulsepainting.com](https://www.pulsepainting.com/): sixteen pulse-derived
+> watercolor landscapes, a close-up capture and zoom-out reveal, and shareable artwork.
+> Browser replay and deployed-asset checks passed; physical-phone validation remains separate.
+> See [release verification](docs/validation/landscape-accepted-2026-10-22.md).
 
 Pulse Painting is a three-minute phone-camera capture experience by [ChatPPG](https://chatppg.com), powered by [ppg-js](https://github.com/sontakey/ppg-js). Accepted pulse waveforms paint one of sixteen landscapes, with layered watercolor washes and recognizable pulse contours. A close-up follows the brush during capture, then pulls back to reveal the same painting, ready to share alongside an expandable HRV report.
 
@@ -20,7 +19,7 @@ The current screenshots use a real-time replay of the public recording with mock
 
 The primary destination is [pulsepainting.com](https://www.pulsepainting.com/), a separate Vercel project connected to this repository. The apex domain redirects to www. The simple library demo remains at [ChatPPG](https://chatppg.com/ppg-js-demo). Release and public verification status are tracked in [HANDOFF.md](HANDOFF.md).
 
-## Desktop gallery · release candidate
+## Desktop gallery
 
 The desktop experience opens with a full-screen landscape, a painted invitation
 to begin on your phone, and a gallery of all sixteen scene families. Browse
@@ -30,8 +29,8 @@ keep the gallery and phone handoff accessible.
 
 ![Current desktop candidate with the Quiet lake background and phone QR invitation](docs/media/pulse-painting-desktop-candidate.jpg)
 
-**Current candidate desktop.** Direct browser capture of the local build, not
-the deployed site. See [image provenance](docs/media/README.md).
+**Desktop experience.** Direct browser capture of the tested build now deployed
+to the public site. See [image provenance](docs/media/README.md).
 
 <p align="center">
   <img src="app/assets/gallery/alpine-peaks-640.webp" width="230" alt="Alpine peaks landscape generated from the public pulse fixture by the current candidate renderer">
@@ -41,7 +40,7 @@ the deployed site. See [image provenance](docs/media/README.md).
 
 **Alpine peaks · Quiet lake · Rolling hills.** These examples are made by the
 actual app renderer from one already-public pulse recording. They show the
-current candidate, combining the accepted natural pigment texture with distinct
+released renderer, combining the accepted natural pigment texture with distinct
 landscape shapes. They are not visitor submissions. Your recording stays in your
 browser, and sharing happens only when you choose it.
 

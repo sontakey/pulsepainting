@@ -1,4 +1,4 @@
-# Accepted Pulse Painting landscape candidate
+# Accepted Pulse Painting landscape release
 
 The user accepted the publicly hosted Quiet Lake V18-combined study with **Keep**.
 Its pigment treatment is integrated across all sixteen scene families. The
@@ -7,9 +7,9 @@ density remain unchanged. Independent visual review passed at 8/10; subsequent
 raster consistency changes retain that visible treatment. A mirrored Coastal
 Cliffs taper bug is corrected and covered by a negative-control regression.
 
-The final renderer under verification has SHA-256
+The deployed renderer has SHA-256
 `a84ebe6772a518e2e9d44e6db5d2f30392a75e488884bbfa4e606765a78384d8`.
-The source and generated gallery provenance must match this hash before release.
+The source, generated gallery provenance and anonymously served renderer match this hash.
 
 ## Rendering consistency
 
@@ -39,8 +39,9 @@ The unchanged diagnostic criterion, scope and failures are preserved in
 
 ## Release verification
 
-GitHub CI run `39895956213` passed the complete default suite on source commit
-`b9c1b294a0fbd8204febc81ab8e0fb2358437e87` in the official Playwright Linux image.
+GitHub CI run `39897117567` passed the complete default suite on final source
+commit `5c3b247dad8a34546c520f0182c760fd72601380` in the official Playwright Linux
+image. Earlier runtime commit `b9c1b29` also passed run `39895956213`.
 It covers model/source fidelity, all-family lifecycle, the focused real-recording
 compositor regression, app/report/export behavior, fallback rendering and gallery.
 
@@ -81,5 +82,25 @@ Raw evidence: `.dream-loop/accepted-material/performance-late/results.json`.
 
 These are desktop browser replay results with mocked camera/share APIs. They do
 not establish physical-phone camera, thermal, physiological or native-share
-acceptance. Hosted asset verification remains pending; the main product remains
-unchanged until the production deployment and public checks succeed.
+acceptance.
+
+### Public production verification
+
+Production is https://www.pulsepainting.com/; the apex returns 308 to that URL.
+Vercel deployment `dpl_BTQ7ht7H9XUbd7dmTRJAjJSkm7Kk` reports READY and carries
+source `5c3b247dad8a34546c520f0182c760fd72601380`. PR #1 is merged to main as
+`3ddae4e20f294a0d53a7669c4927235a42e4d764`.
+
+At `2026-10-23T03:53:55.163Z`, anonymous HTTPS requests returned all 73 runtime
+files with status 200 and SHA-256 exactly matching the frozen local build.
+The hosted WebKit app suite then passed capture, quality attribution, pause,
+report, artwork/export/retry, mobile layout and unavailable-data checks. The
+hosted Chromium/WebKit gallery suite passed all sixteen examples, responsive
+layout, keyboard viewer, exact image sharing, link fallback, quiet cancellation,
+phone deep links, manifest failure handling and no default-phone gallery download.
+The hosted artwork matched its source scene exactly.
+
+Evidence stays in ignored `.dream-loop/accepted-material/hosted-assets.json`
+and `.dream-loop/accepted-material/hosted-gallery/`. The full real-time replay
+above used byte-identical local runtime files; the hosted app replay is accelerated.
+No physical-device or native-sharing claim is inferred from deployment.
