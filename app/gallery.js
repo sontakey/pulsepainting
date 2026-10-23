@@ -28,29 +28,141 @@ const descriptions = {
   'aurora-night':'A night sky carrying a pulse in its ribbons of light.',
 };
 
-if (desktop || requestedScene) initGallery().catch(() => {
-  const status = document.getElementById('gallery-load-status');
-  if (status) status.textContent = 'The example gallery could not load. You can still scan the code to make your own painting.';
-  document.getElementById('gallery-grid')?.setAttribute('aria-busy','false');
-});
+const panel = document.getElementById('desktop-phone-panel');
+const explore = document.getElementById('btn-explore-gallery');
+const back = document.getElementById('btn-gallery-back');
+const start = document.getElementById('btn-start');
+const retry = document.getElementById('gallery-retry');
+const heading = document.getElementById('gallery-heading');
+let galleryPromise=null, galleryAPI=null, openRequest=0, mobileShown=false;
+let returnScroll=0, returnFocus=explore;
+
+function routeURL(scene=null) {
+  const url=new URL(location.href);url.searchParams.delete('scene');url.hash='landscapes';
+  if(scene)url.searchParams.set('scene',scene.id);
+  return url;
+}
+function readyURL() {
+  const url=new URL(location.href);url.searchParams.delete('scene');
+  if(url.hash==='#landscapes')url.hash='';
+  return url;
+}
+function writeRoute(mode, view, url) {
+  history[mode+'State']({...history.state,pulsePaintingGallery:view},'',url);
+}
+function sceneOpener(scene) {
+  const button=document.querySelector(`[data-scene="${scene.id}"] .gallery-open`);
+  return button?.getClientRects().length?button:heading;
+}
+function showMobileGallery() {
+  if(desktop || ready.hidden)return;
+  if(!mobileShown){returnScroll=scrollY;returnFocus=explore;}
+  mobileShown=true;ready.classList.add('mobile-gallery-open');panel.hidden=false;
+  back.hidden=false;explore.setAttribute('aria-expanded','true');
+  start.querySelector('span').textContent='Start painting';
+  start.setAttribute('aria-label','Start painting');
+}
+function hideMobileGallery({focus=true}={}) {
+  ++openRequest;galleryAPI?.dismiss();
+  if(!mobileShown)return;
+  mobileShown=false;ready.classList.remove('mobile-gallery-open');panel.hidden=true;
+  back.hidden=true;explore.setAttribute('aria-expanded','false');
+  start.querySelector('span').textContent='Begin pulse capture';
+  start.setAttribute('aria-label','Begin pulse capture');
+  if(focus){
+    const target=returnFocus instanceof HTMLElement&&returnFocus.getClientRects().length?returnFocus:explore;
+    target.focus({preventScroll:true});window.scrollTo({top:returnScroll,behavior:'instant'});
+  }
+}
+function loadGallery() {
+  if(galleryPromise)return galleryPromise;
+  const grid=document.getElementById('gallery-grid');
+  grid.setAttribute('aria-busy','true');retry.hidden=true;
+  document.getElementById('gallery-load-status').textContent='Loading the example landscapes…';
+  galleryPromise=initGallery().then(api=>galleryAPI=api).catch(error=>{
+    galleryPromise=null;grid.setAttribute('aria-busy','false');
+    document.getElementById('gallery-load-status').textContent=desktop
+      ?'The example gallery could not load. You can still scan the code to make your own painting.'
+      :'The paintings could not load. Try again, or start a painting of your own.';
+    retry.hidden=false;throw error;
+  });
+  return galleryPromise;
+}
+async function presentGallery(sceneId=null,{focus=false}={}) {
+  const request=++openRequest;
+  try{
+    const api=await loadGallery();
+    // Network completion must never reopen a dismissed gallery or cover capture.
+    if(request!==openRequest || ready.hidden || (!desktop&&!mobileShown))return;
+    api.mount();
+    const index=api.scenes.findIndex(scene=>scene.id===sceneId);
+    if(index>=0)api.open(index,sceneOpener(api.scenes[index]),{historyMode:'none'});
+    else if(focus){heading.tabIndex=-1;heading.focus({preventScroll:true});window.scrollTo({top:0,behavior:'instant'});}
+  }catch{/* The inline error and Retry remain alongside the working capture action. */}
+}
+function enterMobileGallery() {
+  if(ready.hidden)return;
+  writeRoute('push','gallery',routeURL());showMobileGallery();
+  heading.tabIndex=-1;heading.focus({preventScroll:true});window.scrollTo({top:0,behavior:'instant'});
+  presentGallery();
+}
+function returnToCapture({focusStart=false}={}) {
+  writeRoute('replace',null,readyURL());hideMobileGallery({focus:!focusStart});
+  if(focusStart){start.focus({preventScroll:true});window.scrollTo({top:0,behavior:'instant'});}
+}
+if(desktop){
+  const title=ready.querySelector(':scope > h1');title.id='desktop-hero-title';
+  title.replaceChildren(document.createTextNode('Your pulse,'),document.createElement('br'),document.createTextNode('made into a place.'));
+  document.getElementById('desktop-title-slot').append(title);
+  ready.querySelectorAll('.desktop-experience a[href^="#"]').forEach(link=>link.addEventListener('click',event=>{
+    const target=document.getElementById(event.currentTarget.hash.slice(1));if(!target)return;
+    event.preventDefault();target.scrollIntoView({behavior:matchMedia('(prefers-reduced-motion: reduce)').matches?'instant':'smooth',block:'start'});
+    if(target.id==='paint-on-phone'){target.tabIndex=-1;target.focus({preventScroll:true});}
+  }));
+  presentGallery(requestedScene);
+}else{
+  heading.tabIndex=-1;
+  heading.textContent='A world within.';
+  heading.previousElementSibling.textContent='The Pulse Painting gallery';
+  heading.parentElement.nextElementSibling.textContent='Sixteen landscapes, painted from a pulse. Explore a little. Imagine your own.';
+  explore.addEventListener('click',enterMobileGallery);
+  back.addEventListener('click',()=>{
+    if(history.state?.pulsePaintingGallery==='gallery')history.back();
+    else returnToCapture();
+  });
+  // Preserve the real button and its trusted camera gesture. This runs before
+  // the existing startSession handler, including while a manifest is pending.
+  start.addEventListener('click',()=>{
+    ++openRequest;
+    if(mobileShown || new URL(location.href).searchParams.has('scene'))returnToCapture({focusStart:true});
+  },{capture:true});
+  window.addEventListener('popstate',()=>{
+    if(ready.hidden){++openRequest;return;}
+    const url=new URL(location.href),scene=url.searchParams.get('scene');
+    if(url.hash==='#landscapes' || scene){
+      showMobileGallery();if(!scene)galleryAPI?.dismiss();presentGallery(scene);
+    }else hideMobileGallery();
+  });
+  if(requestedScene){
+    // Keep the normal ready action usable while a deep-link manifest loads.
+    const request=++openRequest;
+    loadGallery().then(api=>{
+      if(request!==openRequest || ready.hidden)return;
+      writeRoute('replace',null,readyURL());writeRoute('push','gallery',routeURL());
+      showMobileGallery();api.mount();
+      const index=api.scenes.findIndex(scene=>scene.id===requestedScene);
+      if(index>=0)api.open(index,sceneOpener(api.scenes[index]));
+    }).catch(()=>{
+      if(request!==openRequest || ready.hidden)return;
+      writeRoute('replace',null,readyURL());writeRoute('push','gallery',routeURL());showMobileGallery();
+    });
+  }else if(location.hash==='#landscapes'){
+    writeRoute('replace',null,readyURL());enterMobileGallery();
+  }
+}
+retry.addEventListener('click',()=>presentGallery(new URL(location.href).searchParams.get('scene')));
 
 async function initGallery() {
-  if (desktop) {
-    const heading = ready.querySelector(':scope > h1');
-    heading.id = 'desktop-hero-title';
-    heading.replaceChildren(document.createTextNode('Your pulse,'),document.createElement('br'),document.createTextNode('made into a place.'));
-    document.getElementById('desktop-title-slot').append(heading);
-    const jump = event => {
-      const target = document.getElementById(event.currentTarget.hash.slice(1));
-      if (!target) return;
-      event.preventDefault();
-      target.scrollIntoView({behavior:matchMedia('(prefers-reduced-motion: reduce)').matches?'instant':'smooth',block:'start'});
-      if (target.id==='paint-on-phone') {
-        target.tabIndex=-1;target.focus({preventScroll:true});
-      }
-    };
-    ready.querySelectorAll('.desktop-experience a[href^="#"]').forEach(link=>link.addEventListener('click',jump));
-  }
   const response = await fetch(manifestURL);
   if (!response.ok) throw new Error('Example manifest unavailable');
   const manifest = await response.json();
@@ -65,8 +177,13 @@ async function initGallery() {
   const sceneLink = scene => { const url=new URL(canonicalURL);url.searchParams.set('scene',scene.id);url.hash='landscapes';return url.href; };
   let activeIndex=0, previousFocus=null, activeFilter='all', shareFile=null, sharePreparation=null, generation=0;
   const dialog=document.createElement('dialog');
-  dialog.className='gallery-lightbox';dialog.setAttribute('aria-labelledby','gallery-dialog-title');dialog.setAttribute('aria-describedby','gallery-dialog-note');
+  dialog.className='gallery-lightbox';dialog.setAttribute('role','dialog');dialog.setAttribute('aria-labelledby','gallery-dialog-title');dialog.setAttribute('aria-describedby','gallery-dialog-note');
   dialog.innerHTML=`<button class="gallery-dialog-close" type="button" aria-label="Close landscape">×</button><div class="gallery-lightbox-art"><img id="gallery-dialog-image" width="1080" height="1080" alt=""></div><div class="gallery-lightbox-copy"><p class="gallery-eyebrow">A Pulse Painting example</p><h2 id="gallery-dialog-title"></h2><p class="gallery-lightbox-description"></p><p id="gallery-dialog-note" class="gallery-lightbox-note">An example made from a public pulse recording. Your painting comes from your own rhythm.</p><button class="gallery-share" type="button">Share this landscape</button><button class="gallery-copy-link" type="button">Copy example link</button><p class="gallery-share-status" role="status" aria-live="polite"></p><button class="gallery-dialog-paint" type="button">Make a painting of your own ↗</button><div class="gallery-lightbox-navigation"><span id="gallery-dialog-position" aria-live="polite"></span><button type="button" data-gallery-step="-1" aria-label="Previous landscape">←</button><button type="button" data-gallery-step="1" aria-label="Next landscape">→</button></div></div>`;
+  if(!desktop){
+    dialog.classList.add('mobile-gallery-viewer');
+    const navigation=dialog.querySelector('.gallery-lightbox-navigation');
+    dialog.querySelector('.gallery-lightbox-art').after(navigation);
+  }
   document.body.append(dialog);
   const image=dialog.querySelector('#gallery-dialog-image'), title=dialog.querySelector('h2'), status=dialog.querySelector('.gallery-share-status');
   const update = index => {
@@ -77,6 +194,7 @@ async function initGallery() {
     image.src=assets(scene.image);image.alt=`${scene.name}: an example generated from the public pulse recording`;
     dialog.querySelector('#gallery-dialog-position').textContent=`${activeIndex+1} / ${scenes.length}`;
     status.textContent='';
+    if(!desktop && dialog.open)writeRoute('replace','scene',routeURL(scene));
     sharePreparation?.abort();sharePreparation=new AbortController();shareFile=null;
     const current=++generation,button=dialog.querySelector('.gallery-share');
     button.disabled=true;button.textContent='Preparing image…';
@@ -91,15 +209,21 @@ async function initGallery() {
       if(current===generation){button.disabled=false;button.textContent='Share this landscape';}
     });
   };
-  const open = (index,opener=document.activeElement) => {
-    previousFocus=opener;update(index);
+  const open = (index,opener=document.activeElement,{historyMode='push'}={}) => {
+    previousFocus=opener;
+    if(!desktop && historyMode==='push')writeRoute('push','scene',routeURL(scenes[index]));
+    update(index);
     if (!dialog.open) dialog.showModal();
     dialog.querySelector('.gallery-dialog-close').focus({preventScroll:true});
   };
-  const close = () => dialog.close();
+  const close = () => {
+    if(!desktop && mobileShown && history.state?.pulsePaintingGallery==='scene')history.back();
+    else dialog.close();
+  };
+  dialog.addEventListener('cancel',event=>{event.preventDefault();close();});
   dialog.querySelector('.gallery-dialog-close').addEventListener('click',close);
   dialog.addEventListener('click',event=>{if(event.target===dialog){const r=dialog.getBoundingClientRect();if(event.clientX<r.left||event.clientX>r.right||event.clientY<r.top||event.clientY>r.bottom)close();}});
-  dialog.addEventListener('close',()=>{generation++;sharePreparation?.abort();sharePreparation=null;shareFile=null;if(previousFocus instanceof HTMLElement&&previousFocus.isConnected)previousFocus.focus({preventScroll:true});});
+  dialog.addEventListener('close',()=>{generation++;sharePreparation?.abort();sharePreparation=null;shareFile=null;if(!ready.hidden&&previousFocus instanceof HTMLElement&&previousFocus.getClientRects().length)previousFocus.focus({preventScroll:true});});
   dialog.addEventListener('keydown',event=>{
     if(event.key==='Tab'){
       const controls=[...dialog.querySelectorAll('button:not(:disabled),a[href]')].filter(node=>node.getClientRects().length);
@@ -135,14 +259,19 @@ async function initGallery() {
   dialog.querySelector('.gallery-dialog-paint').addEventListener('click',()=>{
     previousFocus=desktop?document.getElementById('paint-on-phone'):document.getElementById('btn-start');
     if(desktop)previousFocus.tabIndex=-1;
-    close();
+    if(desktop)close();
+    else returnToCapture({focusStart:true});
     if(desktop){const target=document.getElementById('paint-on-phone');target.tabIndex=-1;target.scrollIntoView({behavior:matchMedia('(prefers-reduced-motion: reduce)').matches?'instant':'smooth'});target.focus({preventScroll:true});}
     else document.getElementById('btn-start')?.focus();
   });
-  if(desktop){
+  let mounted=false;
+  const mount=()=>{
+    if(mounted)return;mounted=true;
+    if(desktop){
     const hero=scenes.find(scene=>scene.id==='quiet-lake')||scenes[0];
     const heroImage=document.getElementById('gallery-hero-image');heroImage.src=assets(hero.image);
     document.getElementById('gallery-hero-scene').textContent=hero.name;
+    }
     const grid=document.getElementById('gallery-grid');
     const fragment=document.createDocumentFragment();
     scenes.forEach((scene,index)=>{
@@ -151,18 +280,27 @@ async function initGallery() {
       const frame=document.createElement('span');frame.className='gallery-art-frame';
       const thumb=document.createElement('img');thumb.src=assets(scene.thumbnail);thumb.width=640;thumb.height=640;thumb.loading='lazy';thumb.decoding='async';thumb.alt=`${scene.name} generated from the public example recording`;
       frame.append(thumb);
-      const caption=document.createElement('span');caption.className='gallery-card-caption';const name=document.createElement('strong');name.textContent=scene.name;const number=document.createElement('span');number.textContent=String(index+1).padStart(2,'0');caption.append(name,number);button.append(frame,caption);button.addEventListener('click',()=>open(index,button));figure.append(button);fragment.append(figure);
+      const caption=document.createElement('span');caption.className='gallery-card-caption';const name=document.createElement('strong');name.textContent=scene.name;const number=document.createElement('span');number.textContent=String(index+1).padStart(2,'0');caption.append(name,number);const description=document.createElement('span');description.className='gallery-card-description';description.textContent=descriptions[scene.id];button.append(frame,caption,description);button.addEventListener('click',()=>open(index,button));figure.append(button);fragment.append(figure);
     });
+    // Quiet Lake opens the mobile collection as a generous featured painting.
+    if(!desktop){const feature=fragment.querySelector('[data-scene=quiet-lake]');if(feature){feature.classList.add('featured');fragment.prepend(feature);}}
     grid.append(fragment);grid.setAttribute('aria-busy','false');document.getElementById('gallery-load-status').textContent='';
     ready.querySelectorAll('[data-gallery-filter]').forEach(button=>button.addEventListener('click',()=>{
       activeFilter=button.dataset.galleryFilter;let count=0;
       ready.querySelectorAll('[data-gallery-filter]').forEach(item=>item.setAttribute('aria-pressed',String(item===button)));
       grid.querySelectorAll('.gallery-card').forEach(card=>{card.hidden=activeFilter!=='all'&&!groups[activeFilter]?.includes(card.dataset.scene);if(!card.hidden)count++;});
+      if(!desktop){grid.querySelectorAll('.gallery-card').forEach(card=>card.classList.remove('featured'));grid.querySelector('.gallery-card:not([hidden])')?.classList.add('featured');}
       document.getElementById('gallery-count').textContent=`${count} example landscapes`;
     }));
-  }
-  const requestedIndex=scenes.findIndex(scene=>scene.id===requestedScene);
-  // The manifest can finish loading after a phone visitor starts capture.
-  // A startup example must never interrupt placement or an active recording.
-  if(requestedIndex>=0 && ready && !ready.hidden)open(requestedIndex);
+  };
+  const art=dialog.querySelector('.gallery-lightbox-art');let gesture=null;
+  image.draggable=false;
+  art.addEventListener('pointerdown',event=>{if(event.pointerType==='touch')gesture={x:event.clientX,y:event.clientY,id:event.pointerId};});
+  art.addEventListener('pointercancel',()=>{gesture=null;});
+  art.addEventListener('pointerup',event=>{
+    if(!gesture||event.pointerId!==gesture.id)return;
+    const dx=event.clientX-gesture.x,dy=event.clientY-gesture.y;gesture=null;
+    if(Math.abs(dx)>44&&Math.abs(dx)>Math.abs(dy)*1.5)update(activeIndex+(dx<0?1:-1));
+  });
+  return {scenes,mount,open,dismiss:()=>{if(dialog.open)dialog.close();}};
 }

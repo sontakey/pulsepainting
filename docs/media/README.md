@@ -3,6 +3,8 @@
 These are direct browser captures of the actual static app. Capture, report and
 desktop images were refreshed on October 22, 2026 (America/Chicago) for the finer
 Quiet Lake foreground. Ready and QR retain their unchanged first-release images.
+The mobile gallery PNG documents the separately tested October 23 candidate
+described below; it does not establish production deployment.
 See [HANDOFF.md](../../HANDOFF.md) for deployment status.
 
 ## Current artwork images
@@ -55,6 +57,26 @@ correction. Their source renderer was
 `a84ebe6772a518e2e9d44e6db5d2f30392a75e488884bbfa4e606765a78384d8`.
 Original capture evidence is in ignored `.dream-loop/release-readme/`.
 
+## Mobile gallery candidate
+
+`pulse-painting-mobile-gallery.png` is the native WebKit screenshot from
+`test/e2e/mobile-gallery-checks.mjs`, copied byte-for-byte from ignored
+`.dream-loop/mobile-gallery/webkit-gallery-viewport.png`. It shows the actual
+local gallery after **Explore the paintings** is selected, with the first
+thumbnail decoded. No image pixels or interface text were edited.
+
+- Playwright's iPhone 13 emulation, 390 × 844 CSS pixels, device scale factor 1,
+  reduced motion, and loaded local fonts. The output is a 390 × 844 PNG.
+- The artwork is the existing Quiet lake public-fixture example. Neither the
+  landscape renderer nor the generated gallery artwork changed for the mobile
+  navigation work; the renderer remains
+  `981c49eccf799a030199c2d694bfb7e8af9bc64a9dca3d6d4dfa331b1ef82637`.
+- The screenshot requires no new capture or visitor recording. The default
+  phone page requests no gallery manifest or images before the explicit visit.
+- [The mobile verification record](../validation/mobile-gallery-2026-10-23.md)
+  covers Chromium/WebKit behavior, layout, history, retry and capture handoff.
+  This screenshot is not physical-phone, native-share or performance evidence.
+
 ## Image integrity
 
 | File | Bytes | SHA-256 |
@@ -64,3 +86,4 @@ Original capture evidence is in ignored `.dream-loop/release-readme/`.
 | `pulse-painting-ready.jpg` | 51933 | `1da91b18ec49b70eebb09af1fcea4dff9f87078637b8ffcc70adf00e375a1ddf` |
 | `pulse-painting-capture.jpg` | 54988 | `39ffe97770307230c8a67fd97009d1fcf9be886e31c51da27a36f8a86b912cf9` |
 | `pulse-painting-report.jpg` | 65173 | `c2f8559f395c9d6ed8d36738f68a0df638aab51f30377e413e8966e1ce234f4c` |
+| `pulse-painting-mobile-gallery.png` | 469347 | `2f7f07374fb73399156555da8a86281d6b982db7714efe9a7bd2b4d4caa1889b` |
