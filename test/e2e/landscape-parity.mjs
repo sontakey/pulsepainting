@@ -131,6 +131,6 @@ for (const name of engines) {
   finally {
     writeFileSync(path.join(out, `${name}.json`), JSON.stringify(result, null, 2));
     await browser?.close();
-    console.log(JSON.stringify({ engine: name, passed: !!result.passed, cases: result.cases.length, failures: result.failures.length, out }));
+    console.log(JSON.stringify({ engine: name, passed: !!result.passed, cases: result.cases.length, failures: result.failures.length, errors: result.errors, failure: result.failure, out }));
   }
 }
