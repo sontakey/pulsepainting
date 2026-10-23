@@ -16,7 +16,11 @@ regenerated. Final runtime SHA-256:
 Independent visual review passed at 8/10. GitHub CI is green on `b9c1b29`.
 The real-time three-minute interrupted WebKit session passed at 59.85 fps active
 painting; dense Chromium capture measured approximately 60 fps (57 fps at 4×
-CPU throttling). Final broad raster checks and production deployment are pending.
+CPU throttling). The final full macOS matrix passed 96 cases / 288 checkpoints
+per engine; Linux WebKit passed 32 cases / 96 checkpoints. Every live/export and
+repeated-export comparison was pixel-exact. The separate transparent-prefix
+zero-alpha diagnostic still fails and is documented; source data is unchanged.
+Production deployment remains pending.
 See `docs/validation/landscape-accepted-2026-10-22.md` for current evidence.
 The older study and hold notes below are historical, not a new style checkpoint.
 

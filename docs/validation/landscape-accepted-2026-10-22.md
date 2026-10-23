@@ -14,11 +14,14 @@ The source and generated gallery provenance must match this hash before release.
 ## Rendering consistency
 
 Stable Canvas2D contexts and fixed-rectangle texture clipping preserve the
-existing four-raster live budget and pigment budget. The preceding layer-only
-candidate passed all 96 macOS cases in both engines. Extending its Linux check
-exposed one Coastal Cliffs early-frame edge mismatch; the final all-surface
-candidate fixes the targeted case exactly and also passes the previously
-sensitive River Valley case. The final broad matrix remains pending.
+existing four-raster live budget and pigment budget. The final exact renderer
+passed the complete macOS matrix in both Chromium and WebKit: 16 scene families,
+three seeds and short/full recordings, **96 cases and 288 checkpoints per engine**.
+Linux/amd64 WebKit passed all 16 families for seed 39293 at both lengths:
+**32 cases and 96 checkpoints**. Every live/export and repeated-export comparison
+was pixel-exact (maximum and mean error zero). Source data remained exact, raster
+budgets were respected, and no page errors occurred. Earlier failed candidates
+remain documented separately; their results are not substituted for this build.
 
 The strict isolated-painter zero-alpha-loss diagnostic remains **failed** with
 its unchanged zero threshold. It observes the actual output context
