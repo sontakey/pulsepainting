@@ -1,5 +1,22 @@
 # Pulse Painting handoff
 
+## Foreground pulse correction
+
+The user's phone feedback identified oversized, blurred Quiet Lake foreground
+waves. The correction uses smaller wet brush marks, a fine contour through the
+actual measured samples, and shorter foreground passages. Source samples,
+timing, quality and usable-time density are unchanged. The other fifteen scenes'
+gallery image hashes are unchanged. Independent visual review passed at 8/10.
+
+Frozen renderer SHA-256:
+`981c49eccf799a030199c2d694bfb7e8af9bc64a9dca3d6d4dfa331b1ef82637`.
+`npm test`, the separate WebKit app suite, and three-seed Quiet Lake parity in
+both engines passed. The gallery and three README images are refreshed from
+the actual renderer. See
+`docs/validation/defined-foreground-2026-10-22.md` for evidence and scope.
+Production deployment of this correction is pending; the release below remains
+the currently verified public build until promotion and anonymous verification.
+
 ## Current production release
 
 The user accepted the hosted Quiet Lake V18-combined paint treatment with

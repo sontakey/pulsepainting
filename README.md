@@ -15,7 +15,7 @@ Pulse Painting is a three-minute phone-camera capture experience by [ChatPPG](ht
   <img src="docs/media/pulse-painting-report.jpg" width="230" alt="Shareable Pulse Painting artwork and report">
 </p>
 
-The current screenshots use a real-time replay of the public recording with mocked camera input and reduced motion enabled; see [capture provenance](docs/media/README.md). They are not new physical-phone measurements.
+The current capture and report screenshots use an accelerated preload of the public recording, mocked camera input, and the normal animated artwork reveal; see [capture provenance](docs/media/README.md). They are not new physical-phone measurements or a real-time session benchmark.
 
 The primary destination is [pulsepainting.com](https://www.pulsepainting.com/), a separate Vercel project connected to this repository. The apex domain redirects to www. The simple library demo remains at [ChatPPG](https://chatppg.com/ppg-js-demo). Release and public verification status are tracked in [HANDOFF.md](HANDOFF.md).
 
