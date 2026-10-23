@@ -25,7 +25,39 @@ figure{margin:0}img{display:block;width:100%;height:auto;border:1px solid #e3ded
 <p class="brand">Pulse Painting</p><h1>A shared moment.</h1><p class="byline">Painted by a pulse. Shared by <strong>${esc(name)}</strong>.</p>
 <figure><img src="${esc(painting.imageURL)}" width="1080" height="1350" alt="A pulse painting shared by ${esc(name)}"><figcaption>A little of someone’s world, for you to discover.</figcaption></figure>
 <p class="invite">What would your pulse paint?</p><div class="actions"><a class="button" href="${origin}/">Make your own painting</a><a class="button secondary" href="${appURL}">Explore this painting</a></div>
+<a class="gallery" href="${origin}/book/${painting.id}">Open the sketchbook ↗</a><br>
 <a class="gallery" href="${origin}/?collection=community#landscapes">Wander through the gallery ↗</a>
 <p class="footer">A project by <a href="https://chatppg.com/">ChatPPG</a>. Powered by <a href="https://github.com/sontakey/ppg-js">ppg-js</a>.</p>
+</main></body></html>`;
+}
+
+
+// Only already-published artwork enters this page; no private capability or
+// recording metadata is serialized into its HTML or browser runtime.
+export function sketchbookPage(painting, origin) {
+  const name = painting.displayName || 'Someone';
+  const title = `${name}’s pulse sketchbook`;
+  const description = 'Turn the pages of a landscape painted by a pulse. A little world, shared with you.';
+  const url = `${origin}/book/${painting.id}`;
+  const esc = escapeHTML;
+  return `<!doctype html><html lang="en"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>${esc(title)}</title><link rel="canonical" href="${url}"><meta name="description" content="${description}">
+<meta property="og:type" content="website"><meta property="og:title" content="${esc(title)}"><meta property="og:description" content="${description}"><meta property="og:url" content="${url}">
+<meta property="og:image" content="${esc(painting.imageURL)}"><meta property="og:image:width" content="1080"><meta property="og:image:height" content="1350"><meta property="og:image:alt" content="A pulse painting inside a shared sketchbook">
+<meta name="twitter:card" content="summary_large_image"><meta name="twitter:title" content="${esc(title)}"><meta name="twitter:description" content="${description}"><meta name="twitter:image" content="${esc(painting.imageURL)}">
+<link rel="stylesheet" href="/public-sketchbook.css"><script type="module" src="/public-sketchbook.js"></script>
+</head><body><main class="public-book" data-painting-id="${painting.id}">
+<header class="book-header"><a class="book-brand" href="${origin}/">Pulse Painting</a><h1>A little world, shared.</h1><p class="book-byline">A sketchbook painted by a pulse. Shared by <strong>${esc(name)}</strong>.</p></header>
+<section class="book-paper" aria-label="Interactive pulse painting sketchbook">
+<div id="public-book-stage" aria-busy="true"></div>
+<figure id="public-book-fallback"><img src="${esc(painting.imageURL)}" width="1080" height="1350" alt="A pulse painting shared by ${esc(name)}"><figcaption>The complete painting, waiting to become a little book.</figcaption></figure>
+</section>
+<div class="book-guidance"><p id="public-book-status" role="status" aria-live="polite">Opening this sketchbook…</p><button id="public-book-retry" type="button" hidden>Try opening again</button><p class="book-attribution">Page-turning adapted from <a href="https://threeui.com/css/sketchbook" target="_blank" rel="noopener noreferrer">ThreeUI by Meng To</a>.</p></div>
+<div class="book-actions"><button id="share-public-book" class="book-button" type="button" hidden>Share sketchbook <span aria-hidden="true">↗</span></button><a class="book-button secondary" href="${origin}/">Make your own</a></div>
+<section id="book-copy-fallback" hidden aria-label="Copy sketchbook link"><label for="book-link">Your link to this sketchbook</label><div class="book-copy-row"><input id="book-link" type="text" readonly value="${url}" aria-label="Sketchbook link"><button id="copy-public-book" type="button">Copy link</button></div><p id="book-share-status" role="status" aria-live="polite"></p></section>
+<nav class="book-footer" aria-label="More paintings"><a href="${esc(painting.url)}">View the full painting</a><span aria-hidden="true">·</span><a href="${origin}/?collection=community#landscapes">Explore the gallery</a></nav>
+<p class="book-credit">A project by <a href="https://chatppg.com/">ChatPPG</a>, powered by <a href="https://github.com/sontakey/ppg-js">ppg-js</a>.</p>
+<noscript><p class="book-noscript">The painting is yours to explore above. Turn on JavaScript to flip through its sketchbook.</p></noscript>
 </main></body></html>`;
 }

@@ -12,7 +12,7 @@
     "build": "node tools/verify-sketchbook.mjs && node tools/prepare-dist.mjs && tsup",
     "dev": "npm run build && node tools/serve.mjs",
     "serve": "node tools/serve.mjs",
-    "test": "npm run build && npm run test:community-api && npm run test:landscape && npm run test:app && npm run test:paint-fallbacks && npm run test:gallery && npm run test:mobile-gallery && npm run test:community-sharing && npm run test:share-sheet && npm run test:sketchbook && npm run test:personal-sketchbook && npm run test:public-painting-page",
+    "test": "npm run build && npm run test:community-api && npm run test:landscape && npm run test:app && npm run test:paint-fallbacks && npm run test:gallery && npm run test:mobile-gallery && npm run test:community-sharing && npm run test:share-sheet && npm run test:sketchbook && npm run test:personal-sketchbook && npm run test:public-painting-page && npm run test:sketchbook-links && npm run test:public-sketchbook",
     "test:app": "node test/e2e/pulse-painting.mjs",
     "test:safari-session": "node test/e2e/safari-session.mjs",
     "test:paint-performance": "node test/e2e/paint-performance.mjs",
@@ -26,7 +26,9 @@
     "test:sketchbook": "node test/e2e/sketchbook-checks.mjs",
     "test:share-sheet": "node test/e2e/share-sheet-checks.mjs",
     "test:personal-sketchbook": "node test/e2e/personal-sketchbook-checks.mjs",
-    "test:public-painting-page": "node test/e2e/public-painting-page.mjs"
+    "test:public-painting-page": "node test/e2e/public-painting-page.mjs",
+    "test:sketchbook-links": "node test/e2e/sketchbook-links.mjs",
+    "test:public-sketchbook": "node test/e2e/public-sketchbook.mjs"
   },
   "devDependencies": {
     "playwright": "1.63.0",

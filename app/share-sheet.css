@@ -64,6 +64,9 @@
 .ps-paper-stage{height:680px;min-height:0;margin-top:16px;overflow:hidden;border:1px solid #dedbd3;border-radius:16px;background:#ece7dc}
 .ps-paper-status{min-height:22px;margin-top:10px}
 .ps-paper-credit{margin:7px 0 0;font-size:14px;line-height:1.5;color:var(--ps-muted)}
+.ps-book-links{margin-top:8px}.ps-book-link,.ps-paper-link,.ps-book-copy{min-height:44px;padding:10px 12px;border:1px solid #d7ddd8;border-radius:12px;background:#f4f1e9;color:#2447bc;font-size:14px;font-weight:600}
+.ps-book-link{width:100%}.ps-book-note{margin:8px 0 0;font-size:14px;line-height:1.5;color:var(--ps-muted)}
+.ps-paper-links{display:flex;flex-wrap:wrap;gap:10px;margin-top:12px}.ps-book-url{display:block;width:100%;min-height:44px;margin-top:10px;padding:10px;border:1px solid #b7c4d2;border-radius:8px;background:#fff;color:var(--ps-ink);font:16px "DM Sans",sans-serif}
 @media(hover:hover){.ps-platform:hover>span{transform:translateY(-3px) rotate(0);background:#e2e8f8}.ps-utilities button:hover,.ps-close:hover{background:#e8edf3}.ps-share:hover{filter:brightness(1.06)}}
 @media(max-width:650px){
   .pulse-share-sheet{width:calc(100% - 16px);max-height:calc(100dvh - 16px);border-radius:25px;margin:auto}

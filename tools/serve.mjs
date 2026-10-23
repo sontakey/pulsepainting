@@ -15,11 +15,11 @@ const server = createServer(async (req, res) => {
   try {
     const url = new URL(req.url, 'http://localhost');
     let name = decodeURIComponent(url.pathname);
-    const painting = name.match(/^\/p\/([a-f0-9-]+)$/i);
+    const painting = name.match(/^\/(p|book)\/([a-f0-9-]+)$/i);
     const api = apiRoutes[name] || (painting ? apiRoutes['/api/painting-page'] : null);
     if (api) {
       req.query = Object.fromEntries(url.searchParams);
-      if (painting) req.query.id = painting[1];
+      if (painting) { req.query.id = painting[2]; if (painting[1] === 'book') req.query.view = 'book'; }
       res.status = code => { res.statusCode = code; return res; };
       res.json = body => { res.setHeader('Content-Type', 'application/json'); res.end(JSON.stringify(body)); };
       const {default: handler} = await import(api);

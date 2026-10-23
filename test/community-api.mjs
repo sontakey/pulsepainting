@@ -144,6 +144,15 @@ try {
   const detailText = await publicDetail.text(); assert.ok(!detailText.includes(body.ownerToken)); assert.ok(!detailText.includes('owner_hash'));
   const og = await fetch(`${origin}/api/painting-page?id=${body.id}`); assert.equal(og.status, 200); const html = await og.text();
   assert.ok(html.includes('&lt;b&gt;Test painting&lt;/b&gt;')); assert.ok(!html.includes('<b>Test painting</b>')); assert.ok(html.includes(first.painting.imageURL)); assert.ok(!html.includes(body.ownerToken));
+  const bookPage = await fetch(`${origin}/api/painting-page?id=${body.id}&view=book`); assert.equal(bookPage.status, 200);
+  assert.equal(bookPage.headers.get('cache-control'), 'no-store');
+  const bookHTML = await bookPage.text();
+  assert.ok(bookHTML.includes(`/book/${body.id}`)); assert.ok(bookHTML.includes('public-sketchbook.js')); assert.ok(bookHTML.includes(first.painting.imageURL));
+  assert.ok(bookHTML.includes('&lt;b&gt;Test painting&lt;/b&gt;')); assert.ok(!bookHTML.includes('<b>Test painting</b>')); assert.ok(!bookHTML.includes(body.ownerToken));
+  assert.ok(bookPage.headers.get('content-security-policy').includes("frame-src 'self'"));
+  assert.ok(!og.headers.get('content-security-policy').includes('script-src'), 'painting-only policy stays script-free');
+  const bookHead = await fetch(`${origin}/api/painting-page?id=${body.id}&view=book`, { method: 'HEAD' }); assert.equal(bookHead.status, 200); assert.equal(await bookHead.text(), '');
+  const invalidView = await fetch(`${origin}/api/painting-page?id=${body.id}&view=unknown`); assert.equal(invalidView.status, 400); assert.ok(!(await invalidView.text()).includes('property="og:image"'));
   const blocked = await fetch(`${origin}/api/paintings`, { method: 'POST', headers: { 'Content-Type': 'application/json', Origin: 'https://evil.invalid' }, body: JSON.stringify(body) }); assert.equal(blocked.status, 403); assert.equal(blocked.headers.get('cache-control'), 'no-store');
   const httpDelete = await fetch(`${origin}/api/paintings?id=${body.id}`, { method: 'DELETE', headers: { 'Content-Type': 'application/json', Origin: origin }, body: JSON.stringify({ ownerToken: body.ownerToken }) }); assert.equal(httpDelete.status, 200);
   const refreshedList = await fetch(`${origin}/api/paintings`);
@@ -154,8 +163,12 @@ try {
   const removedHTML = await removedPage.text(); assert.ok(removedHTML.includes('noindex')); assert.ok(!removedHTML.includes('property="og:image"'));
   const removedHead = await fetch(`${origin}/api/painting-page?id=${body.id}`, { method: 'HEAD' });
   assert.equal(removedHead.status, 410); assert.equal(await removedHead.text(), '');
+  const removedBook = await fetch(`${origin}/api/painting-page?id=${body.id}&view=book`); assert.equal(removedBook.status, 410); assert.equal(removedBook.headers.get('cache-control'), 'no-store');
+  const removedBookHTML = await removedBook.text(); assert.ok(removedBookHTML.includes('noindex')); assert.ok(!removedBookHTML.includes('property="og:image"')); assert.ok(!removedBookHTML.includes('public-sketchbook.js'));
+  const removedBookHead = await fetch(`${origin}/api/painting-page?id=${body.id}&view=book`, { method: 'HEAD' }); assert.equal(removedBookHead.status, 410); assert.equal(await removedBookHead.text(), '');
   const unknownPage = await fetch(`${origin}/api/painting-page?id=${randomUUID()}`);
   assert.equal(unknownPage.status, 404); assert.equal(unknownPage.headers.get('cache-control'), 'no-store'); assert.ok(!(await unknownPage.text()).includes('property="og:image"'));
+  const unknownBook = await fetch(`${origin}/api/painting-page?id=${randomUUID()}&view=book`); assert.equal(unknownBook.status, 404); assert.equal(unknownBook.headers.get('cache-control'), 'no-store'); assert.ok(!(await unknownBook.text()).includes('property="og:image"'));
   assert.deepEqual(await service.remove(body.id, { ownerToken: body.ownerToken }), { removed: true, cleanupPending: false });
   await assert.rejects(() => service.publish(body, 'test-source'), error => error.status === 410);
   const erased = (await pool.query('SELECT display_name,metrics FROM community_paintings WHERE namespace=$1 AND id=$2', [namespace, body.id])).rows[0]; assert.equal(erased.display_name, ''); assert.equal(erased.metrics, null);

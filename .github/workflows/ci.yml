@@ -8,7 +8,7 @@ permissions:
 jobs:
   browser:
     runs-on: ubuntu-24.04
-    timeout-minutes: 10
+    timeout-minutes: 15
     container:
       # Match the pinned Playwright package; avoid apt mirror availability at test time.
       image: mcr.microsoft.com/playwright:v1.63.0-noble

@@ -61,6 +61,8 @@
   function open(options = {}) {
     close();
     const publishedURL = publicLink(options.publicURL), link = publishedURL || HOME;
+    const bookURL = publishedURL ? publishedURL.replace('/p/', '/book/') : null;
+    const canPublish = typeof options.onPublish === 'function';
     const title = safeText(options.title, 'Pulse Painting', 100);
     const suppliedCaption = safeText(options.caption, `My pulse painted this place. Three minutes, one landscape. Make yours: ${link} #PulsePainting`);
     const caption = suppliedCaption.includes(link) ? suppliedCaption : `${suppliedCaption}\n${link}`;
@@ -78,7 +80,7 @@
       <div class="ps-link-card"><span class="ps-link-dot" aria-hidden="true"></span><div><strong class="ps-link-title"></strong><p class="ps-link-description"></p><button type="button" class="ps-publish" hidden>Give your painting a public page <span aria-hidden="true">↗</span></button></div></div>
       <div class="ps-utilities"><button type="button" data-action="copy-link">${svg('link')}<span>Copy link</span></button><button type="button" data-action="save" disabled>${svg('save')}<span>Save image</span></button><button type="button" data-action="copy-caption">${svg('copy')}<span>Copy caption</span></button></div>
       <details class="ps-caption"><summary>Your caption <span aria-hidden="true">+</span></summary><p></p></details>
-      <button type="button" class="ps-paper-toggle" aria-expanded="false" aria-controls="pulse-share-paper" disabled>${svg('book')}<span><strong>Open your sketchbook</strong><small>Your painting, a little closer</small></span><span aria-hidden="true">↗</span></button></div>
+      <button type="button" class="ps-paper-toggle" aria-expanded="false" aria-controls="pulse-share-paper" disabled>${svg('book')}<span><strong>Open your sketchbook</strong><small>Your painting, a little closer</small></span><span aria-hidden="true">↗</span></button><div class="ps-book-links" hidden><button type="button" class="ps-book-link"></button><p class="ps-book-note"></p></div></div>
       <section class="ps-paper" id="pulse-share-paper" aria-labelledby="pulse-share-paper-title" hidden><header><div><h3 id="pulse-share-paper-title">Your pulse, on paper.</h3><p>A sketchbook made from this painting.</p></div><button type="button" class="ps-paper-close" aria-label="Close your sketchbook">${svg('close')}</button></header><p class="ps-paper-context">Turn the pages to see the whole painting and its details.</p><div class="ps-paper-stage"></div><p class="ps-paper-status" role="status" aria-live="polite">Opening your sketchbook…</p><p class="ps-paper-credit">Page-turning adapted from <a href="https://threeui.com/css/sketchbook" target="_blank" rel="noopener noreferrer">ThreeUI by Meng To</a>.</p></section></div>
       <footer class="ps-footer"><p class="ps-status" role="status" aria-live="polite">Preparing your image…</p><button type="button" class="ps-share" disabled>${svg('share')}<span>Share image</span></button><p class="ps-footer-note">Choose the app and audience. Nothing posts automatically.</p></footer>
     </div>`;
@@ -144,6 +146,47 @@
         navigator.clipboard.writeText(text).then(() => announce(success)).catch(() => { if (!state.closed) fallback(); });
       } catch { fallback(); }
     };
+    const revealBookLink = () => {
+      if (!bookURL || state.closed) return;
+      const field = dialog.querySelector('.ps-book-url');
+      field.hidden = false; field.value = bookURL; field.focus({ preventScroll: true }); field.select(); field.scrollIntoView({ block: 'nearest' });
+      // Keep a selectable link visible even when clipboard permission is denied.
+      try {
+        if (navigator.clipboard?.writeText) navigator.clipboard.writeText(bookURL)
+          .then(() => announce('Sketchbook link copied. Anyone with the link can turn its pages.'))
+          .catch(() => announce('Select and copy the sketchbook link below.'));
+        else announce('Select and copy the sketchbook link below.');
+      } catch { announce('Select and copy the sketchbook link below.'); }
+    };
+    const shareBook = () => {
+      if (state.closed || state.sharing) return;
+      if (!bookURL) { if (canPublish) { close(); options.onPublish({ intent: 'sketchbook' }); } return; }
+      if (typeof navigator.share !== 'function') { revealBookLink(); return; }
+      state.sharing = true; readyButtons();
+      try {
+        Promise.resolve(navigator.share({ title: 'A Pulse Painting sketchbook', text: 'Turn the pages of a landscape painted by a pulse.', url: bookURL }))
+          .then(() => announce('Your sketchbook link is ready to travel.'))
+          .catch(error => { if (error?.name === 'AbortError') announce(''); else revealBookLink(); })
+          .finally(() => { state.sharing = false; readyButtons(); });
+      } catch (error) { state.sharing = false; readyButtons(); if (error?.name === 'AbortError') announce(''); else revealBookLink(); }
+    };
+    const bookLinks = dialog.querySelector('.ps-book-links');
+    const bookActionLabel = bookURL ? 'Share sketchbook link' : 'Create a sketchbook link';
+    bookLinks.hidden = !bookURL && !canPublish;
+    dialog.querySelector('.ps-book-link').textContent = bookActionLabel;
+    dialog.querySelector('.ps-book-link').addEventListener('click', shareBook);
+    dialog.querySelector('.ps-book-note').textContent = bookURL
+      ? 'A link opens straight into this painting’s book. No recording needed.'
+      : 'Review what becomes public first. Creating a link also adds your painting to the community gallery.';
+    const bookActions = document.createElement('div'); bookActions.className = 'ps-paper-links';
+    bookActions.hidden = !bookURL && !canPublish;
+    bookActions.innerHTML = '<button type="button" class="ps-paper-link"></button><button type="button" class="ps-book-copy" hidden>Copy sketchbook link</button><input class="ps-book-url" aria-label="Sketchbook link to copy" type="url" readonly hidden>';
+    bookActions.querySelector('.ps-paper-link').textContent = bookActionLabel;
+    bookActions.querySelector('.ps-paper-link').addEventListener('click', shareBook);
+    const bookCopy = bookActions.querySelector('.ps-book-copy'); bookCopy.hidden = !bookURL; bookCopy.addEventListener('click', revealBookLink);
+    // A fallback URL lives outside the collapsed paper section so it is always reachable.
+    bookLinks.append(bookActions.querySelector('.ps-book-url'));
+    dialog.querySelector('.ps-paper').append(bookActions);
     const encoded = encodeURIComponent;
     const destinations = {
       x: `https://x.com/intent/tweet?text=${encoded(caption.replace(link, '').trim())}&url=${encoded(link)}`,
@@ -222,6 +265,7 @@
         readyButtons();
         if (!canShareImage()) primary.querySelector('span').textContent = 'Save image to share';
         announce(canShareImage() ? 'Ready to share with your favorite apps.' : 'Save your painting, then add it to your favorite app.');
+        if (options.openBook === true && publishedURL) openPaper();
         return state.file;
       } catch (error) {
         if (!state.closed && error?.name !== 'AbortError') {
