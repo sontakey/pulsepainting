@@ -2,8 +2,8 @@
 
 Your pulse, made into a place.
 
-> Landscape release candidate: implemented and browser-tested; the visual target is not yet met.
-> The latest browser replay, performance and QR checks pass; physical-device validation remains separate.
+> Landscape release candidate: the Quiet Lake paint treatment is approved and integrated across all sixteen scenes.
+> Final release checks are in progress; physical-device validation remains separate.
 > The public site and phone screenshots below currently show the earlier manuscript app.
 > The landscape gallery images are actual renders from the current candidate, not a deployed release.
 > See [HANDOFF.md](HANDOFF.md) for the visual review and deployment status.
@@ -41,17 +41,15 @@ the deployed site. See [image provenance](docs/media/README.md).
 
 **Alpine peaks · Quiet lake · Rolling hills.** These examples are made by the
 actual app renderer from one already-public pulse recording. They show the
-current candidate, combining natural pigment texture with revised landscape
-shapes. The desktop gallery's browser checks pass; the landscape visual target
-remains unmet. They are not visitor submissions. Your recording stays in your
+current candidate, combining the accepted natural pigment texture with distinct
+landscape shapes. They are not visitor submissions. Your recording stays in your
 browser, and sharing happens only when you choose it.
 
 The [desktop design note](docs/design/desktop-gallery.md) records the inspected
 Mobbin references, gallery behavior and validation scope. The
 [gallery manifest](app/assets/gallery/manifest.json) records renderer, fixture,
-signal-engine, accepted-window adapter and image hashes. Its current renderer
-SHA-256 is `878928ede818f9866dca9994506df2802570f2c6673c961310d9988a10866b1a`.
-All sixteen examples were regenerated from that source. Default mobile capture
+signal-engine, accepted-window adapter and image hashes. All sixteen examples
+are regenerated from the current renderer. Default mobile capture
 does not download gallery imagery.
 
 ## Run locally

@@ -10,10 +10,13 @@ import { fileURLToPath } from 'node:url';
 import { webkit, devices } from 'playwright';
 import { instrumentReportGraphText } from './report-graph-checks.mjs';
 import { checkArtwork, openReportMenu } from './artwork-checks.mjs';
+import { selectReplayLandscape } from './landscape-selection.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const out = path.resolve(root, process.env.PPG_SAFARI_ARTIFACTS || '.dream-loop/safari-session-check');
 const timeoutSeconds = Number(process.env.PPG_SAFARI_TIMEOUT_SECONDS) || 260;
+const family = process.env.PPG_SAFARI_FAMILY || 'quiet-lake';
+const seed = Number(process.env.PPG_SAFARI_SEED) || 39293;
 assert.ok(timeoutSeconds >= 180 && timeoutSeconds <= 600, 'session timeout must be180–600seconds');
 mkdirSync(out, { recursive: true });
 const original = JSON.parse(readFileSync(path.join(root, 'test/fixtures/iphone-200s.json'), 'utf8'));
@@ -30,7 +33,7 @@ const server = createServer((req, res) => {
 });
 await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
 const evidence = { url: process.env.PPG_SAFARI_URL || `http://127.0.0.1:${server.address().port}/dist/index.html`, fixture: 'test/fixtures/iphone-200s.json',
-  scope: 'Playwright WebKit with iPhone13 emulation; camera I/O mocked; no physical Safari or real camera claim.',
+  scope: 'Playwright WebKit with iPhone13 emulation; camera I/O mocked; no physical Safari or real camera claim.', family, seed,
   replay: { rate: '1x wall clock from session start', originalSamples: original.samples.length,
     originalSeconds: (originalEnd - original.samples[0].t) / 1000,
     extension: 'Recorded final60s repeated once with monotonically shifted timestamps, only if automatic measurement needs more than the original recording.',
@@ -71,6 +74,7 @@ try {
   });
   await page.goto(evidence.url);
   await page.evaluate(() => document.fonts.ready);
+  await selectReplayLandscape(page, family, seed);
   await page.waitForFunction(() => window.__paintGpuStats?.ready && paintGPU, null, { timeout: 60000 });
   assert.equal(await page.evaluate(() => window.__paintGpuStats.backend), 'webgpu', 'actual WebKit WebGPU backend initializes');
   await page.screenshot({ path: `${out}/ready.png`, fullPage: true });

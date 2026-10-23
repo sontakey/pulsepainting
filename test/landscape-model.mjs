@@ -4,7 +4,8 @@ import { readFileSync } from 'node:fs';
 import vm from 'node:vm';
 import { replayPublicFixture } from './landscape-fixture.mjs';
 const context = vm.createContext({ console });
-vm.runInContext(readFileSync(new URL('../app/landscape.js', import.meta.url), 'utf8'), context);
+const rendererSource = readFileSync(new URL('../app/landscape.js', import.meta.url), 'utf8');
+vm.runInContext(rendererSource, context);
 const L = context.PulseLandscape;
 const plain = value => JSON.parse(JSON.stringify(value));
 const segment = (start, duration, hz = 60, convert = x => x) => ({ score: .8, channel: 'green', quality: { good: true }, points: Array.from({ length: Math.round(duration * hz) + 1 }, (_, i) => ({ t: start + i / hz, v: convert(Math.sin(i / hz * Math.PI * 2) + .3 * Math.sin(i / hz * Math.PI * 4)) })) });
@@ -159,5 +160,45 @@ for(const candidate of [dropped,fragmentedDelivery]){
   assert.ok(candidate.scene.slots.length<baseline.scene.slots.length,'fragmentation cannot add scene placements');
   assert.deepEqual(plain(candidate.scene.slots),plain(baseline.scene.slots.slice(0,candidate.scene.slots.length)),'source fragmentation leaves the seeded plan/material sequence unchanged');
 }
+
+// Observe the production brush helper without adding a public runtime export.
+// Canvas commands are recorded, not rasterized: this checks source ownership
+// and mirrored pressure independently of native Canvas2D pixel rounding.
+class RecordedBrushPath {
+  constructor(){this.commands=[];}
+  moveTo(...args){this.commands.push(['moveTo',...args]);}
+  quadraticCurveTo(...args){this.commands.push(['quadraticCurveTo',...args]);}
+  closePath(){this.commands.push(['closePath']);}
+  addPath(path){this.commands.push(...path.commands);}
+}
+const brushMarker='global.PulseLandscape=Object.freeze({';
+assert.equal(rendererSource.split(brushMarker).length,2,'the production brush helpers are observed at one module boundary');
+const brushContext=vm.createContext({Path2D:RecordedBrushPath});
+vm.runInContext(rendererSource.replace(brushMarker,'global.__brushTest={strokePaint,pulseImpressions};'+brushMarker),brushContext);
+const brushEvidence=[];
+for(const family of ['coastal-cliffs','quiet-lake']){
+  const scene=brushContext.PulseLandscape.create({seed:39293,family});
+  baseline.segments.forEach(input=>brushContext.PulseLandscape.append(scene,input));
+  const frozen=JSON.stringify(scene),strokes=scene.strokes.filter(s=>s.role==='water'&&!s.material.underpaint);
+  assert.ok(strokes.length>0,`${family}: the actual public-fixture adapter reaches water impressions`);
+  let knots=0,longStrokes=0;
+  for(const stroke of strokes){
+    const paint=brushContext.__brushTest.strokePaint(stroke);
+    const marks=brushContext.__brushTest.pulseImpressions(stroke,paint).flatMap(chunk=>chunk.items);
+    assert.deepEqual(plain(marks.map(({t,v})=>({t,v}))),plain(stroke.points),`${family}: each measured knot owns exactly one impression with its original time and value`);
+    assert.ok(marks.every(mark=>mark.paths.every(path=>path.commands.every(command=>command.slice(1).every(Number.isFinite)))),`${family}: all emitted brush coordinates are finite`);
+    const travel=marks.at(-1).x-marks[0].x;
+    assert.ok(family==='coastal-cliffs'?travel<0:travel>0,`${family}: the public-fixture regression exercises the expected travel direction`);
+    if(Math.abs(travel)>100){
+      longStrokes++;
+      assert.ok(marks.some(mark=>mark.pressure>.35),`${family}: interior brush pressure must exceed the endpoint-only maximum`);
+    }
+    knots+=marks.length;
+  }
+  assert.ok(longStrokes>0,`${family}: the regression includes a full-width pressure interior`);
+  assert.equal(JSON.stringify(scene),frozen,`${family}: brush generation preserves the complete source, domain, quality and accepted-time model`);
+  brushEvidence.push({family,strokes:strokes.length,knots,longStrokes});
+}
+console.log('LANDSCAPE_BRUSH_DIRECTION',JSON.stringify(brushEvidence));
 console.log('LANDSCAPE_FRAGMENTATION',JSON.stringify([baseline,dropped,fragmentedDelivery].map(({scene,segments,...stats})=>({...stats,sourceFragments:scene.strokes.length,slots:scene.slots.length,usableSeconds:scene.usableSeconds,allocatedSeconds:scene.paintSeconds}))));
 console.log('PASS landscape model: 16 families, source provenance, usable-time slot allocation, public-recording adapter fragmentation, repeatability, immutable history, source-preserving organic curves, shared-window amplitudes, duplicates, overlaps, gaps, rejection and extreme amplitudes');

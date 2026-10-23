@@ -10,12 +10,18 @@ import { readFileSync, existsSync, statSync, mkdirSync, writeFileSync } from 'no
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { chromium, devices } from 'playwright';
+import { selectReplayLandscape } from './landscape-selection.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const log = JSON.parse(readFileSync(process.env.PPG_SESSION_LOG || path.join(root, 'test/fixtures/iphone-200s.json'), 'utf8'));
 const duration = Math.max(5, Number(process.env.PPG_PERF_SECONDS) || 20);
 // The checked-in recording's first accepted window ends at 36.337 seconds.
-const preloadSeconds = 40;
+const preloadSeconds = Number(process.env.PPG_PERF_PRELOAD) || 40;
+const family = process.env.PPG_PERF_FAMILY || 'quiet-lake';
+const seed = Number(process.env.PPG_PERF_SEED) || 39293;
+const availableSeconds = (log.samples.at(-1).t - log.samples[0].t) / 1000;
+assert.ok(preloadSeconds >= 40 && preloadSeconds + duration <= availableSeconds,
+  'performance interval must contain accepted, actually recorded samples');
 const output = path.resolve(root, process.env.PPG_PERF_ARTIFACTS || '.dream-loop/gpu-performance');
 mkdirSync(output, { recursive: true });
 const mime = { '.html': 'text/html', '.js': 'application/javascript', '.css': 'text/css', '.woff2': 'font/woff2' };
@@ -45,6 +51,7 @@ function timing(values) {
   };
 }
 async function installReplay(page) {
+  await selectReplayLandscape(page, family, seed);
   await page.evaluate(log => {
     window.PPGMonitor = class extends PPG.PPGMonitor {
       constructor(host, options) {
@@ -98,7 +105,7 @@ async function installReplay(page) {
   }, log);
 }
 let browser;
-const results = { generatedAt: new Date().toISOString(), scope: 'Desktop Chrome with mobile viewport and real streaming replay; camera I/O mocked; no physical-phone or GPU execution-time claim.', threeVersion: JSON.parse(readFileSync(path.join(root, 'node_modules/three/package.json'), 'utf8')).version, viewport: { width: 390, height: 844, deviceScaleFactor: 3 }, preloadSeconds, durationSeconds: duration, cases: [] };
+const results = { generatedAt: new Date().toISOString(), scope: 'Desktop Chrome with mobile viewport and real streaming replay; camera I/O mocked; no physical-phone or GPU execution-time claim.', threeVersion: JSON.parse(readFileSync(path.join(root, 'node_modules/three/package.json'), 'utf8')).version, viewport: { width: 390, height: 844, deviceScaleFactor: 3 }, family, seed, preloadSeconds, durationSeconds: duration, cases: [] };
 try {
   browser = await chromium.launch(process.env.PPG_CHROMIUM ? { executablePath: process.env.PPG_CHROMIUM } : process.platform === 'darwin' ? { channel: 'chrome' } : {});
   results.browser = await browser.version();
@@ -135,6 +142,7 @@ try {
     const entry = await page.evaluate(() => window.__entryPerf);
     assert.ok(!entry.timedOut && entry.frames > 10, `${name}: entry animation rendered and completed`);
     await page.evaluate(seconds => monitor.feedUntil(seconds), preloadSeconds);
+    assert.equal(await page.evaluate(() => landscape.family), family, `${name}: selected landscape is active`);
     assert.ok(await page.evaluate(() => manuscript.segments.length > 0), `${name}: accepted replay waveform is present`);
     const replay = await page.evaluate(({ seconds, preload }) => new Promise(resolve => {
       const intervals = [], activeIntervals = [], renderCPU = [], engineCPU = [];

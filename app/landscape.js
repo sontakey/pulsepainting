@@ -34,7 +34,7 @@
     meadow:{roles:['hill','grass','sky'],cycle:[0,1,1,1,0,1,1,1]},
     'open-ocean':{roles:['water','sky'],cycle:[0,0,0,0,0,1]},
     'alpine-peaks':{roles:['ridge','sky'],cycle:[0,0,0,0,0,0,1]},
-    'quiet-lake':{roles:['shore','water','reflection','sky'],cycle:[0,1,2,1,0,1,2,0,1]},
+    'quiet-lake':{roles:['shore','water','reflection','lake-ridge'],cycle:[0,1,0,3,1,1,0,0,0,1,0,1,0,0,3,1,1,0,0,1,0,0,1,1,3,1,1,1,1,1]},
     'coastal-cliffs':{roles:['shelf','water','cliff','sky'],cycle:[0,2,1,2,1,2,1,2]},
     'river-valley':{roles:['bank-left','water','bank-right','sky'],cycle:[0,2,1,0,2,1]},
     'rolling-hills':{roles:['hill','sky'],cycle:[0,0,0,0,0,1]},
@@ -70,7 +70,10 @@
     const z=curve.depth,role=curve.role,family=curve.family,phase=curve.phase,p=curve.composition;
     const distance=Math.pow(z,1.55);
     let x=42+996*u,y=500;
-    if(role==='sky'){
+    if(family==='quiet-lake'&&role==='lake-ridge'){
+      x=42+996*u;
+      y=478+p.horizon*.24+curve.count*17-(149-curve.count*15)*bell(u,.81+p.asymmetry*.05,.27)-89*bell(u,.22,.20)-33*bell(u,.02,.18);
+    }else if(role==='sky'){
       x=42+996*u;y=(family==='sea-of-clouds'?300:family==='island-archipelago'?325:285)+p.horizon*.4+12*Math.sin(u*Math.PI*1.2+phase);
     }else if(family==='alpine-peaks'){
       // The far silhouette owns one summit. Nearer contours become broad,
@@ -155,20 +158,18 @@
     }else if(role==='pool'){
       x=145+790*u;y=895+distance*85+16*Math.sin(u*Math.PI);
     }else if(role==='shore'){
-      if(curve.count===0){
-        // A complete measured horizon makes even the first short capture
-        // a lake. Later banks grow from it rather than cutting a central gap.
-        x=40+1000*u;y=495-120*bell(u,.06,.25)-98*bell(u,.91,.27)-30*bell(u,.48,.38);
-      }else{
-        const left=curve.count%2===1,width=left?540:470;
-        x=(left?40:570)+width*u;
-        const near=left?u:1-u;
-        y=503-(130+30*z)*bell(near,.05,.28)-(60+25*z)*bell(near,.39,.19);
-        y+=9*z*Math.sin(near*Math.PI);
-      }
+      const left=curve.count%2===0,group=Math.floor(curve.count/2);
+      const width=group===0?(left?475:425):[0,285,245,320][group%4]||265;
+      const inset=group===0?0:[0,30,187,74][group%4];
+      x=(left?42+inset:1038-width-inset)+width*u;
+      const across=left?(x-42)/505:(1038-x)/455;
+      const height=[133,65,105,54,84,44][group%6];
+      y=507-height*bell(across,.03,.48)-27*bell(across,.54,.24)+group*2;
     }else if(role==='reflection'){
-      const left=curve.count%2===0,width=left?445:385;
-      x=(left?45:640)+width*u;y=520+distance*150+3*Math.sin(u*Math.PI);
+      const left=curve.count%2===0,group=Math.floor(curve.count/2),width=(left?430:390)*(1-.12*Math.min(group,4));
+      x=(left?48:1032-width)+width*u;
+      const near=left?u:1-u;
+      y=534+132*bell(near,.08,.31)+62*bell(near,.55,.22)+group*27;
     }else if(role.startsWith('reeds-')){
       const left=role.endsWith('left'),shift=95*Math.sin(curve.count*1.7+p.phase),width=235+z*180;
       const center=(left?230:810)+shift+p.asymmetry*55;
@@ -200,7 +201,14 @@
       if(family==='river-valley'||family==='glacial-fjord'){
         const river=riverAt(family,z,curve);x=river.center+(u-.5)*river.width;y=river.y+5*Math.sin(u*Math.PI);
       }else if(family==='reed-wetland')y=350+distance*610+6*Math.sin(u*Math.PI);
-      else if(family==='quiet-lake'){const width=curve.count<2?900:560+240*noise(curve.count,29),left=40+(1000-width)*radical(curve.count+1);x=left+width*u;y=520+distance*420+4*Math.sin(u*Math.PI);}
+      else if(family==='quiet-lake'){
+        const width=curve.count===0?996:660+330*noise(curve.count,29),left=42+(996-width)*radical(curve.count+1);
+        x=left+width*u;
+        // Water's measured cross-sections occupy one continuous lake plane.
+        // Linear depth spacing avoids the former unpainted middle shelf;
+        // gentle terrain drift belongs to the deterministic artistic guide.
+        y=curve.count===0?507:518+z*330+5*Math.sin(u*4.7+curve.count*1.63);
+      }
       else if(family==='coastal-cliffs'){
         y=330+distance*630+p.horizon;const edge=40+600*Math.pow(clamp((y-440-p.horizon)/425,0,1),1/1.6);x=mix(Math.max(90,edge),1030,u);y+=8*Math.sin(u*Math.PI);
       }else if(family==='aurora-night')y=860+distance*120+5*Math.sin(u*Math.PI);
@@ -214,7 +222,11 @@
     const base=guide(curve,u),before=guide(curve,u-.0001),after=guide(curve,u+.0001);
     const dx=after.x-before.x,dy=after.y-before.y,length=Math.hypot(dx,dy)||1;
     const amplitude=curve.amplitude*(curve.role==='island'?.30+.70*(bell(u,.28,.18)+bell(u,.74,.16)):1)*(curve.endEnvelope?smooth(Math.min(u/.12,(1-u)/.12)):1);
-    let x=base.x+dy/length*amplitude*(v-.5),y=base.y-dx/length*amplitude*(v-.5);
+    const bank=curve.family==='quiet-lake'&&curve.role==='shore';
+    const left=curve.count%2===0,bankEnvelope=bank?.18+.82*smooth((left?1-u:u)/.58):1;
+    // Upright pulse displacement lets a wooded bank descend without leaning
+    // its measured peaks sideways. Only the artistic projection changes.
+    let x=base.x+(bank?0:dy/length)*amplitude*(v-.5),y=base.y-(bank?bankEnvelope:dx/length)*amplitude*(v-.5);
     const fit=curve.fit||{scale:1,x:0,y:0};
     return {x:x*fit.scale+fit.x,y:y*fit.scale+fit.y};
   }
@@ -262,7 +274,7 @@
     // creates another scene element or moves the existing composition.
     const anchors=[.035,.88,.46,.23,.69];
     const clustered=role==='canopy'||role==='grass',row=role==='grass'?Math.floor(count/3):role==='curtain'?Math.floor(count/3):count;
-    const roleAnchors=role==='canopy'?[.08,.44,.86,.26,.72]:role==='curtain'?[.5,.88,.12,.69,.32]:role==='cloud'?[.12,.76,.43,.28,.92]:role==='water'&&scene.family==='quiet-lake'?[.12,.46,.82,.28,.65]:anchors;
+    const roleAnchors=role==='canopy'?[.08,.44,.86,.26,.72]:role==='curtain'?[.5,.88,.12,.69,.32]:role==='cloud'?[.12,.76,.43,.28,.92]:role==='water'&&scene.family==='quiet-lake'?[0,.18,.32,.08,.64,.04,.53,.84,.73,.42,.94,.99,.25,.79]:anchors;
     const depth=roleAnchors[row]??radical(row+2);
     const night=scene.family==='aurora-night';
     const prominence=role==='shore'?.55:depth;
@@ -280,12 +292,15 @@
     if(role==='water'&&['quiet-lake','glacial-fjord','river-valley'].includes(scene.family))amplitude=5+depth*15;
     if(role==='water'&&scene.family==='reed-wetland')amplitude=4+depth*12;
     if(role==='reflection')amplitude=4+depth*5;
-    if(role==='shore')amplitude=count===0?18:24+depth*18;
-    const curve={mapping:'terrain-normal-v1',family:scene.family,role,count,depth,amplitude,endEnvelope:role==='shore',phase:scene.plan.palettePhase*.2,composition:scene.plan};
+    if(role==='shore')amplitude=scene.family==='quiet-lake'?count<2?77:48+depth*25:count===0?28:82+depth*22;
+    if(role==='lake-ridge')amplitude=56;
+    if(scene.family==='quiet-lake'&&role==='reflection')amplitude=-32;
+    if(scene.family==='quiet-lake'&&role==='water')amplitude=1.6+depth*3.6;
+    const curve={mapping:'terrain-normal-v1',projection:scene.family==='quiet-lake'&&role==='shore'?'upright-amplitude-v1':undefined,family:scene.family,role,count,depth,amplitude,endEnvelope:role==='shore',phase:scene.plan.palettePhase*.2,composition:scene.plan};
     // One shared projection preserves connections between ridge, bank and
     // water roles. The guide envelopes are designed inside this paper margin;
     // fitting each line independently would tear the terrain apart.
-    curve.fit={scale:.86,x:75.6,y:75.6};
+    curve.fit=scene.family==='quiet-lake'?{scale:1,x:0,y:0}:{scale:.86,x:75.6,y:75.6};
     const first=curvePoint(curve,0,.5),last=curvePoint(curve,1,.5),a=last.x-first.x,b=last.y-first.y,length=Math.hypot(a,b)||1;
     const frame={a,b,c:b/length*amplitude,d:-a/length*amplitude,e:first.x-b/length*amplitude/2,f:first.y+a/length*amplitude/2};
     const layer=role==='sky'||role==='summit'?0:role==='island'||role==='cloud'||role==='shelf'||role==='shore'?2:role==='curtain'||role==='cascade'?1:role==='water'&&scene.family==='island-archipelago'?0:role==='reflection'?1:depth<.34?0:depth<.68?1:2;
@@ -310,6 +325,9 @@
     const foundationCliff=role==='cliff'&&count<3;
     const foundationCloud=role==='cloud'&&count<2;
     const m=slot.material;
+    // One porous pigment material unifies the scenes. Geometry, palette and
+    // measured amplitude still belong to each scene's own terrain roles.
+    m.painterly=true;
     m.underpaint=foundationLand||foundationBank||foundationWater||foundationCurtain||foundationCliff||foundationCloud;
     if(m.underpaint){
       m.edgeGain*=.65;
@@ -332,6 +350,28 @@
       m.faceUnderpaint=true;m.flow='down';m.reach=210;m.alpha=.64;m.washGain=1.35;
       // Keep the coherent warm face above the initial open-water wash.
       slot.layer=1;
+    }
+    if(scene.family==='quiet-lake'){
+      m.lake=true;
+      if(role==='shore'){
+        m.alpha=count<2?.75:count<6?.92:.98;m.core=count<2?.21:.25;
+        m.lakeColor=count<2?2:Math.floor(count/2)%2===1?1:0;m.lakeFoundation=count<2;
+        delete m.baseY;m.reach=count<2?44:23+depth*22;
+        if(count<2||count%4===0||count%4===1){m.baseY=512+scene.plan.horizon*(1-depth)*.5;if(count<2)m.alpha=.64;}
+        m.edgeGain=.95;m.width=2.8;m.washGain=1.30;
+      }else if(role==='lake-ridge'){
+        slot.layer=0;m.alpha=.45;m.core=.28;m.color=0;m.foliage=false;
+        m.reach=42+depth*18;m.hero=true;m.width=2.8;m.edgeGain=1.25;
+        delete m.baseY;
+      }else if(role==='reflection'){
+        slot.layer=1;m.alpha=.94;m.core=0;m.flow='lake-reflection';m.reach=80;m.edgeGain=0;m.washGain=1.5;
+      }else if(role==='water'){
+        slot.layer=count===0?0:1;m.alpha=count===0?.22:.38+depth*.10;
+        m.core=.25;m.width=2.2+depth*2.0;m.reach=count===0?m.reach:105-52*smooth((depth-.68)/.32);m.edgeGain=1.05;m.washGain=1.12;
+        if(count===0)m.baseY=900;
+        if(count===1||count===2){m.lakeEarly=count;m.reach=count===1?70:76;m.alpha=count===1?.44:.46;}
+        if(count===6){m.lakeBridge=true;m.reach=92;}
+      }
     }
     return slot;
   }
@@ -458,25 +498,32 @@
     if(role==='shelf'||role==='island')palette=[[27,94,74],[121,145,61],[32,111,95]];
     if(role==='canopy')palette=[[24,90,64],[154,162,52],[29,119,96]];
     if(role.startsWith('wall-')&&scene.family==='waterfall-gorge')palette=[[27,88,111],[58,117,125],[36,104,87]];
+    if(scene.family==='quiet-lake'&&role==='reflection')palette=[[9,89,100],[61,126,102],[20,112,130]];
+    if(role==='lake-ridge')palette=[[24,119,229],[64,146,221],[123,181,218]];
+    if(m.lake&&(role==='shore'||m.reflected))palette=[[3,65,77],[116,134,37],[32,119,104]];
+    if(m.lake&&role==='water')palette=[[24,123,204],[27,143,181],[55,148,192]];
+    if(m.reflected)palette=[[5,77,105],[10,99,124],[31,116,132]];
     if(role==='cloud')palette=[[185,201,225],[206,194,228],[177,209,224]];
     // A single trace mixes neighboring pigments continuously. Across a scene,
     // distance and role establish a restrained warm/cool value hierarchy.
-    const blend=.14+.43*(.5+.5*Math.sin(t*Math.PI*1.65+m.phase+stroke.slot*.14));
+    const blend=(m.lake&&role==='shore'?.08:.14)+(m.lakeFoundation?.43:m.lake&&role==='shore'?.23:.43)*(.5+.5*Math.sin(t*Math.PI*1.65+m.phase+stroke.slot*.14));
     let colorIndex=m.color;
     if(m.foliage)colorIndex=role==='shelf'||role==='island'||z>.74?0:Math.floor(z*7)%3;
+    if(m.lake&&(role==='shore'||m.reflected))colorIndex=m.lakeColor;
+    if(m.reflected)colorIndex=m.lakeColor===1?1:0;
     if(role==='dune')colorIndex=z>.6?0:1;
     if(role==='mesa')colorIndex=z>.7?0:z<.3?1:2;
-    const primary=palette[colorIndex],secondary=palette[(colorIndex+1)%3];
+    const primary=palette[colorIndex],secondary=palette[m.lakeFoundation?1:(colorIndex+1)%3];
     const air=night?0:role==='sky'?.40:role==='cloud'?.23:.13*Math.pow(1-z,1.4),paper=[251,248,240];
-    return primary.map((v,i)=>mix(mix(v,secondary[i],blend)*depth,paper[i],air));
+    return primary.map((v,i)=>mix(mix(v,secondary[i],blend)*depth,paper[i],m.lake&&role==='lake-ridge'?air+.45*bell(t,.49,.18):air));
   }
   function pathPoints(ctx,points) { ctx.beginPath();points.forEach((p,i)=>i?ctx.lineTo(p.x,p.y):ctx.moveTo(p.x,p.y)); }
 
-  const paintCache=new WeakMap(),pigmentAtlases=new WeakMap();
+  const paintCache=new WeakMap(),pigmentAtlases=new WeakMap(),reflectionPasses=new WeakMap();
   const INK_LIMIT=8,INK_SIDE=256,INK_LENGTH=1080,INK_PIXEL_LIMIT=INK_LIMIT*INK_SIDE*INK_LENGTH;
-  function pigmentAtlas(doc){
-    let atlas=pigmentAtlases.get(doc);if(atlas)return atlas;
-    const tile=doc.createElement('canvas');tile.width=tile.height=INK_SIDE;
+  function pigmentAtlas(doc,porous=false){
+    let atlas=pigmentAtlases.get(doc);if(atlas&&atlas.porous===porous)return atlas;
+    const tile=atlas?.tile||doc.createElement('canvas');tile.width=tile.height=INK_SIDE;
     const ctx=tile.getContext('2d'),pixels=ctx.createImageData(INK_SIDE,INK_SIDE),seed=38837;
     const grain=Uint8Array.from(global.atob(PIGMENT_GRAIN_BASE64),c=>c.charCodeAt(0));
     // The embedded pigment scan supplies paper tooth; a periodic field varies
@@ -486,13 +533,15 @@
     for(let y=0;y<INK_SIDE;y++)for(let x=0;x<INK_SIDE;x++){
       const natural=grain[x+y*INK_SIDE]/255, broad=field(x,y,8,31),medium=field(x,y,32,619);
       const body=smooth((broad*.63+medium*.37-.18)/.66);
-      const alpha=(.17+natural*.78)*(.90+body*.10),at=(y*INK_SIDE+x)*4;
+      const concentration=porous?.58*field(x,y,5,31)+.28*field(x,y,13,619)+.14*field(x,y,37,977):0;
+      const dry=porous?smooth((.86*concentration+.14*natural-.25)/.42):1;
+      const alpha=porous?dry*(.62+.38*natural)*(.68+.32*smooth((concentration-.25)/.55)):(.17+natural*.78)*(.90+body*.10),at=(y*INK_SIDE+x)*4;
       pixels.data[at]=pixels.data[at+1]=pixels.data[at+2]=255;pixels.data[at+3]=Math.round(alpha*255);
     }
-    ctx.putImageData(pixels,0,0);atlas={tile,inks:new Map(),pixels:0};pigmentAtlases.set(doc,atlas);return atlas;
+    ctx.putImageData(pixels,0,0);atlas={tile,porous,inks:atlas?.inks||new Map(),pixels:atlas?.pixels||0};pigmentAtlases.set(doc,atlas);return atlas;
   }
   function poolPattern(ctx,scene,stroke){
-    const doc=ctx.canvas.ownerDocument||global.document,atlas=pigmentAtlas(doc),m=stroke.material;
+    const doc=ctx.canvas.ownerDocument||global.document,m=stroke.material,atlas=pigmentAtlas(doc,!!m.painterly);
     const vertical=['curtain','cascade','cliff'].includes(stroke.role)&&!m.faceUnderpaint,curve=stroke.transform.curve;
     const first=curvePoint(curve,0,.5),last=curvePoint(curve,1,.5),axis=vertical?'y':'x';
     let from=Math.min(first[axis],last[axis]),to=Math.max(first[axis],last[axis]);
@@ -500,7 +549,7 @@
     // continue beyond the original distant width as the channel widens.
     if(m.channelUnderpaint||m.landUnderpaint){from=75.6;to=1004.4;}
     const colors=Array.from({length:17},(_,i)=>pigment(scene,stroke,i/16));
-    const key=scene.family+':'+stroke.slot+':'+m.grainSeed+':'+from.toFixed(2)+':'+to.toFixed(2)+':'+colors.map(c=>c.map(Math.round).join(',')).join(';');
+    const key=scene.family+':'+stroke.slot+':'+stroke.role+':'+(m.painterly?'porous':'normal')+':'+(m.reflected?'mirror':'body')+':'+m.grainSeed+':'+from.toFixed(2)+':'+to.toFixed(2)+':'+colors.map(c=>c.map(Math.round).join(',')).join(';');
     let ink=atlas.inks.get(key);
     if(ink){atlas.inks.delete(key);atlas.inks.set(key,ink);}else{
       const width=m.underpaint?INK_LENGTH:vertical?INK_SIDE:INK_LENGTH;
@@ -514,17 +563,36 @@
       }
       const tile=doc.createElement('canvas');tile.width=width;tile.height=height;
       const tc=tile.getContext('2d'),mask=tc.createPattern(atlas.tile,'repeat');
-      mask.setTransform({a:1,b:0,c:0,d:1,e:noise(m.grainSeed,71)*INK_SIDE,f:noise(m.grainSeed,211)*INK_SIDE});
-      tc.fillStyle=mask;tc.fillRect(0,0,tile.width,tile.height);tc.globalCompositeOperation='source-in';
+      const grainScale=m.painterly?(stroke.role==='water'?1.05:stroke.role==='reflection'?.90:stroke.role==='lake-ridge'?1.20:1.0+noise(m.grainSeed,93)*.50):1;
+      mask.setTransform({a:grainScale,b:0,c:0,d:grainScale,e:noise(m.grainSeed,71)*INK_SIDE,f:noise(m.grainSeed,211)*INK_SIDE});
+      tc.fillStyle=mask;tc.fillRect(0,0,tile.width,tile.height);
+      tc.globalCompositeOperation='source-in';
       const gradient=tc.createLinearGradient(vertical?0:from,vertical?from:0,vertical?0:to,vertical?to:0);
-      colors.forEach((rgb,i)=>{const u=i/16,fade=m.channelUnderpaint?1:smooth(u/.12)*smooth((1-u)/.14);gradient.addColorStop(u,color(rgb,fade));});tc.fillStyle=gradient;tc.fillRect(0,0,tile.width,tile.height);
+      colors.forEach((rgb,i)=>{const u=i/16,fade=m.channelUnderpaint?1:m.lake?smooth(u/.008)*smooth((1-u)/.012):smooth(u/.12)*smooth((1-u)/.14);gradient.addColorStop(u,color(rgb,fade));});tc.fillStyle=gradient;tc.fillRect(0,0,tile.width,tile.height);
+      if(m.lake&&stroke.role==='water'&&m.underpaint){
+        // A luminous reserve opens the lake; the source-bound wash remains continuous.
+        tc.globalCompositeOperation='destination-out';
+        const reserve=tc.createRadialGradient(570,525,30,570,570,390);
+        reserve.addColorStop(0,'rgba(0,0,0,.78)');reserve.addColorStop(.50,'rgba(0,0,0,.45)');reserve.addColorStop(1,'rgba(0,0,0,0)');
+        tc.fillStyle=reserve;tc.fillRect(0,0,width,height);
+      }
+      if(m.lake&&['shore','lake-ridge'].includes(stroke.role)){
+        tc.globalCompositeOperation='destination-out';
+        for(let pocket=0;pocket<26;pocket++){
+          const x=noise(m.grainSeed,pocket*7+201)*width,y=noise(m.grainSeed,pocket*7+203)*height;
+          const radius=14+noise(m.grainSeed,pocket*7+207)*42;
+          const reserve=tc.createRadialGradient(x,y,0,x,y,radius);
+          reserve.addColorStop(0,'rgba(0,0,0,.52)');reserve.addColorStop(.6,'rgba(0,0,0,.30)');reserve.addColorStop(1,'rgba(0,0,0,0)');tc.fillStyle=reserve;tc.fillRect(x-radius,y-radius,radius*2,radius*2);
+        }
+      }
       if(m.underpaint){
         const samples=[0,.25,.5,.75,1].map(u=>curvePoint(curve,u,.5));
         tc.globalCompositeOperation='destination-in';
         if(!vertical){
           // Continuous absorption into paper, not another hard parallel strip.
           const floor=m.baseY??Math.min(1035,Math.max(...samples.map(p=>p.y))+(m.reach??160));
-          const mask=tc.createLinearGradient(0,floor-185,0,floor-4);
+          const falloff=m.lake&&stroke.role==='water'?145:185;
+          const mask=tc.createLinearGradient(0,floor-falloff,0,floor-4);
           mask.addColorStop(0,'rgba(0,0,0,1)');mask.addColorStop(.45,'rgba(0,0,0,.82)');mask.addColorStop(.80,'rgba(0,0,0,.22)');mask.addColorStop(1,'rgba(0,0,0,0)');
           tc.fillStyle=mask;tc.fillRect(0,0,width,height);
         }else if(stroke.role==='curtain'){
@@ -541,8 +609,17 @@
     }
     return ink.pattern;
   }
+  function materialField(seed,x,salt){const cell=Math.floor(x),u=smooth(x-cell);return mix(noise(seed,cell+salt),noise(seed,cell+salt+1),u);}
   function strokePaint(stroke){
     let paint=paintCache.get(stroke);if(paint)return paint;
+    if(stroke._mirrorOf){
+      // A reflected deposit is a material pass of this exact accepted path.
+      // It adds no scene stroke, slot, source interval, sample or usable time.
+      const original=strokePaint(stroke._mirrorOf),curve=original.curve;
+      const horizon=512+curve.composition.horizon*(1-curve.depth)*.5;
+      const points=original.points.map(p=>({...p,y:horizon+(horizon-p.y)*1.62,nx:-p.nx,ny:p.ny,dx:0,dy:(p.y-horizon)*1.62,bleed:p.bleed*.35,rag:p.rag*.25,under:{x:p.x,y:horizon}}));
+      paint={points,flow:'lake-reflection',land:false,curve};paintCache.set(stroke,paint);return paint;
+    }
     const source=sampleStroke(stroke),m=stroke.material,seed=m.grainSeed,curve=stroke.transform.curve;
     const flow=m.flow||'down',land=!!m.land,reach=Math.min(m.underpaint?360:125,m.reach??m.wash*1.6);
     const points=source.map(p=>{
@@ -550,17 +627,286 @@
       const perspective=m.perspective==='along'?.25+.75*smooth(u):1;
       const w=.78+.30*Math.sin(u*9+noise(seed,13)*6)+.16*Math.sin(u*27+noise(seed,33)*6)+.08*Math.sin(u*67+noise(seed,53)*6);
       let dx=0,dy=reach*w*perspective*(stroke.role==='curtain'?.40+.60*Math.pow(1-u,.6):1);
-      if(flow==='outward'){dx=(m.side||1)*dy;dy*=.08;}
+      if(flow==='lake-reflection'){dy=(510+curve.composition.horizon*(1-curve.depth)*.5)*curve.fit.scale+curve.fit.y-p.y;}
+      else if(flow==='outward'){dx=(m.side||1)*dy;dy*=.08;}
       else if(flow==='curtain'){dx=p.nx*dy;dy=p.ny*dy;}
       else if(Number.isFinite(m.baseY)){const floor=m.baseY+(m.underpaint?22*Math.sin(u*5+m.phase)+12*Math.sin(u*17+m.phase*.3):0);dy=Math.max(3,floor-p.y);}
-      if(!m.underpaint&&!Number.isFinite(m.baseY)){
+      if(flow!=='lake-reflection'&&!m.underpaint&&!Number.isFinite(m.baseY)){
         const guide=curvePoint(curve,u,.5);
         if(flow==='outward')dx+=(guide.x-p.x)*.72;
         else if(flow!=='curtain')dy=Math.max(2,guide.y+reach*w*perspective-p.y);
       }
-      return {...p,u,perspective,dx,dy,under:{x:p.x+dx,y:p.y+dy}};
+      if(m.lake&&stroke.role==='lake-ridge')dy=Math.min(dy,Math.max(4,511-p.y));
+      let bleed=0,rag=0,drift=0,pool=1;
+      if(m.painterly){
+        const macro=materialField(seed,u*13,701),meso=materialField(seed,u*41,1701),fine=materialField(seed,u*137,2701);
+        const ends=smooth(u/.025)*smooth((1-u)/.025);
+        bleed=(1.5+macro*6+meso*3+fine*1.7)*ends;
+        rag=((macro-.5)*19+(meso-.5)*11+(fine-.5)*4)*ends;
+        drift=(materialField(seed,u*27,3701)-.5)*7*ends;
+        pool=smooth((materialField(seed,u*9,4701)-.28)/.48);
+        if(stroke.role==='shore'){bleed*=.32;rag*=.48;}
+        if(stroke.role==='water'&&!m.underpaint){bleed*=.40;rag*=.28;}
+        if(stroke.role==='lake-ridge'){bleed*=.67;rag*=.75;}
+        if(!m.lake){
+          // Preserve delicate cloud/aurora edges and the narrow river corridor.
+          // A material bleed never substitutes a new terrain or pulse path.
+          const restraint=stroke.role==='sky'||stroke.role==='cloud'||stroke.role==='curtain'?.35:m.channelUnderpaint||m.landUnderpaint?.45:.65;
+          bleed*=restraint;rag*=restraint;drift*=restraint;
+        }
+      }
+      return {...p,u,perspective,dx,dy,bleed,rag,drift,pool,under:{x:p.x+dx,y:p.y+dy}};
     });
     paint={points,flow,land,curve};paintCache.set(stroke,paint);return paint;
+  }
+  function nibHull(nodes,roundStart=true,roundEnd=true){
+    const path=new global.Path2D();if(nodes.length<2)return path;
+    const first=nodes[0],last=nodes.at(-1);
+    const top=p=>({x:p.x-p.nx*p.above,y:p.y-p.ny*p.above});
+    const bottom=p=>({x:p.x+p.nx*p.below,y:p.y+p.ny*p.below});
+    const a=top(first),b=top(last),c=bottom(last),d=bottom(first);
+    path.moveTo(a.x,a.y);for(let i=1;i<nodes.length;i++){const p=top(nodes[i]);path.lineTo(p.x,p.y);}
+    if(roundEnd){const radius=(last.above+last.below)*.64;path.bezierCurveTo(b.x+last.ny*radius,b.y-last.nx*radius,c.x+last.ny*radius,c.y-last.nx*radius,c.x,c.y);}else path.lineTo(c.x,c.y);
+    for(let i=nodes.length-2;i>=0;i--){const p=bottom(nodes[i]);path.lineTo(p.x,p.y);}
+    if(roundStart){const radius=(first.above+first.below)*.64;path.bezierCurveTo(d.x-first.ny*radius,d.y+first.nx*radius,a.x-first.ny*radius,a.y+first.nx*radius,a.x,a.y);}else path.lineTo(a.x,a.y);
+    path.closePath();
+    // Reverse-wound dry paper channels belong to each positive pigment body.
+    // Other overlapping marks can naturally cover them; no composed paint is erased.
+    let hole=[];
+    const closeHole=()=>{if(hole.length>2){let q=hole.at(-1);path.moveTo(q.x+q.nx*q.voidTop,q.y+q.ny*q.voidTop);for(let i=hole.length-2;i>=0;i--){q=hole[i];path.lineTo(q.x+q.nx*q.voidTop,q.y+q.ny*q.voidTop);}for(q of hole)path.lineTo(q.x+q.nx*q.voidBottom,q.y+q.ny*q.voidBottom);path.closePath();}hole=[];};
+    for(let i=0;i<nodes.length;i++){const q=nodes[i];if((q.voidBottom??0)-(q.voidTop??0)>.04){if(!hole.length&&i)hole.push(nodes[i-1]);hole.push(q);}else if(hole.length){hole.push(q);closeHole();}}
+    closeHole();return path;
+  }
+  function pigmentIslands(stroke,paint){
+    if(paint.islands)return paint.islands;
+    const m=stroke.material,seed=m.grainSeed,z=m.depth??.5,source=paint.points,first=source[0],last=source.at(-1),reflection=!!m.reflected;
+    const curve=paint.curve,a=curvePoint(curve,0,.5),b=curvePoint(curve,1,.5),span=Math.max(1,Math.hypot(b.x-a.x,b.y-a.y));
+    const horizon=512+curve.composition.horizon*(1-curve.depth)*.5,groups=Array.from({length:3},()=>[]);
+    const at=u=>{
+      let lo=0,hi=source.length-1;while(hi-lo>1){const mid=(lo+hi)>>1;if(source[mid].u<=u)lo=mid;else hi=mid;}
+      const p=source[lo],q=source[hi],v=q.u>p.u?clamp((u-p.u)/(q.u-p.u),0,1):0;
+      return {x:mix(p.x,q.x,v),y:mix(p.y,q.y,v),t:mix(p.t,q.t,v),u,nx:mix(p.nx,q.nx,v),ny:mix(p.ny,q.ny,v)};
+    };
+    const emit=(nodes,group,roundStart,roundEnd,pool,salt=0)=>{
+      if(nodes.length<2)return;
+      // Paper tooth alters the positive pigment support itself. The measured
+      // core is untouched; dry channels and edge losses stay inside its nib.
+      const startU=nodes[0].u,endU=nodes.at(-1).u,runs=[];let run=[],dryEnd=null;
+      const lift=v=>{const a=clamp(v,0,1);return Math.sqrt(a*(2-a));};
+      for(const q of nodes){
+        const x=q.u*span,wet=materialField(seed,x/9,12031+salt),tooth=materialField(seed,x/1.55,12731+salt);
+        const dry=.72+.28*smooth((wet-.10)/.20),tip=Math.min(lift((q.u-startU)*span/(roundStart?10:5)),lift((endU-q.u)*span/(roundEnd?13:5)));
+        const topLoss=q.above*.05+.10+.55*materialField(seed,x/2.8,13101+salt)+.30*tooth;
+        const lowLoss=q.below*.05+.10+.55*materialField(seed,x/2.1,14101+salt)+.30*(1-tooth);
+        const above=Math.max(0,q.above-topLoss)*dry*tip,below=Math.max(0,q.below-lowLoss)*dry*tip;
+        if(above+below<.22){const zero={...q,above:0,below:0,voidTop:0,voidBottom:0};if(run.length>1){run.push(zero);runs.push(run);}run=[];dryEnd=zero;continue;}
+        if(!run.length&&dryEnd){run.push(dryEnd);dryEnd=null;}
+        const paper=smooth((.21-materialField(seed,x/8,17101+salt))/.16),center=(below-above)*.30+Math.min(above,below)*(materialField(seed,x/13,18101+salt)-.5)*.72,voidRadius=Math.min(1.25,Math.min(above,below)*.22)*paper*(.40+.60*materialField(seed,x/.95,19101+salt));
+        run.push({...q,above,below,voidTop:center-voidRadius,voidBottom:center+voidRadius});
+      }
+      if(run.length>1)runs.push(run);
+      for(const body of runs){
+        // Dry lifts end with tiny uneven deposits rather than a vector cap.
+        // Each detached body keeps its original source-time range.
+        const path=nibHull(body,false,false),edgePath=new global.Path2D(),edgeNodes=[];
+        let active=false;
+        for(let j=1;j<body.length-1;j++){
+          const q=body[j],x=q.u*span,wet=materialField(seed,x/14,15101+salt);
+          const present=wet>(reflection?.64:.54)&&pool>.28;
+          if(!present){active=false;continue;}
+          const lower=materialField(seed,x/32,16101+salt)>.66;
+          const radius=lower?q.below:-q.above;
+          const node={x:q.x+q.nx*radius*.93,y:q.y+q.ny*radius*.93,t:q.t,move:!active};
+          edgeNodes.push(node);active?edgePath.lineTo(node.x,node.y):edgePath.moveTo(node.x,node.y);active=true;
+        }
+        groups[group].push({nodes:body,path,edgePath,edgeNodes,pooled:edgeNodes.length>1,roundStart:false,roundEnd:false,start:body[0].t,end:body.at(-1).t});
+      }
+    };
+    // The same accepted cross-section wets an irregular depth footprint.
+    // Interleaved pigment patches occupy that field, not parallel copies of
+    // accepted traces. Their phases/coverage are fixed in slot coordinates.
+    const lanes=reflection?1:3;
+    for(let lane=0;lane<lanes;lane++){
+      const accent=!reflection&&lane===lanes-1;
+      let u=-noise(seed,1021+lane*211)*.11,window=0;
+      while(u<1){
+        const salt=5101+window*37+lane*2309;
+        const extent=(reflection?68+noise(seed,salt)*102:accent?48+noise(seed,salt)*110:125+noise(seed,salt)*220)/span;
+        const end=u+extent,lo=Math.max(u,first.u),hi=Math.min(end,last.u);
+        if(hi-lo>.001&&noise(seed,salt+3)>(reflection?.07:accent?.58:.09)){
+          const middle=at(clamp((u+end)/2,first.u,last.u)),available=Math.max(0,middle.y-horizon);
+          const tiers=reflection?clamp(Math.ceil(available/19),2,11):1;
+          const weights=Array.from({length:tiers},(_,j)=>.56+noise(seed,salt+j*131+107)*1.04),weightTotal=weights.reduce((a,b)=>a+b,0);let tierStart=0;
+          for(let tier=0;tier<tiers;tier++){
+            const salt2=salt+tier*701,pitch=available*weights[tier]/weightTotal,level=(tierStart+weights[tier]*.5)/weightTotal;tierStart+=weights[tier];
+            if(reflection&&noise(seed,salt2+5)<(tier<2?.03:.12))continue;
+            const shared=reflection?noise(seed,salt+Math.floor(tier/3)*107+9):0;
+            const inset=reflection?extent*(level*.11+shared*.03):0;
+            const drift=reflection?extent*(noise(seed,salt+Math.floor(tier/2)*149+43)-.5)*.68:0;
+            let left=u+inset+drift,right=end-inset*.60+drift;
+            // The first two real water traces form complementary passages.
+            // Their primary wash still follows the whole accepted source;
+            // only the secondary pigment footprint is grouped asymmetrically.
+            if(m.lakeEarly&&lane===1){left=Math.max(left,m.lakeEarly===1?.015:.42);right=Math.min(right,m.lakeEarly===1?.64:.985);}
+            const start=Math.max(left,first.u),finish=Math.min(right,last.u);if(finish-start<.001)continue;
+            const nodes=[],num=Math.max(4,Math.ceil((finish-start)*span/1.25));
+            for(let i=0;i<=num;i++){
+              const q=at(mix(start,finish,i/num)),local=clamp((q.u-left)/(right-left),0,1);
+              const broad=materialField(seed,q.u*17,6101+lane*229),upper=materialField(seed,q.u*47,7101+lane*313+tier*53),lower=materialField(seed,q.u*61,8101+lane*331+tier*71);
+              const ends=reflection?Math.min(1,.36+Math.min(local,1-local)*5.0):1;
+              if(reflection){
+                const depth=Math.max(0,q.y-horizon),radius=pitch*(.48+.16*noise(seed,salt2+19))*(.83+.22*upper);
+                const cy=horizon+level*(available*.96+depth*.04)+(upper-.5)*.7;
+                if(cy-radius<horizon+1||cy+radius*1.22>q.y-1){emit(nodes.splice(0),level<.22?2:level>.75?0:Math.floor(noise(seed,salt+Math.floor(tier/2)*173)*3),true,true,noise(seed,salt2+31),salt2);continue;}
+                nodes.push({...q,x:q.x,y:cy,nx:0,ny:1,above:radius*ends,below:radius*(.77+.38*lower)*ends});
+              }else{
+                q.nx=0;q.ny=1;
+                const wet=materialField(seed,q.u*8,9201+lane*431),branch=materialField(seed,q.u*29,10301+lane*433);
+                const offset=(accent?-.035:lane*(m.lakeEarly?.40:.48)-.10)*(m.reach??90);
+                const neck=.58+.42*smooth((broad-.12)/.65);
+                const radius=(accent?.75+z*.65:(10.5+z*7.5)*(m.lakeBridge?1.4:1))*(.80+.34*noise(seed,salt+19))*neck*ends;
+                nodes.push({...q,x:q.x,y:q.y+offset,above:Math.max(.20,radius*(.62+.70*upper)),below:Math.max(.20,radius*(.57+.78*lower))});
+              }
+            }
+            const focused=m.lakeEarly&&!accent&&Math.abs((start+finish)/2-(m.lakeEarly===1?.31:.70))<.18;
+            emit(nodes,reflection?(level<.22?2:level>.75?0:Math.floor(noise(seed,salt+Math.floor(tier/2)*173)*3)):accent?0:focused?2:Math.floor(noise(seed,salt2+29)*3),start<=left+1e-7,finish>=right-1e-7,noise(seed,salt2+31),salt2);
+          }
+        }
+        u=end+(reflection?(-extent*span*.26)+noise(seed,salt+41)*6:4+noise(seed,salt+41)*19)/span;window++;
+      }
+    }
+    const chunks=[];
+    groups.forEach((marks,group)=>{
+      marks.sort((a,b)=>a.end-b.end);
+      for(let offset=0;offset<marks.length;offset+=8){
+        const items=marks.slice(offset,offset+8),path=new global.Path2D(),edge=new global.Path2D();
+        for(const mark of items){path.addPath(mark.path);if(mark.pooled)edge.addPath(mark.edgePath);}
+        chunks.push({group,items,path,edge,start:Math.min(...items.map(m=>m.start)),end:Math.max(...items.map(m=>m.end))});
+      }
+    });
+    paint.islands=chunks;return chunks;
+  }
+  function drawPigmentIslands(ctx,stroke,paint,wash,alpha,stop){
+    const z=stroke.material.depth??.5;
+    ctx.fillStyle=ctx.strokeStyle=wash;ctx.lineCap='round';ctx.lineJoin='round';
+    const draw=(path,edge,group)=>{
+      ctx.globalAlpha=clamp(alpha*[.64,.96,1.20][group],0,1);ctx.fill(path);
+      if(!stroke.material.reflected){ctx.globalAlpha=alpha*.085;ctx.lineWidth=2.6;ctx.stroke(path);}
+      ctx.globalAlpha=alpha*.43;ctx.lineWidth=.65+z*.30;ctx.stroke(edge);
+    };
+    for(const chunk of pigmentIslands(stroke,paint)){
+      if(stop>=chunk.end){draw(chunk.path,chunk.edge,chunk.group);continue;}
+      if(stop<=chunk.start)continue;
+      const visible=new global.Path2D(),visibleEdge=new global.Path2D();
+      const prefix=(nodes,time)=>{
+        const out=[];
+        for(let i=0;i<nodes.length;i++){
+          const q=nodes[i];if(q.t<=time){out.push(q);continue;}
+          if(i&&nodes[i-1].t<time){const p=nodes[i-1],v=(time-p.t)/(q.t-p.t),tip={};for(const key of Object.keys(p))tip[key]=typeof p[key]==='number'?mix(p[key],q[key],v):p[key];tip.t=time;out.push(tip);}
+          break;
+        }
+        return out;
+      };
+      for(const mark of chunk.items){
+        if(stop>=mark.end){visible.addPath(mark.path);visibleEdge.addPath(mark.edgePath);continue;}
+        if(stop<=mark.start)continue;
+        const nodes=prefix(mark.nodes,stop);if(nodes.length>1)visible.addPath(nibHull(nodes,mark.roundStart,false));
+        const edge=prefix(mark.edgeNodes,stop);if(edge.length>1){visibleEdge.moveTo(edge[0].x,edge[0].y);for(let i=1;i<edge.length;i++)edge[i].move?visibleEdge.moveTo(edge[i].x,edge[i].y):visibleEdge.lineTo(edge[i].x,edge[i].y);}
+      }
+      // Completed and partial windows share one coverage pass. Switching to
+      // the cached complete chunk must not remove accumulated overlap alpha.
+      draw(visible,visibleEdge,chunk.group);
+    }
+  }
+  function pulseCore(stroke,paint){
+    if(paint.pulseCore)return paint.pulseCore;
+    const curve=stroke.transform.curve,water=stroke.material.lake&&stroke.role==='water',strong=water&&[4,7,11].includes(curve.count);
+    // The wash stays a calm plane; this pigment edge gives the same measured
+    // samples a readable artistic amplitude. The source/domain never change.
+    const projected=water?{...stroke,transform:{...stroke.transform,curve:{...curve,amplitude:strong?19+curve.depth*14:curve.count<3?22:14+curve.depth*13}}}:stroke;
+    const nodes=sampleStroke(projected).map(q=>{const u=clamp((stroke.slotStart+q.t-stroke.sourceStart)/SLOT_SECONDS,0,1),edge=water?7+curve.depth*10:0;return {...q,u,nx:water?0:q.nx,ny:water?1:q.ny,above:water?.65:0,below:edge*(.62+.38*materialField(stroke.material.grainSeed,u*37,20501))};});
+    paint.pulseCore=nodes;paint.coreStrong=strong;return nodes;
+  }
+  function pulseImpressions(stroke,paint){
+    if(paint.pulseImpressions)return paint.pulseImpressions;
+    const curve=paint.curve,z=curve.depth,seed=stroke.material.grainSeed,core=pulseCore(stroke,paint);
+    const originalTimes=new Set(stroke.points.map(q=>q.t));
+    // Every original measured knot owns one pressure impression. Hermite
+    // interpolation remains available in pulseCore, but no fabricated knot
+    // or repeated accepted wave is needed to populate this pigment field.
+    const source=core.filter(q=>originalTimes.has(q.t)),first=source[0],last=source.at(-1),items=[];
+    const dab=(q,rx,ry,dy,salt)=>{
+      const path=new global.Path2D(),rim=[];
+      // Small rounded ragged tips replace long upper/lower ribbon polygons.
+      // All impressions wind in the same direction and have no cutout holes.
+      for(let j=0;j<10;j++){
+        const angle=j*Math.PI*2/10,r=.74+.26*noise(seed,salt+j*113);
+        rim.push({x:q.x+Math.cos(angle)*rx*r,y:q.y+dy+Math.sin(angle)*ry*r});
+      }
+      const a=rim.at(-1),b=rim[0];path.moveTo((a.x+b.x)/2,(a.y+b.y)/2);
+      for(let j=0;j<rim.length;j++){const a=rim[j],b=rim[(j+1)%rim.length];path.quadraticCurveTo(a.x,a.y,(a.x+b.x)/2,(a.y+b.y)/2);}
+      path.closePath();return path;
+    };
+    for(const q of source){
+      const unit=normalized(q.v,stroke.transform.domain.min,stroke.transform.domain.max),key=Math.round(q.t*1e7);
+      const wet=materialField(seed,q.x/31,41301),tooth=materialField(seed,q.x/8,41901);
+      // Mirrored coastal strokes travel right to left. Taper only their ends,
+      // rather than reducing pressure throughout the whole measured path.
+      const direction=last.x>=first.x?1:-1;
+      const ends=.35+.65*Math.min(smooth((q.x-first.x)*direction/18),smooth((last.x-q.x)*direction/23));
+      const pressure=(.69+.31*unit)*(.67+.33*wet)*ends;
+      const rx=(8+z*8+tooth*4)*(.63+.37*pressure),ry=(6+z*6+unit*2)*pressure;
+      const dy=ry*.62,halo=dab(q,rx*(1.28+tooth*.16),ry*(1.45+wet*.22)+1.2*ends,dy+ry*.20,key+42101);
+      const body=dab(q,rx,ry,dy,key+42901),pool=new global.Path2D();
+      // Local concentration is another small impression inside the wet tip,
+      // selected by the real normalized sample value and material pressure.
+      if(unit*(.5+wet*.5)>.27)pool.addPath(dab(q,rx*(.36+tooth*.19),ry*(.34+wet*.22),dy-ry*.13,key+43701));
+      items.push({...q,pressure,paths:[halo,body,pool]});
+    }
+    const chunks=[];
+    for(let offset=0;offset<items.length;offset+=64){
+      const group=items.slice(offset,offset+64),paths=Array.from({length:3},()=>new global.Path2D());
+      for(const item of group)for(let pass=0;pass<3;pass++)paths[pass].addPath(item.paths[pass]);
+      chunks.push({items:group,paths,start:group[0].t,end:group.at(-1).t});
+    }
+    paint.pulseImpressions=chunks;return chunks;
+  }
+  function markPrefix(nodes,stop){
+    const prefix=[];
+    for(let i=0;i<nodes.length;i++){
+      const q=nodes[i];if(q.t<=stop){prefix.push(q);continue;}
+      if(i&&nodes[i-1].t<stop){const p=nodes[i-1],v=(stop-p.t)/(q.t-p.t),tip={};for(const key of Object.keys(p))tip[key]=typeof p[key]==='number'?mix(p[key],q[key],v):p[key];tip.t=stop;prefix.push(tip);}break;
+    }
+    return prefix;
+  }
+  function drawPulseImpressions(ctx,scene,stroke,paint,alpha,stop){
+    if(stop<=stroke.sourceStart)return;
+    const wash=poolPattern(ctx,scene,stroke),z=paint.curve.depth,density=(.71+stroke.score*.29)*(.74+z*.26);
+    ctx.save();ctx.fillStyle=wash;
+    for(const chunk of pulseImpressions(stroke,paint)){
+      if(stop<chunk.start)break;
+      const complete=stop>=chunk.end;
+      const paths=complete?chunk.paths:Array.from({length:3},()=>new global.Path2D());
+      if(!complete){
+        for(const item of chunk.items){if(item.t>stop)break;for(let pass=0;pass<3;pass++)paths[pass].addPath(item.paths[pass]);}
+      }
+      // Full and active chunks use the exact same positive-winding unions,
+      // alpha and pass order. Completing a chunk cannot erase an earlier dab.
+      ctx.globalAlpha=alpha*density*.36;ctx.save();ctx.clip(paths[0]);ctx.fillRect(0,0,WORLD,WORLD);ctx.restore();
+      ctx.globalAlpha=density*(.45+z*.09);ctx.save();ctx.clip(paths[1]);ctx.fillRect(0,0,WORLD,WORLD);ctx.restore();
+      ctx.globalAlpha=density*(.20+z*.13);ctx.save();ctx.clip(paths[2]);ctx.fillRect(0,0,WORLD,WORLD);ctx.restore();
+      if(!complete)break;
+    }
+    ctx.restore();
+  }
+  function drawPulseCore(ctx,scene,stroke,paint,alpha,stop){
+    const ridge=stroke.role==='lake-ridge',source=pulseCore(stroke,paint),nodes=markPrefix(source,stop);
+    if(nodes.length<2)return;
+    ctx.save();ctx.lineCap='round';ctx.lineJoin='round';
+    const curve=paint.curve,first=curvePoint(curve,0,.5),last=curvePoint(curve,1,.5),gradient=ctx.createLinearGradient(first.x,first.y,last.x,last.y);
+    for(let i=0;i<=12;i++){const u=i/12,base=pigment(scene,stroke,u,ridge?.77:.73),ends=smooth(u/.025)*smooth((1-u)/.03);gradient.addColorStop(u,color(base,ends));}
+    pathPoints(ctx,nodes);ctx.strokeStyle=gradient;ctx.globalAlpha=alpha*(ridge?.66:.62);ctx.lineWidth=ridge?2.25:2.5;ctx.stroke();
+    ctx.strokeStyle=poolPattern(ctx,scene,stroke);ctx.globalAlpha=alpha*.14;ctx.lineWidth=4.2;ctx.stroke();ctx.restore();
   }
   function drawStroke(ctx,scene,stroke,progress=1){
     if(progress<=0)return;
@@ -579,8 +925,11 @@
       const river=riverAt(family,(low+high)/2,curve),left=(river.center-river.width/2)*fit.scale+fit.x,right=(river.center+river.width/2)*fit.scale+fit.x;
       return {x:inside?clamp(x,left,right):role.endsWith('left')?Math.min(x,left):Math.max(x,right),y};
     };
-    const support=(amount)=>{
-      ctx.beginPath();points.forEach((p,i)=>i?ctx.lineTo(p.x-p.nx*.8,p.y-p.ny*.8):ctx.moveTo(p.x-p.nx*.8,p.y-p.ny*.8));
+    const support=(amount,absorption=0)=>{
+      ctx.beginPath();points.forEach((p,i)=>{
+        const edge=m.painterly?p.bleed*absorption:.8,x=p.x-p.nx*edge,y=p.y-p.ny*edge;
+        i?ctx.lineTo(x,y):ctx.moveTo(x,y);
+      });
       if(m.channelUnderpaint||m.landUnderpaint){
         const curve=paint.curve,fit=curve.fit,start=curve.depth,finish=mix(start,1,amount),leftU=points[0].u,rightU=points.at(-1).u;
         const at=(z,u)=>{
@@ -592,7 +941,7 @@
         let q=at(finish,leftU);ctx.lineTo(q.x,q.y);
         for(let i=15;i>=0;i--){q=at(mix(start,finish,i/16),leftU);ctx.lineTo(q.x,q.y);}
       }else{
-        for(let i=points.length-1;i>=0;i--){const p=points[i];const q=confine(p.x+p.dx*amount,p.y+p.dy*amount);ctx.lineTo(q.x,q.y);}
+        for(let i=points.length-1;i>=0;i--){const p=points[i];const q=confine(p.x+p.dx*amount+(m.painterly?p.drift*amount:0),p.y+p.dy*amount+(m.painterly?p.rag*amount:0));ctx.lineTo(q.x,q.y);}
       }
       ctx.closePath();
     };
@@ -605,31 +954,45 @@
       for(let i=32;i>=0;i--){const river=riverAt(curve.family,i/32,curve);ctx.lineTo((river.center+side*river.width/2)*fit.scale+fit.x,river.y*fit.scale+fit.y);}
       ctx.lineTo(side<0?0:WORLD,0);ctx.closePath();ctx.clip();
     }
-    ctx.globalCompositeOperation=night?'screen':stroke.role==='cloud'?'source-over':'multiply';
+    ctx.globalCompositeOperation=night?'screen':stroke.role==='cloud'||m.lake&&stroke.role==='shore'?'source-over':'multiply';
     const wash=poolPattern(ctx,scene,stroke);
+    if((m.painterly&&['water','pool'].includes(stroke.role)&&!m.underpaint)||m.reflected){
+      if(m.reflected){support(1,0);ctx.clip();drawPigmentIslands(ctx,stroke,paint,wash,alpha,stop);}
+      else drawPulseImpressions(ctx,scene,stroke,paint,alpha,stop);
+      ctx.restore();return;
+    }
     // Uneven, overlapping deposits form one wash. Most pigment pools
     // close to its measured edge; long soft bleeds and dry pockets vary by slot.
-    const wetness=noise(m.grainSeed,801),body=m.underpaint?1.5:night&&stroke.role==='curtain'?2.25:delicate?.85:wet?.95:1.25;
-    const deposits=m.underpaint?[[1,.36],[.90,.29],[.72,.23]]:[[1,.17],[.82,.28],[.46+.18*wetness,.45]];
-    for(const [extent,opacity] of deposits){
-      ctx.save();support(extent);ctx.clip();ctx.globalAlpha=alpha*opacity*body*(m.washGain??1);ctx.fillStyle=wash;ctx.fillRect(0,0,WORLD,WORLD);ctx.restore();
+    const wetness=noise(m.grainSeed,801),body=m.underpaint?1.5:m.painterly?(delicate?1.25:wet?1.45:1.70):night&&stroke.role==='curtain'?2.25:delicate?.85:wet?.95:1.25;
+    const deposits=m.painterly?[[1.13,.18,1.3],[1,.40,.55],[.69,.35,.10]]:m.underpaint?[[1,.36],[.90,.29],[.72,.23]]:[[1,.17],[.82,.28],[.46+.18*wetness,.45]];
+    for(const [extent,opacity,absorption] of deposits){
+      ctx.save();support(extent,absorption||0);ctx.clip();ctx.globalAlpha=alpha*opacity*body*(m.washGain??1);ctx.fillStyle=wash;ctx.fillRect(0,0,WORLD,WORLD);ctx.restore();
     }
     // Local pooling has the real waveform as its boundary. It is strongest in
     // selected foreground marks, rather than the same dark outline everywhere.
-    ctx.save();support(1);ctx.clip();pathPoints(ctx,points);ctx.strokeStyle=wash;
-    ctx.globalAlpha=alpha*(delicate?.18:m.hero?.45:.20)*(m.washGain??1);ctx.lineWidth=delicate?7:9+depth*10;ctx.lineJoin='round';ctx.lineCap='round';ctx.stroke();ctx.restore();
+    ctx.save();support(1,.32);ctx.clip();pathPoints(ctx,points);ctx.strokeStyle=wash;
+    ctx.globalAlpha=m.lake&&stroke.role==='reflection'?0:alpha*(delicate?.18:m.hero?.45:.20)*(m.washGain??1);ctx.lineWidth=delicate?7:9+depth*10;ctx.lineJoin='round';ctx.lineCap='round';ctx.stroke();ctx.restore();
     ctx.lineJoin='round';ctx.lineCap='round';
     const chunk=12,edge=(stroke.role==='cloud'?.48:delicate?.28:wet?.53:.65)+m.core*.48;
     const edgeCoverage=m.hero?.84:wet?.59:.25;
     for(let first=0;first<points.length-1;first+=chunk){
       const end=Math.min(points.length,first+chunk+1),part=points.slice(first,end),u=part[0].u;
       const grain=.45+.55*noise(m.grainSeed,Math.floor(u*180)+313);
-      const lostEdge=.15+.85*smooth((Math.sin(u*12+m.phase+noise(m.grainSeed,67)*6)+.45)/1.3);
+      const lostEdge=m.painterly?(.02+.98*part[0].pool):.15+.85*smooth((Math.sin(u*12+m.phase+noise(m.grainSeed,67)*6)+.45)/1.3);
       const pressure=.62+.38*(.5+.5*Math.sin(u*19+m.phase)),ends=smooth(u/.10)*smooth((1-u)/.12);
       pathPoints(ctx,part);ctx.strokeStyle=color(pigment(scene,stroke,u,night?1:.86),clamp(alpha*edge*grain*ends*edgeCoverage*lostEdge*(m.edgeGain??1),0,1));
       ctx.lineWidth=Math.max(.55,m.width*(delicate?.35:.75+.30*depth)*pressure);ctx.stroke();
     }
+    if(m.lake&&['shore','lake-ridge'].includes(stroke.role))drawPulseCore(ctx,scene,stroke,paint,alpha,stop);
     ctx.restore();
+    if(m.lake&&stroke.role==='shore'&&!m.reflected){
+      let reflected=reflectionPasses.get(stroke);
+      if(!reflected){
+        reflected={...stroke,_mirrorOf:stroke,role:'reflection',material:{...m,reflected:true,lakeFoundation:false,underpaint:false,baseY:undefined,land:false,hero:false,alpha:m.lakeFoundation?.53:m.lakeColor===0?.68:.54,core:0,width:1.4,edgeGain:0,washGain:1.26,flow:'lake-reflection'}};
+        reflectionPasses.set(stroke,reflected);
+      }
+      drawStroke(ctx,scene,reflected,progress);
+    }
   }
   function paper(ctx,scene) {
     const night=scene.family==='aurora-night'&&scene.strokes.length;
@@ -654,7 +1017,7 @@
   }
   function render(scene,canvas,options={}) {
     if(!scene||scene.version!==VERSION)throw new Error('Unsupported landscape version.');
-    const ctx=canvas.getContext('2d');
+    const ctx=canvas.getContext('2d',{willReadFrequently:true});
     if(!ctx)throw new Error('Landscape canvas is unavailable.');
     const width=canvas.width||WORLD,height=canvas.height||WORLD;
     ctx.setTransform(1,0,0,1,0,0);ctx.clearRect(0,0,width,height);
@@ -664,7 +1027,7 @@
     const layers=Array.from({length:3},()=>{
       const item=canvas.ownerDocument?canvas.ownerDocument.createElement('canvas'):new global.OffscreenCanvas(width,height);
       item.width=width;item.height=height;
-      const layer=item.getContext('2d');
+      const layer=item.getContext('2d',{willReadFrequently:true});
       return {canvas:item,ctx:layer};
     });
     if(options.paper!==false){const back=layers[0].ctx;back.setTransform(scale,0,0,scale,(width-side)/2,(height-side)/2);paper(back,scene);back.setTransform(1,0,0,1,0,0);}
@@ -695,7 +1058,7 @@
   function createView(container,scene,options={}) {
     if(!container)throw new Error('A landscape view container is required.');
     const doc=container.ownerDocument,win=doc.defaultView||global;
-    pigmentAtlas(doc);
+    pigmentAtlas(doc,true);
     const stage=doc.createElement('div');stage.className='landscape-stage';
     const canvas=doc.createElement('canvas'),caches=Array.from({length:3},()=>doc.createElement('canvas'));
     canvas.className='landscape-canvas';canvas.setAttribute('role','img');canvas.setAttribute('aria-label','A landscape formed from your accepted pulse waveforms');
@@ -708,8 +1071,8 @@
     const motion=win.matchMedia?.('(prefers-reduced-motion: reduce)');
     let reduced=options.reducedMotion===true||options.reducedMotion==='reduce'||!!motion?.matches;
     if(!reduced)camera.scale=target.scale=2.8;
-    const stats=global.__pulseLandscapeStats={frames:0,active:false,revealing:false,frameMs:0,pixelBudget:pixels,cachedPixels:side*side*4,materialPixelBudget:INK_SIDE*INK_SIDE+2*INK_PIXEL_LIMIT,get materialPixels(){return INK_SIDE*INK_SIDE+2*pigmentAtlas(doc).pixels;},camera:{...camera},finished:false,strokes:0,painted:0};
-    const ctx=canvas.getContext('2d'),cached=caches.map(item=>item.getContext('2d'));
+    const stats=global.__pulseLandscapeStats={frames:0,active:false,revealing:false,frameMs:0,pixelBudget:pixels,cachedPixels:side*side*4,materialPixelBudget:INK_SIDE*INK_SIDE+2*INK_PIXEL_LIMIT,get materialPixels(){return INK_SIDE*INK_SIDE+2*(pigmentAtlases.get(doc)?.pixels||0);},camera:{...camera},finished:false,strokes:0,painted:0};
+    const ctx=canvas.getContext('2d',{willReadFrequently:true}),cached=caches.map(item=>item.getContext('2d',{willReadFrequently:true}));
     function base() {const back=cached[0];back.setTransform(side/WORLD,0,0,side/WORLD,0,0);paper(back,scene);back.setTransform(1,0,0,1,0,0);publishLayer(ctx,caches[0]);}
     base();ctx.drawImage(caches[0],0,0);
     function strokeIntoCache(stroke){const layer=cached[stroke.layer];layer.setTransform(side/WORLD,0,0,side/WORLD,0,0);drawStroke(layer,scene,stroke);layer.setTransform(1,0,0,1,0,0);publishLayer(ctx,caches[stroke.layer]);}

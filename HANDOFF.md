@@ -2,6 +2,17 @@
 
 ## Current candidate and release status
 
+The user accepted the hosted Quiet Lake V18-combined paint treatment with
+**Keep** after reviewing the public study at
+https://pulsepainting-quiet-lake-study.vercel.app/. This resolves the latest
+visual checkpoint. Preserve that treatment while integrating it into the
+sixteen-family app; the previous pending-style notes below are historical.
+The accepted renderer SHA-256 is
+`3f61aab31f73cc4ae16c591160f441709ad124383342de650502239838f38e16`.
+The study is a separate static Vercel project, not the main product release.
+Final renderer integration, rendering consistency, gallery regeneration,
+mobile browser checks and production deployment remain in progress.
+
 Pulse Painting is the art application extracted from ppg-js source commit
 `732e1ef51f76bce9145bb7f666f92a30be5e0181`. The scientific library and its simple
 ChatPPG demo remain separate. The landscape candidate has not replaced the
