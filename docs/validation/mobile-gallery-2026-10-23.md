@@ -43,5 +43,17 @@ acquisition. They do not establish physical iPhone camera, thermal, or native
 share performance. No new real-time three-minute or performance claim is made
 for this navigation-only change. npm publication remains intentionally pending.
 
-Production deployment and anonymous asset/hosted-browser verification are
-recorded in `HANDOFF.md` after release.
+## Public release
+
+PR #3 merged as `a7d6ef0960b0a386f99c9784e45a78225fb29a60`, after CI run
+`39937171917` passed on `53c0274ac775501b2181b846055dda3907e06c3b`.
+The connected Git integration deployed that merge as
+`dpl_4T73TqCwoKtZMFd6vZ95Hg9GAQ3C`, READY on the public domains.
+
+At `2026-10-23T10:14:43.712Z`, anonymous requests matched all 73 served files
+to the tested build. The apex returned 308 to `https://www.pulsepainting.com/`.
+The complete new mobile gallery suite then passed against that public URL in
+both Chromium and WebKit, including delayed loading and Start/cancel recovery.
+Evidence is in `.dream-loop/mobile-gallery/hosted/` and
+`.dream-loop/mobile-gallery/hosted-assets.json`. Documentation-only main commits
+may create a later deployment with the same application bytes.

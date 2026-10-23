@@ -6,6 +6,8 @@ Your pulse, made into a place.
 > watercolor landscapes, a close-up capture and zoom-out reveal, and shareable artwork.
 > Browser replay and deployed-asset checks passed; physical-phone validation remains separate.
 > See [release verification](docs/validation/defined-foreground-2026-10-22.md).
+> The [mobile gallery](https://www.pulsepainting.com/#landscapes) is now live too;
+> see [mobile verification](docs/validation/mobile-gallery-2026-10-23.md).
 
 Pulse Painting is a three-minute phone-camera capture experience by [ChatPPG](https://chatppg.com), powered by [ppg-js](https://github.com/sontakey/ppg-js). Accepted pulse waveforms paint one of sixteen landscapes, with layered watercolor washes and recognizable pulse contours. A close-up follows the brush during capture, then pulls back to reveal the same painting, ready to share alongside an expandable HRV report.
 
@@ -63,9 +65,9 @@ Start uses the existing capture button and camera-permission flow.
   <img src="docs/media/pulse-painting-mobile-gallery.png" width="300" alt="Mobile Pulse Painting gallery with a Quiet lake artwork, landscape filters, and floating Back and Start painting buttons">
 </p>
 
-**Tested mobile gallery candidate.** Direct WebKit browser capture at 390 × 844.
-This image documents the local implementation, not a production or physical-phone
-test. See [image provenance](docs/media/README.md), the
+**Mobile gallery, now live.** Direct WebKit browser capture at 390 × 844 from
+the tested build. The public site passed the same mobile suite; this image is
+not a physical-phone test. See [image provenance](docs/media/README.md), the
 [mobile design note](docs/design/mobile-gallery.md), and
 [browser verification](docs/validation/mobile-gallery-2026-10-23.md).
 [HANDOFF.md](HANDOFF.md) records deployment status.

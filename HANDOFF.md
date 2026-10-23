@@ -2,6 +2,30 @@
 
 ## Current production release
 
+The mobile gallery is live at https://www.pulsepainting.com/#landscapes.
+Phone visitors can tap **Explore the paintings** on the opening screen, browse
+all sixteen examples, filter Water/Land/Sky and swipe through the viewer. A
+featured Quiet Lake and floating Back/Start painting actions keep the collection
+connected to capture. Default phone visits download no gallery assets. Browser
+history, shared links, retry, focus and delayed-request isolation are covered.
+
+PR #3 merged as `a7d6ef0960b0a386f99c9784e45a78225fb29a60`; CI run `39937171917`
+passed on tested source `53c0274ac775501b2181b846055dda3907e06c3b`. The complete
+local `npm test` and separate WebKit app suite passed. Git integration deployment
+`dpl_4T73TqCwoKtZMFd6vZ95Hg9GAQ3C` reached READY on both public domains.
+Anonymous verification at `2026-10-23T10:14:43.712Z` matched all 73 deployed
+files to the tested build; the apex returns 308 to www. The mobile suite also
+passed against the public site in Chromium and WebKit. Later documentation-only
+main commits can advance the deployment ID without changing the shipped assets.
+
+Renderer, library, artwork images, metrics and capture timing are unchanged.
+The renderer remains `981c49eccf799a030199c2d694bfb7e8af9bc64a9dca3d6d4dfa331b1ef82637`.
+This navigation release makes no new physical-phone, native-share or frame-rate
+claim. See `docs/validation/mobile-gallery-2026-10-23.md` and
+`docs/design/mobile-gallery.md`; evidence is in `.dream-loop/mobile-gallery/`.
+
+## Foreground pulse correction (history)
+
 The user's phone feedback identified oversized, blurred Quiet Lake foreground
 waves. The correction uses smaller wet brush marks, a fine contour through the
 actual measured samples, and shorter foreground passages. Source samples,

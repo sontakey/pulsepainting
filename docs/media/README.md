@@ -3,8 +3,9 @@
 These are direct browser captures of the actual static app. Capture, report and
 desktop images were refreshed on October 22, 2026 (America/Chicago) for the finer
 Quiet Lake foreground. Ready and QR retain their unchanged first-release images.
-The mobile gallery PNG documents the separately tested October 23 candidate
-described below; it does not establish production deployment.
+The mobile gallery PNG documents the separately tested October 23 build
+described below. Its release was subsequently verified on the public site;
+the screenshot itself was captured locally.
 See [HANDOFF.md](../../HANDOFF.md) for deployment status.
 
 ## Current artwork images
@@ -57,7 +58,7 @@ correction. Their source renderer was
 `a84ebe6772a518e2e9d44e6db5d2f30392a75e488884bbfa4e606765a78384d8`.
 Original capture evidence is in ignored `.dream-loop/release-readme/`.
 
-## Mobile gallery candidate
+## Mobile gallery
 
 `pulse-painting-mobile-gallery.png` is the native WebKit screenshot from
 `test/e2e/mobile-gallery-checks.mjs`, copied byte-for-byte from ignored
