@@ -47,6 +47,20 @@ validation. No QA paintings are published to production.
 
 ## Release status
 
-Local verification is complete. Final-source CI and hosted verification are
-required before release; production identifiers are recorded in HANDOFF.md.
+Full Linux CI `40035283792` passed tested source
+`d24165e4b20bc52f1bf790d951e047c2372b7264`. Preview
+`dpl_2wV2RBPDPzSLgi47QiCXcYYpdnw1` matched all 107 frozen files and passed four
+hosted Chromium/WebKit phone/desktop cases without runtime or HTTP errors.
+
+PR #8 merged as `5a137f586be05b5f4ca1542088ee9f071b3ee56b`. Production
+`dpl_SuAe9em7a6ZirnYoJSUoYhngXDPD` is READY at https://www.pulsepainting.com/.
+At `2026-10-23T22:53:52.295Z`, all 107 public files matched the tested build and
+the apex returned 308 to www. Anonymous Chromium/WebKit at 390 and 1440px passed
+real gallery, centered sharing, image readiness, no-book loading, and community
+reads. Community had zero real publications and eight clearly labeled examples.
+No public write attempts, runtime errors or HTTP errors occurred.
+
+Hosted results are in `.dream-loop/simple-sharing/production-browser/results.json`
+and `.dream-loop/no-emoji/simple-production-assets.json`. Later documentation-only
+commits may advance deployment IDs without changing these verified assets.
 The ppg-js npm publication remains intentionally pending.

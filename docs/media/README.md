@@ -103,9 +103,9 @@ thumbnail decoded. No image pixels or interface text were edited.
 
 ## Simple painting sharing
 
-`pulse-painting-sharing.png` was refreshed on October 23, 2026 at 22:39 UTC.
+`pulse-painting-sharing.png` was refreshed on October 23, 2026 at 22:44:05 UTC.
 It is the direct 390 × 844 browser capture of the actual built app with loaded
-fonts, DPR 1, iPhone 13 emulation and reduced motion. No screenshot pixels were
+fonts, Chrome 155.0.8059.85, DPR 1, iPhone 13 emulation and reduced motion. No screenshot pixels were
 edited. The real report's Share artwork button opened this dialog.
 
 The public fixture was processed through `replayPublicFixture(1, 0, 180)` and
@@ -155,5 +155,5 @@ social-post delivery or sustained frame-rate evidence.
 | `pulse-painting-capture.jpg` | 249074 | `e5aa4cc9195b77e495e7ae8755259cd429c8f9c323a1c8df5ca6f02eb952fbe4` |
 | `pulse-painting-report.jpg` | 65173 | `c2f8559f395c9d6ed8d36738f68a0df638aab51f30377e413e8966e1ce234f4c` |
 | `pulse-painting-mobile-gallery.png` | 469347 | `2f7f07374fb73399156555da8a86281d6b982db7714efe9a7bd2b4d4caa1889b` |
-| `pulse-painting-sharing.png` | 124894 | `03c371c3040993dd16741d01426aa3af462a5749515ccfd4aeb4b2700ec47811` |
+| `pulse-painting-sharing.png` | 121071 | `125d0fbf8cdb8d49b85a592191e2835ffd4ece6101e9d2ed3f18299d79845fc9` |
 | `pulse-painting-sketchbook.png` | 533165 | `3a39ce8438a318de609cb2ef215e22b07ff9758e1abd86741d1f5f72afbdfb04` |

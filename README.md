@@ -6,7 +6,8 @@ Your pulse, made into a place.
 > watercolor landscapes, crisp measured pulse strokes, a pointed brush and soft
 > trailing pigment, a calm zoom-out reveal, and shareable artwork.
 > Browser replay and deployed-asset checks passed; physical-phone validation remains separate.
-> See [current release verification](docs/validation/slow-phone-2026-10-23.md).
+> See [current release verification](docs/validation/simple-sharing-2026-10-23.md)
+> and [painting performance](docs/validation/slow-phone-2026-10-23.md).
 > The [mobile gallery](https://www.pulsepainting.com/#landscapes) is now live too;
 > see [mobile verification](docs/validation/mobile-gallery-2026-10-23.md).
 > Community publishing and artwork sharing are live;

@@ -1,6 +1,6 @@
 # Pulse Painting handoff
 
-## Prepared release: simple sharing and mobile capture polish
+## Current production release: simple sharing and mobile capture polish
 
 PR #8 replaces the sharing book/platform picker with a large painting preview,
 Share image, Save image, an accurate painting/app link and optional Caption/Add
@@ -8,11 +8,18 @@ to gallery. Existing public book links retain compatibility. Mobile capture uses
 SVG icons, centered placement title, Finding signal guidance and Cancel reading
 with resource cleanup and stale-callback isolation. Full WebKit interruption
 replay passed; the renderer remains unchanged. Current-source browser checks and
-actual-app visual review pass. CI and hosted promotion are still pending.
+actual-app visual review pass. Full Linux CI `40035283792` passed tested source
+`d24165e4b20bc52f1bf790d951e047c2372b7264`; PR #8 merged as
+`5a137f586be05b5f4ca1542088ee9f071b3ee56b`. Production
+`dpl_SuAe9em7a6ZirnYoJSUoYhngXDPD` is READY on https://www.pulsepainting.com/.
+At `2026-10-23T22:53:52.295Z`, all 107 public files matched the tested build;
+anonymous Chromium/WebKit phone/desktop checks passed with no public writes or
+runtime/HTTP errors. Later documentation commits can advance the deployment ID
+without changing the verified runtime. npm publication remains pending.
 See `docs/validation/simple-sharing-2026-10-23.md`. The new continuous-brush
 motion discussed from the user's video is a proposed next step, not implemented.
 
-## Current production release: adaptive painting and gallery polish
+## Previous production release: adaptive painting and gallery polish
 
 The app keeps the crisp real PPG contour, pointed
 brush, wet pigment and camera animation on every frame while budgeting scenic
