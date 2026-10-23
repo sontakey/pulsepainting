@@ -94,14 +94,23 @@ try{for(const[name,engine]of[['chromium',chromium],['webkit',webkit]]){
    window.PulseLandscape={FAMILIES:[{id:'quiet-lake',name:'Quiet lake'}],render:(scene,c)=>c.getContext('2d').drawImage(image,0,0,c.width,c.height)};
    const host=document.getElementById('host');window.host=host;
    await PulsePortrait.mount(host,{landscape:{family:'quiet-lake',strokes:[1],usableSeconds:148.9,seed:12},startedAt:new Date('2026-10-21T16:31:32Z'),metrics:{hr:71,rmssd:62,sdnn:51},shareButton:document.getElementById('open'),saveButton:document.getElementById('save')});
-   const initial=PulsePortrait.getState(host);const checkbox=host.querySelector('input');checkbox.checked=true;checkbox.dispatchEvent(new Event('change'));await new Promise(r=>setTimeout(r,200));
-   const labels=[],original=CanvasRenderingContext2D.prototype.fillText;CanvasRenderingContext2D.prototype.fillText=function(...args){labels.push(args[0]);return original.apply(this,args)};
-   const privatePublic=await PulsePortrait.preparePublication({},host);const privateLabels=[...labels];labels.length=0;
-   const optedIn=await PulsePortrait.preparePublication({includeMetrics:true},host);CanvasRenderingContext2D.prototype.fillText=original;
-   return {initial,after:PulsePortrait.getState(host),plain:{bytes:privatePublic.blob.size,type:privatePublic.blob.type,metrics:privatePublic.metrics,revision:privatePublic.revision,labels:privateLabels},opted:{metrics:optedIn.metrics,labels}};
+   const initial=PulsePortrait.getState(host),initialCheckbox=host.querySelector('input').checked;
+   const labels=[],draws=[],original=CanvasRenderingContext2D.prototype.fillText,originalDraw=CanvasRenderingContext2D.prototype.drawImage;
+   CanvasRenderingContext2D.prototype.fillText=function(...args){labels.push(args[0]);return original.apply(this,args)};
+   CanvasRenderingContext2D.prototype.drawImage=function(...args){draws.push({width:this.canvas.width,height:this.canvas.height,bounds:args.slice(1)});return originalDraw.apply(this,args)};
+   try{
+     const privatePublic=await PulsePortrait.preparePublication({},host);const privateLabels=[...labels],privateDraws=[...draws];labels.length=0;draws.length=0;
+     const optedIn=await PulsePortrait.preparePublication({includeMetrics:true},host);
+     return {initial,initialCheckbox,after:PulsePortrait.getState(host),plain:{bytes:privatePublic.blob.size,type:privatePublic.blob.type,metrics:privatePublic.metrics,revision:privatePublic.revision,labels:privateLabels,draws:privateDraws},opted:{metrics:optedIn.metrics,labels,draws}};
+   }finally{CanvasRenderingContext2D.prototype.fillText=original;CanvasRenderingContext2D.prototype.drawImage=originalDraw;}
  });
- assert.equal(publication.plain.metrics,null);assert.equal(publication.plain.type,'image/jpeg');assert.ok(publication.plain.bytes<=2*1024*1024);assert.equal(publication.initial.revision,publication.after.revision);assert.equal(publication.after.includeMetrics,true);
+ assert.equal(publication.initial.includeMetrics,true,'local image includes summary metrics by default');assert.equal(publication.initialCheckbox,true,'local artwork toggle starts checked');
+ assert.equal(publication.plain.metrics,null,'default-on local metrics never authorize public biometric disclosure');assert.equal(publication.plain.type,'image/jpeg');assert.ok(publication.plain.bytes<=2*1024*1024);assert.equal(publication.initial.revision,publication.after.revision);assert.equal(publication.after.includeMetrics,true);
  assert.ok(!publication.plain.labels.some(text=>/2026|148|2 min|Pulse$|RMSSD|SDNN|62 ms|51 ms/.test(text)));assert.deepEqual(publication.opted.metrics,{hr:71,rmssd:62,sdnn:51});
+ for(const variant of[publication.plain,publication.opted]){
+   assert.ok(variant.labels.includes('Pulse Painting')&&variant.labels.includes('Quiet lake')&&variant.labels.includes('PulsePainting.com'),'every public frame retains its title, cursive scene name and website independently of metrics');
+   assert.deepEqual(variant.draws,[{width:1080,height:1350,bounds:[100,190,880,880]}],'public export places the full cached artwork inside the same paper border without a source crop');
+ }
  await page.locator('#open').click();await page.waitForFunction(()=>PulseShare.getState().ready);assert.equal(await page.locator('.pulse-share-sheet').isVisible(),true);
  const stale=await page.evaluate(async()=>{const pending=PulsePortrait.preparePublication({},host);PulsePortrait.clear(host);try{await pending;return false}catch(error){return error.message.includes("report changed")}});assert.equal(stale,true,"replaced report cannot publish a stale canvas");assert.equal(await page.locator('.pulse-share-sheet').count(),0);
  assert.equal(serverRequests.some(request=>/sketchbook|react/i.test(request.path)),false,'artwork sharing never imports React, the book renderer or its assets');
