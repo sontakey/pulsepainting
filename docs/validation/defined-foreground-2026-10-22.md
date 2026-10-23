@@ -60,3 +60,21 @@ physiological-accuracy or native-share validation.
 The older isolated transparent-prefix zero-alpha diagnostic remains a separate
 known native-raster precision limitation; this change does not claim to resolve
 it or relax its threshold.
+
+## Public release
+
+- [PR #2](https://github.com/sontakey/pulsepainting/pull/2) merged as
+  `def02f672d83cb8df7cc0f3dbd73dbb49ca816e3`. GitHub CI run `39900142944` passed
+  on tested source `cefbe4aee7664b4fa0a2d13a7f5f6bd340028906`.
+- Vercel CLI 65.2.0 staged production deployment
+  `dpl_92dHN471Lnz7bvv3giJK12rb3rcJ` in the existing `pulsepainting` project,
+  scope `sontakeys-projects`. The protected staged renderer, gallery manifest
+  and Quiet Lake image matched local hashes before promotion. Build: 16 seconds.
+- The same deployment was promoted to [Pulse Painting](https://www.pulsepainting.com/).
+  Anonymous verification at `2026-10-23T04:26:56.586Z` matched all 73 public files
+  to the tested build. The apex returns 308 to www. The deployment is READY.
+- The actual hosted app passed the WebKit capture/report/export/recovery suite,
+  including pixel-exact source-artwork parity. No private recording was uploaded.
+- Release manifest and staged/anonymous verification evidence remain in ignored
+  `.dream-loop/foreground-pulse/`. README images include separate screenshot
+  provenance. npm publication remains intentionally pending.

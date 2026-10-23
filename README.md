@@ -5,7 +5,7 @@ Your pulse, made into a place.
 > Live at [pulsepainting.com](https://www.pulsepainting.com/): sixteen pulse-derived
 > watercolor landscapes, a close-up capture and zoom-out reveal, and shareable artwork.
 > Browser replay and deployed-asset checks passed; physical-phone validation remains separate.
-> See [release verification](docs/validation/landscape-accepted-2026-10-22.md).
+> See [release verification](docs/validation/defined-foreground-2026-10-22.md).
 
 Pulse Painting is a three-minute phone-camera capture experience by [ChatPPG](https://chatppg.com), powered by [ppg-js](https://github.com/sontakey/ppg-js). Accepted pulse waveforms paint one of sixteen landscapes, with layered watercolor washes and recognizable pulse contours. A close-up follows the brush during capture, then pulls back to reveal the same painting, ready to share alongside an expandable HRV report.
 
