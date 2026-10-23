@@ -1,7 +1,7 @@
-// Isolate the actual impression painter with the visible canvas' default 2D
-// context and drawing history. Each observation reads its canvas only once.
-// Repeated readbacks or willReadFrequently:true select a different native path
-// on some engines and are retained separately as diagnostic stress controls.
+// Isolate the actual impression painter with the visible canvas' real 2D
+// context options and drawing history. Each observation reads its canvas once.
+// Observe createView's context request instead of assuming a particular native
+// raster path. Repeated-readback/cropped stress controls remain separate.
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { readFileSync, mkdirSync, writeFileSync } from 'node:fs';
@@ -31,7 +31,7 @@ for (const name of engines) {
   const result = {
     engine: name, platform: process.platform, architecture: process.arch,
     rendererSha256: createHash('sha256').update(renderer).digest('hex'),
-    scope: 'Public-fixture pigment-prefix retention with default-context drawing history; isolated painter correctness, not performance or physical-device evidence.',
+    scope: 'Public-fixture pigment-prefix retention using observed runtime output-context options and frame history; isolated painter correctness, not performance or physical-device evidence.',
     thresholds: { maximumAlphaLoss: 0 }, errors: [], cases: [], failures: [],
   };
   try {
@@ -43,6 +43,26 @@ for (const name of engines) {
     await page.addScriptTag({ content: observed });
     Object.assign(result, await page.evaluate(segments => {
       const result = { cases: [], comparisons: 0, maxAlphaLoss: 0, alphaLossPixels: 0, failures: [] };
+      // Record the requested options from the actual live canvas creation. An
+      // empty scene avoids drawing any measured pigment during this observation.
+      const getContext = HTMLCanvasElement.prototype.getContext;
+      let outputContextOptions;
+      HTMLCanvasElement.prototype.getContext = function (type, options) {
+        if (type === '2d' && this.classList.contains('landscape-canvas')) outputContextOptions = { ...options };
+        return getContext.call(this, type, options);
+      };
+      const container = document.createElement('div');
+      container.style.cssText = 'width:390px;height:700px';
+      document.body.append(container);
+      try {
+        const view = PulseLandscape.createView(container, PulseLandscape.create({ seed: 39293, family: 'quiet-lake' }));
+        view.dispose();
+      } finally {
+        HTMLCanvasElement.prototype.getContext = getContext;
+        container.remove();
+      }
+      if (!outputContextOptions) throw Error('Live output context options were not observed');
+      result.outputContextOptions = outputContextOptions;
       for (const seed of [39293, 17]) for (const side of [800, 1080]) for (const solid of [true, false]) {
         const scene = PulseLandscape.create({ seed, family: 'quiet-lake' });
         segments.forEach(segment => PulseLandscape.append(scene, segment));
@@ -66,7 +86,7 @@ for (const name of engines) {
             globalThis.__retentionSolid = solid;
             const canvas = document.createElement('canvas');
             canvas.width = canvas.height = side;
-            const ctx = canvas.getContext('2d');
+            const ctx = canvas.getContext('2d', outputContextOptions);
             // Replay persistent frame history, but defer observation until its
             // final frame. This avoids changing the tested context by reading it.
             for (let frame = 0; frame <= target; frame++) {

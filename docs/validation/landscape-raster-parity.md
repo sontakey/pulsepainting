@@ -1,5 +1,75 @@
 # Landscape live/export raster check
 
+## Adopted all-surface candidate
+
+The layer-only correction described below subsequently failed one checkpoint
+in an extended Linux WebKit check after the coastal directional taper fix:
+Coastal Cliffs, seed 39293, thirty segments, early partial painting. Its maximum
+channel difference was 16, mean 0.0000203125, with exact repeated exports. The
+other eleven cases passed. This result is preserved in ignored
+`.dream-loop/accepted-material/linux-final/webkit.json`.
+
+The adopted follow-up renderer is SHA-256
+`a84ebe6772a518e2e9d44e6db5d2f30392a75e488884bbfa4e606765a78384d8`.
+It also requests `{ willReadFrequently: true }` for the visible/export canvas,
+so both retained layers and the output use that context hint. The material
+canvases and all source, geometry, pigment and cache-budget code are unchanged.
+This avoids mixing the two requested raster paths within the active layer
+composition; a precise native implementation cause is still unproven.
+
+The bounded follow-up passes with exact pixels in every checked phase:
+
+- Linux/amd64 WebKit, Coastal Cliffs seed 39293, short/full: two cases,
+  six checkpoints, live/export and repeated-export maximum 0.
+- macOS Chromium and WebKit, River Valley seed 39293, short/full: two cases and
+  six checkpoints per engine, live/export and repeated-export maximum 0.
+
+These checks cover both the new coastal failure and the river case that rejected
+the earlier output-only control. The subsequent broader matrix on this same hash
+also passes without changing any acceptance criterion:
+
+| Final adopted renderer check | Cases / checkpoints | Maximum channel difference | Maximum mean | Repeated export difference | Result |
+| --- | --- | --- | --- | --- | --- |
+| macOS Chromium, all sixteen families, three seeds, short/full | 96 / 288 | 0 | 0 | 0 | PASS |
+| macOS WebKit, all sixteen families, three seeds, short/full | 96 / 288 | 0 | 0 | 0 | PASS |
+| Linux/amd64 WebKit, all sixteen families, seed 39293, short/full | 32 / 96 | 0 | 0 | 0 | PASS |
+
+The macOS matrix uses seeds 39293, 17 and 9991. Every checkpoint preserves source
+scene data exactly. The maximum live and material rasters remain 2,560,000 and
+4,489,216 pixels, respectively. There are no page errors. macOS Chromium is
+155.0.8059.85; both WebKit runs are 26.6. Linux uses the official Playwright
+1.63.0 Noble image under amd64 emulation on this Mac. These stepped-presentation
+runs verify correctness, not performance or physical-phone behavior.
+
+Raw evidence is in ignored
+`.dream-loop/accepted-parity/macos-all-surfaces-final/` and
+`.dream-loop/accepted-parity/linux-all-surfaces-final/`; exact renderer and
+evidence hashes are recorded in
+`.dream-loop/accepted-parity/all-surfaces-final-report.json`.
+
+The retention harness now observes the context options requested by the real
+`createView` output canvas and applies those same options to each isolated
+history canvas. The final build requests `willReadFrequently: true`; the prior
+default-output-context result below does not describe this build. Fresh results
+from the tracked diagnostic on the exact adopted hash are:
+
+| Engine | Comparisons | Solid coverage maximum loss / pixel observations | Actual pigment maximum loss / pixel observations | Strict zero-loss result |
+| --- | --- | --- | --- | --- |
+| macOS Chromium | 672 | 9 / 245 | 6 / 152 | FAIL |
+| macOS WebKit | 672 | 1 / 5 | 1 / 6 | FAIL |
+
+Values are raw 8-bit alpha levels; observations can include the same pixel at
+multiple source cutoffs. There are no page errors or source mutations. Evidence
+is in ignored `.dream-loop/accepted-parity/actual-context-retention/`.
+These are isolated transparent-prefix rasterizations with the actual output
+context options. They are not measurements of the complete opaque application
+image, and do not demonstrate visible end-to-end flicker or missing recorded
+geometry. The exact native cause remains unproven. Both strict diagnostics
+remain failed; exact retained-alpha stability is not a claim of this release.
+No threshold was weakened and no production paint change was made to conceal
+this limitation. The passing full-image raster matrix and failed isolated-prefix
+diagnostic are separate results; neither supersedes the other.
+
 ## Accepted material integration and raster correction
 
 The user accepted the hosted V18-combined Quiet Lake treatment. Its shared
@@ -36,8 +106,9 @@ The context hint is an empirically verified fix for the observed repeat/export
 failure, not proof of a particular native-browser implementation cause. Material-
 only context changes and nearest-neighbor sampling did not fix the Linux failure.
 An output-only context change fixed that focused failure but worsened the separate
-retention diagnostic; it was rejected. The final patch confines the hint to the
-retained layers. Mobile performance still needs measurement on the adopted build.
+retention diagnostic; it was rejected. This historical layer-only candidate
+confines the hint to the retained layers. Its results do not establish the final
+all-surface build's frame rate; performance is measured separately.
 
 Changing the native raster path preserves the accepted scene's composition and
 paint treatment, but does not produce bit-identical pixels to the prior backend.
@@ -48,17 +119,18 @@ are 49 and 46. Before/after images and measurements are in ignored
 `.dream-loop/accepted-parity/visual-diff.json`. Visual inspection retains the
 same approved treatment; exact prior PNG equivalence is not claimed.
 
-### Separate retained-pigment diagnostic
+### Prior layer-only retained-pigment diagnostic
 
-`test/e2e/landscape-retention.mjs` now records a strict zero-alpha-loss check of
-the actual impression painter using default-context frame history. Each
+The initial `test/e2e/landscape-retention.mjs` recorded a strict zero-alpha-loss
+check of the actual impression painter using default-context frame history.
+The current harness observes the real output context options, as described above. Each
 observation uses a fresh canvas, replays the preceding clear/draw history, and
 reads only its final frame. It covers two seeds, early/late water fragments,
 800/1080 rasters, solid coverage and actual textured pigment, for 672 comparisons
 per engine. This isolates pigment-prefix retention rather than observing the
 entire opaque, layered app image.
 
-The tracked test passes in Chromium on the layer-only correction with zero
+That initial test passed in Chromium on the layer-only correction with zero
 loss. Its negative control rejects the previous integrated material renderer
 (`59ec1721…`) at maximum one-level loss and 92 pixel-loss observations. The
 equivalent WebKit default-context probe still fails strict zero: maximum one
@@ -80,7 +152,8 @@ keep those scopes distinct rather than claiming that every raster diagnostic
 passes. Evidence and failed controls remain under ignored
 `.dream-loop/accepted-parity/`; no failed criterion was widened.
 
-Run the new diagnostic independently with Node 24:
+Run the current diagnostic independently with Node 24 (the final-build strict
+zero-loss result above remains failed):
 
 ```sh
 rtk proxy node test/e2e/landscape-retention.mjs
