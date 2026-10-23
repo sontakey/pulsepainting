@@ -53,6 +53,21 @@ phone capture, physiology, native social delivery or thermal performance.
 
 ## Deployment
 
-Final source/build checks and the focused browser suites passed. Full final-head
-CI, preview and production verification will be recorded here after completion.
-npm publication remains pending.
+- Tested source: `b6ae978795dbbf6728a9762adbca2a4bd2bc4f04`.
+- [PR #9](https://github.com/sontakey/pulsepainting/pull/9), merged as
+  `a06fb28cab7a4abbf93170f352e509004a20a8d7`.
+- Full Linux [CI 40040417841](https://github.com/sontakey/pulsepainting/actions/runs/40040417841)
+  passed on the tested head.
+- Preview `dpl_6wgWPYRDARvPYRWy7UarHc26ih3L` was READY; all 107 files matched at
+  `2026-10-23T23:35:41.289Z` and real hosted phone/desktop checks passed in
+  Chromium/WebKit at `2026-10-23T23:35:54.723Z`.
+- Production `dpl_5yJgAfLTDdCC1FueiLX6tNC2ny8z` is READY on https://www.pulsepainting.com/.
+  All 107 public files matched the frozen tested build at
+  `2026-10-23T23:44:36.548Z`. The apex redirects to www with HTTP 308.
+- Anonymous real-site Chromium/WebKit checks at 390px and 1440px passed at
+  `2026-10-23T23:44:50.290Z`: prepared share-image bytes, centered artwork
+  sharing, gallery, lazy loading, and read-only community requests. No public
+  test paintings or messages were created; no runtime or HTTP errors occurred.
+
+Later documentation-only commits can advance the deployment ID without
+changing these verified runtime bytes. npm publication remains pending.

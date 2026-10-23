@@ -1,6 +1,6 @@
 # Pulse Painting handoff
 
-## Current candidate: framed keepsake cards
+## Current production release: framed keepsake cards
 
 Finished artwork has a full warm ochre frame, padded brand lettering, a cursive
 scene name, a stable summary-metrics band and left date/right website footer.
@@ -10,10 +10,18 @@ generic landscape tagline is removed. Sixteen gallery share JPEGs use the same
 card renderer; all landscape and thumbnail pixels remain unchanged. Legacy
 book detail crops use the intersection of old and new artwork rectangles.
 
-Local Chromium/WebKit artwork, export, mobile-layout and privacy checks pass;
-final source checks and hosted deployment verification are in progress. See
-`docs/validation/keepsake-card-2026-10-23.md`. No camera, acceptance, waveform,
-landscape or live-animation behavior changed. npm publication remains pending.
+PR #9 merged as `a06fb28cab7a4abbf93170f352e509004a20a8d7` after full Linux CI
+`40040417841` passed tested source `b6ae978795dbbf6728a9762adbca2a4bd2bc4f04`.
+Production `dpl_5yJgAfLTDdCC1FueiLX6tNC2ny8z` is READY at https://www.pulsepainting.com/.
+At `2026-10-23T23:44:36.548Z`, all 107 public files matched the tested build;
+anonymous Chromium/WebKit phone/desktop checks passed at
+`2026-10-23T23:44:50.290Z` with no public writes or runtime/HTTP errors.
+Ninety-six card exports and the focused app, sharing, gallery and book checks
+passed locally. See `docs/validation/keepsake-card-2026-10-23.md`.
+No camera, acceptance, waveform, landscape or live-animation behavior changed.
+Physical-phone/native-share validation remains separate. Later documentation
+commits may advance deployment IDs without changing runtime bytes.
+npm publication remains pending.
 
 ## Previous production release: simple sharing and mobile capture polish
 
