@@ -134,6 +134,28 @@ Evidence and bounded reproduction scripts are in ignored
 acceptance threshold changed during this investigation. Linux CI remains failed;
 the successful macOS session and focused check are separate results.
 
+The revised harness ran in CI as `39891506680` on `d4cb7cd`: Chromium passes;
+WebKit again fails, including full-completion maximum 27 and mean
+0.003170703125. Explicitly resetting each shared ink pattern to its intended
+identity transform does not fix the local reproduction. The separate frozen
+V18-plus-compositor study also fails the Linux focused check (live/export
+maximum 17, repeated-export maximum 14). Those findings do not change its
+appearance or replace the pending visual checkpoint.
+
+## Preserve completed artwork during encoding recovery
+
+An independent report fix retains the completed 1080-square artwork when PNG
+encoding fails. Retrying encoding recomposes the portrait from those exact
+retained pixels, without rasterizing the landscape again. If landscape rendering
+itself failed, no incomplete canvas is published and the retry invokes the
+renderer again. Sharing and downloading continue to use the prepared PNG.
+
+The recovery regression distinguishes these paths with render-attempt counts,
+completed-canvas identity, exact retained-pixel comparison and existing
+source/seed/action-state assertions. It rejects the prior implementation because
+an encoder retry invokes the landscape renderer twice. This improves product
+recovery; it does **not** fix or waive the independent fresh-render diagnostic.
+
 The earlier diagnostic smoke check against the pre-fix renderer
 confirmed that both engines write fresh results even when Chromium fails first:
 Quiet Lake short/full records fail at max13 in Chromium and max4 in WebKit,

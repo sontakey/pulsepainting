@@ -129,7 +129,10 @@ renderer workaround was made while the visual checkpoint is pending.
 The separate V18-plus-compositor study has SHA-256
 `3f61aab31f73cc4ae16c591160f441709ad124383342de650502239838f38e16`.
 Quiet Lake live/direct parity passes for three seeds, short/full records and
-early/late/complete states in Chromium and WebKit. The existing lifecycle
+early/late/complete states in macOS Chromium and WebKit. The Linux focused
+check of this same frozen study subsequently fails at live/export maximum 17
+and repeated-export maximum 14; see `.dream-loop/linux-repeat/v18-combined/`.
+The existing lifecycle
 assertions also pass against that exact study: pause/resume, reduced motion,
 continuous same-scene reveal, fragmented recordings and disposal. One twenty-
 second late-capture probe (desktop Chrome, mobile viewport, WebGL2 entry,
@@ -180,13 +183,37 @@ export difference five. The exact official Linux/amd64 browser image reproduces
 it locally. The diagnostic now collects all phase failures before asserting;
 the formerly unexamined full-record completion differs by up to twenty-six and
 also exceeds the mean-error bound. macOS still passes this focused check.
-No thresholds or runtime source changed. Bounded cache/cleanup controls do not
+No thresholds or landscape-renderer source changed. Bounded cache/cleanup controls do not
 fix the short-case failure; its two export command streams are identical.
 See `docs/validation/landscape-raster-parity.md` and ignored
 `.dream-loop/linux-repeat/`. This is additional unresolved evidence, not an
 invalidation of the separately measured macOS full-session behavior below.
 
-The compositor-corrected candidate passed the complete local `npm test` suite,
+The improved diagnostic is pushed as `d4cb7cd`. Its CI run 39891506680 reports
+all short/full failures: WebKit full-completion maximum 27 and mean
+0.003170703125; Chromium passes. Explicit pattern-transform reset is also
+ineffective. No experimental control was adopted in the runtime.
+
+Report recovery now retains a successfully rendered artwork canvas across PNG
+encoding retries. A failed landscape render is never published as completed,
+so renderer retry still runs. The new recovery assertions reject the previous
+implementation and verify render counts, the same canvas, exact retained
+pixels, source/seed preservation and recovered controls. macOS Chromium,
+macOS WebKit and Linux Chromium app suites pass. This does not close the
+independent fresh-raster diagnostic or change the pending visual decision.
+The changed portrait source and dist both hash to
+`87a2725e358dbd2f5dd42d151bc840257bccd6cfdec0791b4925b9303146cb3d`.
+A new full WebKit replay on that build passes: 180.404 seconds active in
+209.846 seconds wall time, with all three interruption recoveries crediting
+zero stale time. Active painting averages 59.98 fps, p95 18 ms, maximum 101 ms;
+the deliberate 2.5-second stall remains in the separately reported overall
+cadence. Zoom-out, report, same-scene export and both retry paths pass. Encoder
+retry performs one total landscape render and retains every artwork pixel;
+renderer retry performs the required second attempt. Evidence is in ignored
+`.dream-loop/artwork-retry/`, using the same public fixture, documented tail
+extension and mocked camera/native-sharing scope.
+
+Before the portrait-retry change, the compositor-corrected candidate passed the complete local `npm test` suite,
 including the new focused real-recording regression, model and source
 preservation, synthetic presentation-path checks, partial rendering,
 capture/report/export, GPU fallback, and Chromium/WebKit desktop-gallery checks.

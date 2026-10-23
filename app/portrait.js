@@ -123,8 +123,13 @@
       if (state.disposed) return null;
       retry.hidden = true; status.textContent = 'Preparing your artwork…';
       try {
-        state.art ||= document.createElement('canvas'); state.art.width = 1080; state.art.height = 1080;
-        window.PulseLandscape.render(scene, state.art);
+        if (!state.art) {
+          const art = document.createElement('canvas'); art.width = 1080; art.height = 1080;
+          window.PulseLandscape.render(scene, art);
+          // Publish only a completed painting. Encoding retries reuse these
+          // exact pixels; a failed landscape render can still be tried again.
+          state.art = art;
+        }
         checkbox.disabled = false;
         await render();
         return state;

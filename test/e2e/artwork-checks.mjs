@@ -180,13 +180,23 @@ export async function checkArtwork(page, output = process.env.PPG_ARTWORK_ARTIFA
       const share=document.createElement('button'),save=document.createElement('button');
       const originalToBlob=HTMLCanvasElement.prototype.toBlob, originalLandscape=window.PulseLandscape;
       const sourceBefore=JSON.stringify(landscape);
+      let renderCalls=0,successfulRenders=0,renderedArt=null;
       try {
+        window.PulseLandscape={...originalLandscape,render(...args){
+          renderCalls++;
+          if(mode==='renderer'&&renderCalls===1)throw new Error('Test-only renderer failure');
+          const result=originalLandscape.render(...args);successfulRenders++;renderedArt=args[1];return result;
+        }};
         if(mode==='encoder')HTMLCanvasElement.prototype.toBlob=function(callback){callback(null);};
-        else window.PulseLandscape={...originalLandscape,render(){throw new Error('Test-only renderer failure');}};
-        await PulsePortrait.mount(host,{landscape,durationSec:elapsedMeasuringMs/1000,startedAt:new Date(portraitStartedAt),shareButton:share,saveButton:save});
+        const initialState=await PulsePortrait.mount(host,{landscape,durationSec:elapsedMeasuringMs/1000,startedAt:new Date(portraitStartedAt),shareButton:share,saveButton:save});
         const retry=host.querySelector('.portrait-retry');
         const held=retry&&!retry.hidden&&share.disabled&&save.disabled&&!PulsePortrait.getState(host).ready;
-        HTMLCanvasElement.prototype.toBlob=originalToBlob;window.PulseLandscape=originalLandscape;
+        const initialRenderCalls=renderCalls,initialSuccessfulRenders=successfulRenders;
+        // Observe only after the encoder has failed. This is a retained-artifact
+        // check, not a fresh-render parity or performance measurement.
+        const originalArt=renderedArt;
+        const originalPixels=originalArt?.getContext('2d').getImageData(0,0,originalArt.width,originalArt.height).data;
+        HTMLCanvasElement.prototype.toBlob=originalToBlob;
         const retryStarted=performance.now();
         // PNG encoding is asynchronous; CI can still be preparing at five
         // seconds. Observe the terminal UI state instead of polling. This is a
@@ -204,7 +214,15 @@ export async function checkArtwork(page, output = process.env.PPG_ARTWORK_ARTIFA
           retry.click();
           inspect();
         });
-        outcomes.push({mode,held,completion,ready:PulsePortrait.getState(host).ready,actionsEnabled:!share.disabled&&!save.disabled,sourceStable:sourceBefore===JSON.stringify(landscape),sameSeed:PulsePortrait.getState(host).seed===landscape.seed,family:landscape.family,retryMs:performance.now()-retryStarted,status:host.querySelector('.portrait-status')?.textContent,retryVisible:!retry.hidden});
+        const retryMs=performance.now()-retryStarted;
+        let sourceArtMaxDelta=null;
+        if(originalPixels&&renderedArt){
+          const pixels=renderedArt.getContext('2d').getImageData(0,0,renderedArt.width,renderedArt.height).data;
+          sourceArtMaxDelta=pixels.length===originalPixels.length?0:Infinity;
+          for(let i=0;i<Math.min(pixels.length,originalPixels.length);i++)sourceArtMaxDelta=Math.max(sourceArtMaxDelta,Math.abs(pixels[i]-originalPixels[i]));
+        }
+        outcomes.push({mode,held,completion,ready:PulsePortrait.getState(host).ready,actionsEnabled:!share.disabled&&!save.disabled,sourceStable:sourceBefore===JSON.stringify(landscape),sameSeed:PulsePortrait.getState(host).seed===landscape.seed,family:landscape.family,retryMs,status:host.querySelector('.portrait-status')?.textContent,retryVisible:!retry.hidden,
+          initialRenderCalls,initialSuccessfulRenders,renderCalls,successfulRenders,retainedArt:!!originalArt&&initialState?.art===originalArt&&renderedArt===originalArt,sourceArtMaxDelta});
       } finally {HTMLCanvasElement.prototype.toBlob=originalToBlob;window.PulseLandscape=originalLandscape;PulsePortrait.clear(host);host.remove();}
     }
     return outcomes;
@@ -218,6 +236,18 @@ export async function checkArtwork(page, output = process.env.PPG_ARTWORK_ARTIFA
     assert.equal(result.retryVisible,false, `${result.mode}: successful recovery hides the retry action`);
     assert.equal(result.status,'', `${result.mode}: successful recovery clears the preparing message`);
     assert.ok(result.sourceStable&&result.sameSeed, `${result.mode}: failure and recovery preserve every source stroke and scene seed`);
+    assert.equal(result.initialRenderCalls,1, `${result.mode}: initial preparation attempts the landscape once`);
+    if(result.mode==='encoder'){
+      assert.equal(result.initialSuccessfulRenders,1, 'encoder: the landscape succeeded before PNG encoding failed');
+      assert.equal(result.renderCalls,1, 'encoder: retry reuses the completed landscape instead of rasterizing it again');
+      assert.equal(result.successfulRenders,1, 'encoder: one completed landscape supplies both encoding attempts');
+      assert.equal(result.retainedArt,true, 'encoder: retry retains the original artwork canvas');
+      assert.equal(result.sourceArtMaxDelta,0, 'encoder: every retained source-art pixel survives the encoding retry unchanged');
+    }else{
+      assert.equal(result.initialSuccessfulRenders,0, 'renderer: failed preparation has no completed artwork to reuse');
+      assert.equal(result.renderCalls,2, 'renderer: retry performs the required second landscape render');
+      assert.equal(result.successfulRenders,1, 'renderer: recovery retains one successful landscape');
+    }
   }
   const canvas = page.locator('.portrait-preview canvas');
   const checkbox = page.locator('.portrait-options input');
