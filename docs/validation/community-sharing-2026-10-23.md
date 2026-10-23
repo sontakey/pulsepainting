@@ -107,9 +107,32 @@ the Chromium bundled in the pinned Playwright container. Assertions are unchange
 
 ## Release status and scope
 
-Source review and local browser checks are recorded here. Hosted preview,
-CI and production verification are added to the release record when complete;
-local success alone does not establish a public release.
+Released through [PR #4](https://github.com/sontakey/pulsepainting/pull/4),
+merged as `317d91d4073b367c73ba7dbb372da450a4c37316`. Linux CI run
+`39982645973` passed the complete suite on
+`a9babc06eef45dc18f95a84c649ec5f33935f6be`.
+
+Preview `dpl_ArcjBGfHV8f6Rju3fZ43oWPQLCm7` passed real publication, normalized
+JPEG/WebP decoding, list/detail reads, rewritten public HTML/OG metadata,
+font CSP, HEAD responses, removal, 410/noindex and Blob cleanup. Its test
+painting was removed. The final preview passed phone/desktop browser checks
+and all 99 runtime asset hashes matched the tested build.
+
+Production `dpl_qG1B1xYrYLNA6RPcMvEC9ehkoWB5` reached READY at
+https://www.pulsepainting.com/. Anonymous verification at
+`2026-10-23T16:06:18.933Z` matched all 99 assets. Apex redirects to www with 308.
+Chromium and WebKit passed phone/desktop checks against the public site:
+actual example gallery, centered share screen, three decoded personal pages,
+page/zoom controls, closing back to normal sharing and the live community API.
+Anonymous API checks confirmed no-store reads, invalid/missing painting
+responses and the local font CORS header. Production tests were read-only.
+
+Evidence: `.dream-loop/community-release/` contains preview and production
+asset, API and browser records. Runtime error-log inspection of the preview
+showed upstream Node URL-parser and pg SSL-mode deprecation warnings, without
+application request failures. These warnings remain documented, not suppressed.
+Later documentation-only commits can advance deployment IDs while leaving the
+verified runtime unchanged.
 
 These checks use browser emulation, a public recording fixture and mocked
 camera/native-share interfaces. They do not establish physical iPhone camera,

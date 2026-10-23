@@ -1,8 +1,8 @@
 # Pulse Painting handoff
 
-## Community sharing candidate
+## Current production release: community sharing
 
-The current branch adds opt-in community publication, a social sharing sheet,
+The live release adds opt-in community publication, a social sharing sheet,
 server-rendered public painting pages and a personal ThreeUI paper sketchbook.
 The exact original source and seventeen authored assets are preserved;
 `src/pulse-sketchbook-*` contains the approved separate adaptation. Its three
@@ -17,8 +17,23 @@ operator commands need `COMMUNITY_NAMESPACE=production` if their private env
 file omits `VERCEL_ENV`. Do not publish npm 0.3.1; it remains intentionally pending.
 
 See `docs/validation/community-sharing-2026-10-23.md` and
-`docs/design/threeui-sketchbook.md`. The prior production release below remains
-current until hosted preview, CI and the public deployment are verified.
+`docs/design/threeui-sketchbook.md`. PR #4 merged as `317d91d4073b367c73ba7dbb372da450a4c37316` after CI run
+`39982645973` passed on source `a9babc06eef45dc18f95a84c649ec5f33935f6be`.
+The protected preview passed real publication, image normalization, public-page
+metadata, removal and Blob cleanup. No test paintings remain in the gallery.
+Production deployment `dpl_qG1B1xYrYLNA6RPcMvEC9ehkoWB5` is READY on both public
+domains. At `2026-10-23T16:06:18.933Z`, all 99 public assets matched the tested
+build; apex returns 308 to www. Anonymous production checks passed in Chromium
+and WebKit at phone and desktop sizes, including three decoded personal book
+pages, controls, normal sharing readiness and the real community API. Production
+verification made no gallery writes. API reads use no-store; public HTML has a
+bounded 30-second cache. Later documentation-only commits can change deployment
+IDs without changing the verified runtime.
+
+The full local suite and full three-minute WebKit replay passed. Real device
+capture, native social-app delivery and thermal performance remain separate.
+Runtime logs showed upstream URL-parser/SSL-mode deprecation warnings, with no
+application request failure in the hosted checks.
 
 ## Previous production release: mobile gallery
 
