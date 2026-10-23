@@ -93,7 +93,8 @@ republishing it. The original public images are deleted on a best-effort basis;
 and removes abandoned upload attempts without touching current published
 images. It is scoped to this application's namespace and Blob prefixes.
 
-Public API/HTML caches last at most 30 seconds; Blob propagation/cache copies
+Gallery API reads use no-store so mutation refreshes are current. Public HTML
+caches last at most 30 seconds; Blob propagation/cache copies
 can last at least 60 seconds. Already downloaded copies cannot be recalled.
 The UI therefore says "Remove from gallery", not "erase everywhere". If the
 user loses the local removal capability, they can report the painting for an

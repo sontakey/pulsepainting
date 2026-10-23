@@ -90,6 +90,21 @@ checks ran concurrently on this Mac, so this is a regression observation,
 not an isolated performance benchmark or physical-phone claim. Evidence:
 `.dream-loop/safari-session-check/result.json`.
 
+## Hosted checks and follow-up fixes
+
+The first hosted preview successfully built all three Node functions, loaded
+all personal book pages and passed read-only phone/desktop checks in Chromium
+and WebKit. A real publication smoke check exposed a cached gallery list: the
+client could treat the stale result as settled indefinitely. Gallery API reads
+now use `no-store`, with a real-handler regression covering immediate list and
+detail visibility after publication/removal. Public HTML keeps its bounded
+30-second cache. The smoke painting was removed and Blob cleanup confirmed.
+
+The first Linux CI run passed capture, landscape, gallery and community tests
+but stopped because the new sharing harness requested the macOS-installed
+Chrome channel. The harness now selects that channel only on macOS; Linux uses
+the Chromium bundled in the pinned Playwright container. Assertions are unchanged.
+
 ## Release status and scope
 
 Source review and local browser checks are recorded here. Hosted preview,

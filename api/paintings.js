@@ -6,8 +6,10 @@ export default async function handler(req, res) {
     const params = query(req); allowKeys(params, ['id', 'cursor', 'limit']);
     const service = getCommunityService();
     if (req.method === 'GET') {
-      if (params.id) return json(res, 200, { painting: await service.get(params.id) }, { cache: true });
-      return json(res, 200, await service.list({ cursor: params.cursor ?? null, limit: params.limit === undefined ? 24 : Number(params.limit) }), { cache: true });
+      // Mutation-driven gallery refreshes must observe publication/removal now.
+      // A cached empty list otherwise becomes the client's settled list state.
+      if (params.id) return json(res, 200, { painting: await service.get(params.id) });
+      return json(res, 200, await service.list({ cursor: params.cursor ?? null, limit: params.limit === undefined ? 24 : Number(params.limit) }));
     }
     if (!['POST', 'DELETE'].includes(req.method)) { res.setHeader('Allow', 'GET, POST, DELETE'); throw new CommunityError(405, 'method_not_allowed', 'Method not allowed.'); }
     checkOrigin(req);

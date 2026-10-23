@@ -19,7 +19,7 @@ await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));
 const base=`http://127.0.0.1:${server.address().port}`;
 const results=[];
 try{for(const[name,engine]of[['chromium',chromium],['webkit',webkit]]){
- const browser=await engine.launch(name==="chromium"?{channel:"chrome",headless:true}:{headless:true}),context=await browser.newContext({viewport:{width:390,height:844},isMobile:true,deviceScaleFactor:1});
+ const browser=await engine.launch(name==="chromium"&&process.platform==='darwin'?{channel:"chrome",headless:true}:{headless:true}),context=await browser.newContext({viewport:{width:390,height:844},isMobile:true,deviceScaleFactor:1});
  const page=await context.newPage(),errors=[];page.on('pageerror',e=>errors.push(e.message));
  serverRequests.length=0;await page.goto(base);await page.evaluate(async()=>{await document.fonts.load('42px "Water Brush"');});
  await page.evaluate(async()=>{

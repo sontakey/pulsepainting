@@ -137,11 +137,18 @@ try {
   await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
   const origin = `http://127.0.0.1:${server.address().port}`;
   const publicDetail = await fetch(`${origin}/api/paintings?id=${body.id}`); assert.equal(publicDetail.status, 200);
+  assert.equal(publicDetail.headers.get('cache-control'), 'no-store', 'published detail must reflect owner removal without an edge cache');
+  const publicList = await fetch(`${origin}/api/paintings`); assert.equal(publicList.status, 200);
+  assert.equal(publicList.headers.get('cache-control'), 'no-store', 'mutation refresh must not settle on a cached list');
+  assert.ok((await publicList.json()).paintings.some(painting => painting.id === body.id));
   const detailText = await publicDetail.text(); assert.ok(!detailText.includes(body.ownerToken)); assert.ok(!detailText.includes('owner_hash'));
   const og = await fetch(`${origin}/api/painting-page?id=${body.id}`); assert.equal(og.status, 200); const html = await og.text();
   assert.ok(html.includes('&lt;b&gt;Test painting&lt;/b&gt;')); assert.ok(!html.includes('<b>Test painting</b>')); assert.ok(html.includes(first.painting.imageURL)); assert.ok(!html.includes(body.ownerToken));
   const blocked = await fetch(`${origin}/api/paintings`, { method: 'POST', headers: { 'Content-Type': 'application/json', Origin: 'https://evil.invalid' }, body: JSON.stringify(body) }); assert.equal(blocked.status, 403); assert.equal(blocked.headers.get('cache-control'), 'no-store');
   const httpDelete = await fetch(`${origin}/api/paintings?id=${body.id}`, { method: 'DELETE', headers: { 'Content-Type': 'application/json', Origin: origin }, body: JSON.stringify({ ownerToken: body.ownerToken }) }); assert.equal(httpDelete.status, 200);
+  const refreshedList = await fetch(`${origin}/api/paintings`);
+  assert.equal(refreshedList.headers.get('cache-control'), 'no-store');
+  assert.ok(!(await refreshedList.json()).paintings.some(painting => painting.id === body.id));
   const removedPage = await fetch(`${origin}/api/painting-page?id=${body.id}`);
   assert.equal(removedPage.status, 410); assert.equal(removedPage.headers.get('cache-control'), 'no-store');
   const removedHTML = await removedPage.text(); assert.ok(removedHTML.includes('noindex')); assert.ok(!removedHTML.includes('property="og:image"'));
