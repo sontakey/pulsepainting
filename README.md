@@ -146,6 +146,7 @@ private export and example gallery work without these credentials.
 ## What is implemented
 
 - Sixteen seeded landscape families made from accepted waveform paths, with curved terrain, flowing brush strokes and within-stroke gradients. Artistic mapping preserves the original samples; the original manuscript and computed report remain unchanged.
+- During capture, a fine pulse contour follows the recording's actual time and value on a steady baseline. A pointed brush and textured wet pigment trail sit above the quieter landscape; each completed trace settles into its scenic placement. This treatment applies to all sixteen families.
 - Density based on usable recorded time: sparse sessions keep open paper; longer sessions fill interleaved slots without moving earlier strokes.
 - A close-up artwork camera and a continuous zoom-out reveal of the same accumulated painting. Cached layers keep the main thread available for capture.
 - Optional WebGPU/WebGL2 painted entry transitions and an independent Canvas2D landscape compositor.

@@ -116,7 +116,8 @@ for (const name of engines) {
           assert.ok(phase.sourceStable, 'painting and exporting retain every original source field');
           if (phase.repeatMax !== 0) result.failures.push({ ...checkpoint, check: 'repeated-export', max: phase.repeatMax });
           assert.ok(phase.stats.cachedPixels <= 2560000, 'live raster memory remains bounded');
-          assert.ok(phase.stats.materialPixels <= 4489216, 'material raster memory remains bounded');
+          // Existing pigment cache plus one 256² decoded live-wash mask.
+          assert.ok(phase.stats.materialPixels <= 4489216 + 256 ** 2, 'material raster memory remains bounded');
           if (phase.max > maxChannel || phase.mean >= .001) result.failures.push({ ...checkpoint, check: 'live-export', max: phase.max, mean: phase.mean });
         }
       }
