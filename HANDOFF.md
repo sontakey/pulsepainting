@@ -152,7 +152,7 @@ precise native cause remains unproven; the criterion is not widened again.
 The correction is now integrated in the development app as a partial fix;
 gallery assets were regenerated from its exact hash. A focused real-recording
 regression is included in `npm test` and rejects the old renderer at max13.
-The corrected focused check passes at max0 in Chromium and max2 in WebKit.
+The corrected focused check passes on macOS at max0 in Chromium and max2 in WebKit.
 The default all-family invocation of `test/e2e/landscape-parity.mjs` remains
 separate and failed. Fresh observation controls did not remove its max3 residual.
 See
@@ -172,6 +172,19 @@ Tracked runtime, hosted preview and production remain on their separate,
 previously verified versions. No study has been released.
 
 ## Current verification
+
+The compositor integration is pushed as `1ad9d16`; diagnostic exception logging
+is pushed as `2bc8c8b`. Linux CI runs 39889412817 and 39889702883 **fail** the new
+focused real-recording WebKit regression. The second log identifies repeated
+export difference five. The exact official Linux/amd64 browser image reproduces
+it locally. The diagnostic now collects all phase failures before asserting;
+the formerly unexamined full-record completion differs by up to twenty-six and
+also exceeds the mean-error bound. macOS still passes this focused check.
+No thresholds or runtime source changed. Bounded cache/cleanup controls do not
+fix the short-case failure; its two export command streams are identical.
+See `docs/validation/landscape-raster-parity.md` and ignored
+`.dream-loop/linux-repeat/`. This is additional unresolved evidence, not an
+invalidation of the separately measured macOS full-session behavior below.
 
 The compositor-corrected candidate passed the complete local `npm test` suite,
 including the new focused real-recording regression, model and source

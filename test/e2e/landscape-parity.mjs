@@ -34,7 +34,7 @@ for (const name of engines) {
   // See docs/validation/landscape-raster-parity.md. This new WebKit criterion
   // is distinct from the existing Chromium one-level gate, which is unchanged.
   const maxChannel = name === 'webkit' ? 2 : 1;
-  const result = { engine: name, mode: regression ? 'focused-compositor-regression' : 'all-family-diagnostic', startedAt, nodeVersion: process.version, rendererPath, rendererSha256: createHash('sha256').update(source).digest('hex'),
+  const result = { engine: name, mode: regression ? 'focused-compositor-regression' : 'all-family-diagnostic', startedAt, nodeVersion: process.version, platform: process.platform, architecture: process.arch, rendererPath, rendererSha256: createHash('sha256').update(source).digest('hex'),
     scope: 'Public camera replay; stepped presentation correctness only, not mobile performance or physical-device validation.',
     thresholds: { maxChannel, meanExclusive: .001, repeatMax: 0 }, cases: [], errors: [], failures: [] };
   try {
@@ -112,16 +112,17 @@ for (const name of engines) {
         }, { family, seed, segments: segments.slice(0, count) });
         result.cases.push(item);
         for (const phase of item.phases) {
+          const checkpoint = { family, seed, count, phase: phase.label };
           assert.ok(phase.sourceStable, 'painting and exporting retain every original source field');
-          assert.equal(phase.repeatMax, 0, 'repeated exports are exact');
+          if (phase.repeatMax !== 0) result.failures.push({ ...checkpoint, check: 'repeated-export', max: phase.repeatMax });
           assert.ok(phase.stats.cachedPixels <= 2560000, 'live raster memory remains bounded');
           assert.ok(phase.stats.materialPixels <= 4489216, 'material raster memory remains bounded');
-          if (phase.max > maxChannel || phase.mean >= .001) result.failures.push({ family, seed, count, phase: phase.label, max: phase.max, mean: phase.mean });
+          if (phase.max > maxChannel || phase.mean >= .001) result.failures.push({ ...checkpoint, check: 'live-export', max: phase.max, mean: phase.mean });
         }
       }
     }
     assert.deepEqual(result.errors, []);
-    assert.deepEqual(result.failures, [], 'early, late and completed live painting match direct exports');
+    assert.deepEqual(result.failures, [], 'early, late and completed live painting match direct exports, and repeated exports are exact');
     result.passed = true;
   } catch (error) {
     // Preserve a failing exit status while still recording the other engine.
@@ -131,6 +132,6 @@ for (const name of engines) {
   finally {
     writeFileSync(path.join(out, `${name}.json`), JSON.stringify(result, null, 2));
     await browser?.close();
-    console.log(JSON.stringify({ engine: name, passed: !!result.passed, cases: result.cases.length, failures: result.failures.length, errors: result.errors, failure: result.failure, out }));
+    console.log(JSON.stringify({ engine: name, passed: !!result.passed, cases: result.cases.length, failures: result.failures, errors: result.errors, failure: result.failure, out }));
   }
 }

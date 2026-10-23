@@ -66,6 +66,8 @@ of the remaining WebKit discrepancy. The gallery was regenerated from this exact
 renderer. The existing all-family matrix uses sixteen families, seeds 39293, 17 and 9991,
 and six or thirty accepted segments: 96 cases and 288 checkpoints per engine.
 
+The following matrix was measured on macOS, not Linux CI:
+
 | Engine | Maximum channel difference | Maximum mean | Repeated exports | Result |
 | --- | --- | --- | --- | --- |
 | Chromium | 0 | 0 | Exact | PASS |
@@ -90,8 +92,47 @@ residual is open. A focused `--compositor-regression` mode now runs in
 `npm run test:landscape`: Quiet Lake, seed 39293, short/full accepted records,
 early/late/complete checkpoints and both engines, with the same frozen thresholds.
 This catches the established blend-target defect. The pre-fix renderer fails all
-six Chromium checkpoints; the corrected renderer passes in both engines. This
+six Chromium checkpoints; the corrected renderer passes in both engines on macOS. This
 focused pass does not stand in for the broader all-family result above.
+
+## Linux regression failure
+
+GitHub Actions run `39889702883` on commit `2bc8c8b` fails the new focused
+WebKit check: repeated exports differ by five channel levels in the short
+recording. The original assertion aborted before checking the full recording.
+The harness now retains every repeat/live-export failure with its scene, seed,
+recording length and phase. It records platform/architecture and still exits
+nonzero under exactly the same criteria.
+
+The failure reproduces locally with the official Playwright 1.63.0 Noble
+Linux/amd64 image (digest
+`sha256:eff16c30e6f3f4af0a03fa4b706120d5e9b0891c344a27d64559aff5900a4a27`).
+The Docker host is Apple silicon with x64 emulation; this is a correctness
+reproduction, not performance evidence. The app renderer remains `a7807450…`.
+With both recording lengths inspected, short late/completed exports differ
+by up to five; full-session late exports differ by four and completed exports
+by twenty-six. Completed full-session live/direct maximum is also twenty-six,
+mean 0.003144140625, exceeding both existing bounds. Original scene data and
+runtime raster budgets remain intact. The revised harness still passes the
+focused Chromium/WebKit checks on macOS.
+
+Bounded controls keep evicted material canvases, keep temporary render layers,
+or disable material eviction entirely. Each retains the short-record repeat-five
+failure. Reading the first export before drawing the repeat also leaves the late
+failure, although the completed repeat becomes exact. These controls do not
+justify a production change. An instrumented no-eviction probe records all
+60,279 commands for the late direct and repeated exports: exact numeric
+arguments, state assignments and shared pattern identities match, while one
+pixel still differs in three channels (maximum five). A second probe preserves
+the short-then-full history and records the completed full scene: all 295,743
+commands and shared patterns match, while repeat maximum remains twenty-six.
+These probes localize both discrepancies below the recorded drawing commands.
+They do not identify the native cause or establish an appearance-preserving fix.
+
+Evidence and bounded reproduction scripts are in ignored
+`.dream-loop/linux-repeat/`. No renderer, gallery asset, source recording or
+acceptance threshold changed during this investigation. Linux CI remains failed;
+the successful macOS session and focused check are separate results.
 
 The earlier diagnostic smoke check against the pre-fix renderer
 confirmed that both engines write fresh results even when Chromium fails first:
