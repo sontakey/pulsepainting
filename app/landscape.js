@@ -202,7 +202,10 @@
         const river=riverAt(family,z,curve);x=river.center+(u-.5)*river.width;y=river.y+5*Math.sin(u*Math.PI);
       }else if(family==='reed-wetland')y=350+distance*610+6*Math.sin(u*Math.PI);
       else if(family==='quiet-lake'){
-        const width=curve.count===0?996:660+330*noise(curve.count,29),left=42+(996-width)*radical(curve.count+1);
+        // Shorter foreground passages keep a measured beat intimate at phone
+        // scale. The same five seconds of source still occupy each slot.
+        const span=1-.42*smooth((z-.22)/.60);
+        const width=curve.count===0?996:(660+330*noise(curve.count,29))*span,left=42+(996-width)*radical(curve.count+1);
         x=left+width*u;
         // Water's measured cross-sections occupy one continuous lake plane.
         // Linear depth spacing avoids the former unpainted middle shelf;
@@ -830,6 +833,7 @@
   function pulseImpressions(stroke,paint){
     if(paint.pulseImpressions)return paint.pulseImpressions;
     const curve=paint.curve,z=curve.depth,seed=stroke.material.grainSeed,core=pulseCore(stroke,paint);
+    const lakeWater=stroke.material.lake&&stroke.role==='water';
     const originalTimes=new Set(stroke.points.map(q=>q.t));
     // Every original measured knot owns one pressure impression. Hermite
     // interpolation remains available in pulseCore, but no fabricated knot
@@ -855,8 +859,10 @@
       const direction=last.x>=first.x?1:-1;
       const ends=.35+.65*Math.min(smooth((q.x-first.x)*direction/18),smooth((last.x-q.x)*direction/23));
       const pressure=(.69+.31*unit)*(.67+.33*wet)*ends;
-      const rx=(8+z*8+tooth*4)*(.63+.37*pressure),ry=(6+z*6+unit*2)*pressure;
-      const dy=ry*.62,halo=dab(q,rx*(1.28+tooth*.16),ry*(1.45+wet*.22)+1.2*ends,dy+ry*.20,key+42101);
+      // Keep the wet footprint below the pulse excursion so the measured
+      // upstroke and decay remain legible rather than merging into a cord.
+      const rx=(8+z*8+tooth*4)*(.63+.37*pressure)*(lakeWater?.46:1),ry=(6+z*6+unit*2)*pressure*(lakeWater?.38:1);
+      const dy=ry*.62,halo=dab(q,rx*(lakeWater?1.16+tooth*.10:1.28+tooth*.16),ry*(lakeWater?1.23+wet*.12:1.45+wet*.22)+(lakeWater?.35:1.2)*ends,dy+ry*.20,key+42101);
       const body=dab(q,rx,ry,dy,key+42901),pool=new global.Path2D();
       // Local concentration is another small impression inside the wet tip,
       // selected by the real normalized sample value and material pressure.
@@ -900,13 +906,13 @@
     ctx.restore();
   }
   function drawPulseCore(ctx,scene,stroke,paint,alpha,stop){
-    const ridge=stroke.role==='lake-ridge',source=pulseCore(stroke,paint),nodes=markPrefix(source,stop);
+    const ridge=stroke.role==='lake-ridge',water=stroke.material.lake&&stroke.role==='water',source=pulseCore(stroke,paint),nodes=markPrefix(source,stop);
     if(nodes.length<2)return;
     ctx.save();ctx.lineCap='round';ctx.lineJoin='round';
     const curve=paint.curve,first=curvePoint(curve,0,.5),last=curvePoint(curve,1,.5),gradient=ctx.createLinearGradient(first.x,first.y,last.x,last.y);
     for(let i=0;i<=12;i++){const u=i/12,base=pigment(scene,stroke,u,ridge?.77:.73),ends=smooth(u/.025)*smooth((1-u)/.03);gradient.addColorStop(u,color(base,ends));}
-    pathPoints(ctx,nodes);ctx.strokeStyle=gradient;ctx.globalAlpha=alpha*(ridge?.66:.62);ctx.lineWidth=ridge?2.25:2.5;ctx.stroke();
-    ctx.strokeStyle=poolPattern(ctx,scene,stroke);ctx.globalAlpha=alpha*.14;ctx.lineWidth=4.2;ctx.stroke();ctx.restore();
+    pathPoints(ctx,nodes);ctx.strokeStyle=gradient;ctx.globalAlpha=alpha*((ridge||water)?.66:.62);ctx.lineWidth=ridge?2.25:water?1.35+curve.depth*.60:2.5;ctx.stroke();
+    ctx.strokeStyle=poolPattern(ctx,scene,stroke);ctx.globalAlpha=alpha*.14;ctx.lineWidth=water?2.8:4.2;ctx.stroke();ctx.restore();
   }
   function drawStroke(ctx,scene,stroke,progress=1){
     if(progress<=0)return;
@@ -958,7 +964,10 @@
     const wash=poolPattern(ctx,scene,stroke);
     if((m.painterly&&['water','pool'].includes(stroke.role)&&!m.underpaint)||m.reflected){
       if(m.reflected){support(1,0);ctx.clip();drawPigmentIslands(ctx,stroke,paint,wash,alpha,stop);}
-      else drawPulseImpressions(ctx,scene,stroke,paint,alpha,stop);
+      else {
+        drawPulseImpressions(ctx,scene,stroke,paint,alpha,stop);
+        if(m.lake&&stroke.role==='water')drawPulseCore(ctx,scene,stroke,paint,alpha,stop);
+      }
       ctx.restore();return;
     }
     // Uneven, overlapping deposits form one wash. Most pigment pools

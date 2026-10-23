@@ -2,7 +2,7 @@
   "schema": 1,
   "kind": "public-fixture-examples",
   "rendererVersion": "landscape-2",
-  "rendererSha256": "a84ebe6772a518e2e9d44e6db5d2f30392a75e488884bbfa4e606765a78384d8",
+  "rendererSha256": "981c49eccf799a030199c2d694bfb7e8af9bc64a9dca3d6d4dfa331b1ef82637",
   "fixture": "test/fixtures/iphone-200s.json",
   "fixtureSha256": "5f09524bc151460d1a1a1fa58c30681dd84eaf30d989f4637edf6183e4a03b66",
   "engineSha256": "b7fdadb68fa32a1e3e36c1d792b5a3cabac9565c6182368d78589406c52374be",
@@ -93,16 +93,16 @@
       "shareImageType": "image/jpeg",
       "shareWidth": 1080,
       "shareHeight": 1350,
-      "shareBytes": 166923,
-      "shareSha256": "7f4fa6ed9855e0286b78c9c3eb06f0bdf3222259bd59f73781a96c446add822f",
+      "shareBytes": 161924,
+      "shareSha256": "6b47a4352f427b8ae0124dd65e14e80a37d0ec3c957c60c46469cf6b45f24677",
       "width": 1080,
       "height": 1080,
       "thumbnailWidth": 640,
       "thumbnailHeight": 640,
-      "imageBytes": 104068,
-      "thumbnailBytes": 33352,
-      "imageSha256": "576fcb34976ab9bcdefd2ff5d62acb2078b6f126e76a78b43012767055712daf",
-      "thumbnailSha256": "0c4c3d7c63816928fdab5471399257f1f3d1b9ed0a0fb4b4972e84efc689c45e"
+      "imageBytes": 98264,
+      "thumbnailBytes": 33412,
+      "imageSha256": "71ab7135214150a68a42a4b3c1364934861fb2f122e1aaf69d2f314fb59cf067",
+      "thumbnailSha256": "77e8bb8039bc1461070aba87d863463542d34a3e0d7ba08ca551cdd3585f1a6c"
     },
     {
       "id": "coastal-cliffs",
@@ -385,7 +385,7 @@
     "file": "social.jpg",
     "width": 1200,
     "height": 630,
-    "bytes": 96438,
-    "sha256": "f0b4ec56efdc226fad43473c99d2371fcf346f6e3e6b0ccdac85a16b49261e44"
+    "bytes": 95484,
+    "sha256": "80091f1f5bfd2a31761b5c143eec65b30fb898f67522f2d1df112667c4fd91d9"
   }
 }
