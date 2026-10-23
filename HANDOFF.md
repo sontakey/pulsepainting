@@ -5,8 +5,8 @@
 The user accepted the hosted Quiet Lake V18-combined paint treatment with
 **Keep** after reviewing the public study at
 https://pulsepainting-quiet-lake-study.vercel.app/. This resolves the latest
-visual checkpoint. Preserve that treatment while integrating it into the
-sixteen-family app; the previous pending-style notes below are historical.
+visual checkpoint. Preserve that treatment across the sixteen-family app;
+the previous pending-style notes below are historical.
 The accepted renderer SHA-256 is
 `3f61aab31f73cc4ae16c591160f441709ad124383342de650502239838f38e16`.
 The study is a separate static Vercel project, not the main product release.
@@ -26,14 +26,21 @@ Deployment `dpl_BTQ7ht7H9XUbd7dmTRJAjJSkm7Kk` is READY; anonymous verification a
 The apex returns 308 to www. Hosted WebKit app checks and the complete Chromium /
 WebKit gallery suite passed. PR #1 merged as `3ddae4e20f294a0d53a7669c4927235a42e4d764`;
 final pre-merge source `5c3b247` passed CI run `39897117567`.
-ChatPPG's landing/migration update is being released separately.
+ChatPPG's landing/migration update is also live at https://chatppg.com/ppg-js.
+PR #251 merged as `1112b892f86b639bfe138b9b7b3b5854eff97fc6`; deployment
+`dpl_46eKJBwQovCzixGoq1uS7B6pMXmg` is READY and promoted on chatppg.com.
+All 35 anonymous checks passed at 320/390/768/1440 pixels: exact Quiet Lake
+artwork bytes, both legacy-route redirects, all 21 compatibility assets, the
+standalone artwork link and the unchanged HRV reference demo. The www host also
+redirects to ChatPPG's canonical host.
 See `docs/validation/landscape-accepted-2026-10-22.md` for current evidence.
 The older study and hold notes below are historical, not a new style checkpoint.
 
 Pulse Painting is the art application extracted from ppg-js source commit
 `732e1ef51f76bce9145bb7f666f92a30be5e0181`. The scientific library and its simple
-ChatPPG demo remain separate. The landscape release replaces the earlier manuscript presentation on the
-standalone site; the original measured waveform manuscript remains in its menu.
+ChatPPG demo remain separate. The landscape release replaces the earlier
+manuscript presentation on the standalone site; the original measured waveform
+manuscript remains in its menu.
 
 The retained candidate uses all sixteen scene families, usable-time density,
 organic terrain mapping of the actual accepted samples, a close-up artwork

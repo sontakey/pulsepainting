@@ -27,15 +27,15 @@ water, land and sky, open an artwork at full size, then share its labeled exampl
 image or copy a link. Keyboard navigation, reduced motion and a stationary QR
 keep the gallery and phone handoff accessible.
 
-![Current desktop candidate with the Quiet lake background and phone QR invitation](docs/media/pulse-painting-desktop-candidate.jpg)
+![Desktop experience with the Quiet lake background and phone QR invitation](docs/media/pulse-painting-desktop-candidate.jpg)
 
 **Desktop experience.** Direct browser capture of the tested build now deployed
 to the public site. See [image provenance](docs/media/README.md).
 
 <p align="center">
-  <img src="app/assets/gallery/alpine-peaks-640.webp" width="230" alt="Alpine peaks landscape generated from the public pulse fixture by the current candidate renderer">
-  <img src="app/assets/gallery/quiet-lake-640.webp" width="230" alt="Quiet lake landscape generated from the public pulse fixture by the current candidate renderer">
-  <img src="app/assets/gallery/rolling-hills-640.webp" width="230" alt="Rolling hills landscape generated from the public pulse fixture by the current candidate renderer">
+  <img src="app/assets/gallery/alpine-peaks-640.webp" width="230" alt="Alpine peaks landscape generated from the public pulse fixture by the released renderer">
+  <img src="app/assets/gallery/quiet-lake-640.webp" width="230" alt="Quiet lake landscape generated from the public pulse fixture by the released renderer">
+  <img src="app/assets/gallery/rolling-hills-640.webp" width="230" alt="Rolling hills landscape generated from the public pulse fixture by the released renderer">
 </p>
 
 **Alpine peaks · Quiet lake · Rolling hills.** These examples are made by the

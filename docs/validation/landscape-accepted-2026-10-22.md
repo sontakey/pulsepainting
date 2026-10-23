@@ -104,3 +104,20 @@ Evidence stays in ignored `.dream-loop/accepted-material/hosted-assets.json`
 and `.dream-loop/accepted-material/hosted-gallery/`. The full real-time replay
 above used byte-identical local runtime files; the hosted app replay is accelerated.
 No physical-device or native-sharing claim is inferred from deployment.
+
+### ChatPPG parent-site release
+
+The project listing at https://chatppg.com/ppg-js now shows the final Quiet Lake
+example and links to Pulse Painting's verified standalone home. PR #251 merged
+as `1112b892f86b639bfe138b9b7b3b5854eff97fc6`; the production deployment is
+`dpl_46eKJBwQovCzixGoq1uS7B6pMXmg` (READY/promoted, tree `0806ea8e`).
+
+The local production build generated 4,019 routes and passed all sitemap and
+metadata checks. The deployed site passed all 35 anonymous browser checks at
+320/390/768/1440 pixels, plus www-to-canonical redirection. Both former
+`/pulse-painting` entries redirect to the standalone app, all 21 historical
+compatibility assets still match, and both the artwork and unchanged HRV
+reference-demo links work. The public Quiet Lake image has SHA-256
+`576fcb34976ab9bcdefd2ff5d62acb2078b6f126e76a78b43012767055712daf`, identical to
+the canonical Pulse Painting gallery artwork. No scientific-library or npm
+publication was performed for this release.
