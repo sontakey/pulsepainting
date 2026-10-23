@@ -115,5 +115,27 @@ public replay fixture, without pixel or metric editing.
 
 ## Release checks
 
-CI, hosted preview and production checks are pending.
-This record does not yet assert that the new changes are publicly deployed.
+PR [#7](https://github.com/sontakey/pulsepainting/pull/7) merged as
+`fa063e6499b890dfaf35b9ac521992ffb3a49892` after the full Linux `npm test`
+completed successfully in Actions run
+[40021941151](https://github.com/sontakey/pulsepainting/actions/runs/40021941151).
+The tested source is `e1b5b1b40346dec5008f00ca13e7a4f655a5564e`; the merge has
+an identical file tree.
+
+Protected preview `dpl_CT5Uc364fnK84VtrbuBrKMnLBM2Z` matched all 107 files in
+the frozen build at `2026-10-23T20:48:27.822Z`. Hosted Chromium/WebKit checks
+at 390px and 1440px passed sharing, three-page sketchbooks, Community examples
+and the walkthrough images. No public writes, runtime errors or HTTP errors
+occurred; deployment protection stayed enabled.
+
+Production `dpl_78P1bzh2G5Lfa5cB5nhqVw5qNQyA` is READY at
+https://www.pulsepainting.com/. Anonymous verification at
+`2026-10-23T20:58:44.624Z` matched all 107 public files to the tested build.
+The apex returns 308 to www. Anonymous Chromium/WebKit checks at 390px and
+1440px passed at `2026-10-23T20:59:38Z`. Sharing and three-page sketchbook
+interactions passed, Community returned 200 with zero real publications and
+eight labeled examples, all three desktop illustrations decoded, and phones
+requested none. No authentication, public writes, runtime errors or HTTP
+errors occurred. Evidence: `.dream-loop/slow-phone/production-browser/results.json`.
+Later documentation-only commits can advance the deployment ID without changing
+the verified runtime. npm 0.3.1 remains intentionally unpublished.

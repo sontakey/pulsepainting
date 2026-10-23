@@ -1,8 +1,8 @@
 # Pulse Painting handoff
 
-## Release candidate: adaptive painting and gallery polish
+## Current production release: adaptive painting and gallery polish
 
-Branch `codex/slow-phone-painting` keeps the crisp real PPG contour, pointed
+The app keeps the crisp real PPG contour, pointed
 brush, wet pigment and camera animation on every frame while budgeting scenic
 raster work separately. A matched layout comparison improved active cadence
 21.2% under 4× CPU throttle. Final browser runs measured 59.95–60 fps normally
@@ -17,11 +17,20 @@ publications are present. Three generated watercolor walkthrough illustrations
 load only near the desktop process section, never during phone capture.
 
 Renderer: `2e7e417aeffe1cfef835bfbf49d80e49029de02314a00591a3366aa18d0df794`.
-All sixteen canonical gallery images are unchanged. Details and release checks:
-`docs/validation/slow-phone-2026-10-23.md`. Hosted checks and deployment are still
-pending; the production release below remains the verified live version.
+All sixteen canonical gallery images are unchanged. PR #7 merged as
+`fa063e6499b890dfaf35b9ac521992ffb3a49892` after full Linux CI `40021941151`
+passed tested source `e1b5b1b40346dec5008f00ca13e7a4f655a5564e`.
+Production `dpl_78P1bzh2G5Lfa5cB5nhqVw5qNQyA` is READY at
+https://www.pulsepainting.com/. At `2026-10-23T20:58:44.624Z`, all 107 public
+files matched the frozen tested build. Anonymous Chromium/WebKit checks at
+390px and 1440px passed at `2026-10-23T20:59:38Z`, including sharing, sketchbook
+page turns, real Community reads with eight labeled fallback examples, and
+desktop-only illustration loading. No public writes or runtime/HTTP errors.
+Details: `docs/validation/slow-phone-2026-10-23.md`. Later documentation commits
+can advance deployment IDs without changing the verified runtime. npm 0.3.1
+remains intentionally unpublished.
 
-## Current production release: crisp pulse brush
+## Previous production release: crisp pulse brush
 
 All sixteen scene families now show a fine measured PPG contour, a pointed
 brush tip and soft pigment trailing behind it. The active foreground follows
