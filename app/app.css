@@ -1,5 +1,8 @@
 * { margin: 0; padding: 0; box-sizing: border-box; }
 
+/* Authored vector icons never depend on a platform emoji font. */
+.ui-arrow { display:inline-block; flex:none; vertical-align:-.12em; pointer-events:none; }
+
 /* The artwork camera moves inside its frame; controls and live readings stay
    in the page layout. The original manuscript remains an export/fallback. */
 #screen-measuring #manuscript[hidden], #landscape-view[hidden] { display: none; }

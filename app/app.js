@@ -1198,7 +1198,7 @@ function mountLandscapeArtwork(header, td) {
     if(state && portraitHost===host && window.PulseCommunity) {
       const invitation=document.createElement('button');
       invitation.type='button';invitation.className='community-publish-invitation';
-      invitation.innerHTML='<span><strong>Add your painting to the gallery</strong><span>A shared moment. Only if you choose.</span></span><span aria-hidden="true">↗</span>';
+      invitation.innerHTML='<span><strong>Add your painting to the gallery</strong><span>A shared moment. Only if you choose.</span></span><span aria-hidden="true"><svg class="ui-arrow" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M5 19 19 5M5 5h14v14"/></svg></span>';
       invitation.addEventListener('click',()=>window.PulseCommunity.openPublish({container:host,preparePublication:options=>window.PulsePortrait.preparePublication(options,host)}));
       host.append(invitation);
     }

@@ -14,6 +14,10 @@
   let publishDialog=null,publishingView=null,publishVersion=0,viewer=null,viewVersion=0,viewRequest=null,viewed=null,viewOpener=null;
   const grid=document.getElementById('community-grid'),status=document.getElementById('community-status'),more=document.getElementById('community-more');
   const node=(tag,className,text)=>{const el=document.createElement(tag);if(className)el.className=className;if(text!=null)el.textContent=text;return el;};
+  function cardArrow(){
+    const arrow=node('span','community-card-arrow');arrow.setAttribute('aria-hidden','true');
+    arrow.innerHTML='<svg class="ui-arrow" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M5 19 19 5M5 5h14v14"/></svg>';return arrow;
+  }
   function readReceipts(){try{const value=JSON.parse(localStorage.getItem(STORAGE)||'{}');return value&&typeof value==='object'&&!Array.isArray(value)?value:{};}catch{return {};}}
   function receipt(id){return memoryOwners.get(id)||readReceipts()[id]||null;}
   function saveReceipt(value,{required=false}={}){
@@ -58,7 +62,7 @@
     if(grid.querySelector(`[data-painting="${item.id}"]`))return;
     const card=node('button','community-card');card.type='button';card.dataset.painting=item.id;
     card.setAttribute('aria-label',`Open painting shared by ${item.displayName||'Anonymous'}`);
-    const frame=node('span','community-card-art'),img=node('img');img.src=item.thumbnailURL;img.alt=`A pulse painting shared by ${item.displayName||'Anonymous'}`;img.width=1080;img.height=1350;img.loading='lazy';img.decoding='async';frame.append(img,node('span','community-card-arrow','↗'));
+    const frame=node('span','community-card-art'),img=node('img');img.src=item.thumbnailURL;img.alt=`A pulse painting shared by ${item.displayName||'Anonymous'}`;img.width=1080;img.height=1350;img.loading='lazy';img.decoding='async';frame.append(img,cardArrow());
     const caption=node('span','community-card-caption');caption.append(node('strong','',item.displayName||'Anonymous'),node('span','', 'Shared a moment'));
     card.append(frame,caption);card.addEventListener('click',()=>hooks.openPainting?.(item.id,card));grid.insertBefore(card,grid.querySelector('[data-example]'));
   }
@@ -71,7 +75,7 @@
       if(grid.querySelector(`[data-example="${scene.id}"]`))continue;
       const card=node('button','community-example-card');card.type='button';card.dataset.example=scene.id;card.setAttribute('aria-label',`Open ${scene.name} example`);
       const frame=node('span','community-card-art'),img=node('img');img.src=scene.thumbnailURL;img.alt=`${scene.name}: an example made from a public pulse recording`;img.width=640;img.height=640;img.loading='lazy';img.decoding='async';
-      frame.append(img,node('span','community-example-label','Example'),node('span','community-card-arrow','↗'));
+      frame.append(img,node('span','community-example-label','Example'),cardArrow());
       const caption=node('span','community-card-caption');caption.append(node('strong','',scene.name),node('span','','From a public pulse recording'));
       card.append(frame,caption);card.addEventListener('click',()=>hooks.openExample?.(scene.id,card));grid.append(card);
     }
