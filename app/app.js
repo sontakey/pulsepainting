@@ -30,7 +30,7 @@ function cancelLandscapeReveal() {
   sessionFinishing = false;
   sessionFinishPromise = null;
   document.getElementById('screen-measuring').classList.remove('is-revealing');
-  document.getElementById('btn-pause').disabled = false;
+  document.getElementById('btn-cancel-reading').disabled = false;
   document.getElementById('btn-stop').textContent = 'Finish painting';
 }
 function useManuscriptFallback() {
@@ -118,7 +118,6 @@ function resetManuscript() {
   cancelAnimationFrame(manuscript.frame);
   manuscript.pending = []; manuscript.segments = []; manuscript.lastWindow = -1; manuscript.paused = false;
   manuscript.viewFirstRow = 0; manuscript.scroll = null;
-  document.getElementById('btn-pause').textContent = 'Pause artwork';
   document.getElementById('pause-note').textContent = '3-minute recording · Not a medical device';
   document.getElementById('manuscript-empty').hidden = false;
   resetLandscape();
@@ -671,6 +670,11 @@ const REASON_TEXT = {
   camera_resumed: 'camera restarted',
 };
 
+// Friendly coaching is separate from the engine's unchanged quality decision.
+function findingSignal(metrics) {
+  return ['irregular', 'fft_disagree'].includes(metrics.quality?.code);
+}
+
 function updatePlacementScreen(metrics) {
   const remaining = metrics.settleRemainingSec || 0;
   const coachEl = document.getElementById('coach-line');
@@ -687,7 +691,8 @@ function updatePlacementScreen(metrics) {
     const frac = 1 - Math.min(1, remaining / settleSec());
     ring.style.strokeDashoffset = String(circumference * (1 - frac));
   } else {
-    coachEl.textContent = metrics.guidanceMessage || 'Cover the rear camera and flash gently.';
+    coachEl.textContent = findingSignal(metrics) ? 'Finding signal. Hold still.'
+      : metrics.guidanceMessage || 'Cover the rear camera and flash gently.';
     ring.style.strokeDashoffset = String(circumference);
   }
   document.getElementById('torch-note').hidden = monitor ? monitor.torchSupported !== false : true;
@@ -725,6 +730,7 @@ function updateMeasuringScreen(metrics) {
   pill.classList.toggle('bad', !good);
   document.getElementById('quality-text').textContent = good
     ? 'Good signal'
+    : findingSignal(metrics) ? 'Finding signal'
     : (metrics.quality ? metrics.quality.reason : metrics.guidanceMessage) || 'Settling';
 
   document.getElementById('painting-state').textContent = manuscript.paused ? 'Artwork paused' : good ? 'Painting' : 'Waiting for clear signal';
@@ -1536,7 +1542,7 @@ function startSession() {
 function completeSessionReport() {
   sessionFinishing = false;
   document.getElementById('screen-measuring').classList.remove('is-revealing');
-  document.getElementById('btn-pause').disabled = false;
+  document.getElementById('btn-cancel-reading').disabled = false;
   document.getElementById('btn-stop').textContent = 'Finish painting';
   renderSummary();
   showScreen('summary');
@@ -1570,7 +1576,7 @@ function stopSession() {
   document.getElementById('screen-measuring').classList.add('is-revealing');
   document.getElementById('painting-state').textContent = 'Your landscape, revealed';
   document.getElementById('quality-text').textContent = 'Recording complete';
-  document.getElementById('btn-pause').disabled = true;
+  document.getElementById('btn-cancel-reading').disabled = true;
   document.getElementById('btn-stop').textContent = 'Skip reveal';
   document.getElementById('pause-note').textContent = 'Every accepted stroke, in one place.';
   let finish;
@@ -1597,7 +1603,7 @@ document.querySelector('.live-details').addEventListener('toggle', event => {
   if (event.currentTarget.open) { drawWave(); drawTachogram(); }
 });
 document.getElementById('btn-start').addEventListener('click', startSession);
-document.getElementById('btn-cancel-placement').addEventListener('click', () => {
+function cancelSession() {
   sessionGeneration++;
   cancelLandscapeReveal();
   lastMeasuringFrame = null;
@@ -1610,17 +1616,20 @@ document.getElementById('btn-cancel-placement').addEventListener('click', () => 
     if (!pendingMonitorStarts.has(monitor)) monitor.destroy();
     monitor = null;
   }
+  cancelAnimationFrame(manuscript.frame);
+  try { landscapeView?.dispose(); } catch { /* Camera cleanup already completed. */ }
+  landscapeView = null;
+  landscape = null;
+  document.getElementById('landscape-view').replaceChildren();
+  manuscript.pending = []; manuscript.segments = []; manuscript.raster = null; manuscript.scroll = null;
+  manuscript.lastWindow = -1; manuscript.paused = false;
+  resetWaveBuffer();
+  elapsedMeasuringMs = 0; measuringStartedAt = null; portraitStartedAt = null; lastMetrics = null;
   showScreen('ready');
-});
-document.getElementById('btn-pause').addEventListener('click', () => {
-  if (sessionFinishing) return;
-  manuscript.paused = !manuscript.paused;
-  syncLandscapeView();
-  if (manuscript.paused) cancelAnimationFrame(manuscript.frame); else animateManuscript();
-  document.getElementById('btn-pause').textContent=manuscript.paused?'Resume artwork':'Pause artwork';
-  document.getElementById('pause-note').textContent=manuscript.paused?'Painting paused. Recording continues.':'3-minute recording · Not a medical device';
-  if(lastMetrics) updateMeasuringScreen(lastMetrics);
-});
+  document.getElementById('btn-start').focus({ preventScroll: true });
+}
+document.getElementById('btn-cancel-placement').addEventListener('click', cancelSession);
+document.getElementById('btn-cancel-reading').addEventListener('click', cancelSession);
 document.getElementById('btn-save-artwork').addEventListener('click', () => closeDebugSheet());
 document.getElementById('btn-save-manuscript').addEventListener('click', () => {
   closeDebugSheet();
