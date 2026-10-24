@@ -6,7 +6,7 @@ Your pulse, made into a place.
 > watercolor landscapes, crisp measured pulse strokes, a pointed brush and soft
 > pigment fixed to the paper, a gradually emerging background, and shareable artwork.
 > Browser replay and deployed-asset checks passed; physical-phone validation remains separate.
-> See [current release verification](docs/validation/emerging-landscape-2026-10-24.md)
+> See [current release verification](docs/validation/camera-guidance-2026-10-24.md)
 > and [painting performance](docs/validation/emerging-landscape-2026-10-24.md).
 > The [mobile gallery](https://www.pulsepainting.com/#landscapes) is now live too;
 > see [mobile verification](docs/validation/mobile-gallery-2026-10-23.md).
@@ -27,6 +27,21 @@ twenty usable seconds after the first discovery. Occasional short captions mark
 visible new details. Signal interruptions pause that growth; existing
 colors and shapes stay in place. The finished painting retains its complete
 detail and stronger pigment for the final reveal.
+
+**Camera access, with a little guidance.** Tap **Need help with camera access?**
+on the phone's opening screen for illustrated browser and phone-settings steps.
+The same guide appears when the camera cannot open, with an explicit retry and
+an in-app browser link-copy option. Waiting prompts stay calm, and a camera
+failure during capture keeps the partial painting and report. See the
+[browser guidance](docs/design/camera-guidance.md) and
+[verification scope](docs/validation/camera-guidance-2026-10-24.md).
+
+<p align="center">
+  <img src="docs/media/pulse-painting-camera-help.png" width="280" alt="Illustrated camera help with Safari instructions, a browser selector and a large Try camera again button">
+</p>
+
+Direct WebKit capture of the hosted guide. This shows the app's instructions;
+it is not a screenshot or validation of the phone's native permission controls.
 
 <p align="center">
   <img src="docs/media/pulse-painting-ready.jpg" width="230" alt="Pulse Painting phone capture instructions">

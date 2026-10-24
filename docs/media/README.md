@@ -11,6 +11,20 @@ described below. Its release was subsequently verified on the public site;
 the screenshot itself was captured locally.
 See [HANDOFF.md](../../HANDOFF.md) for deployment status.
 
+## Camera guidance
+
+`pulse-painting-camera-help.png` is a direct WebKit browser screenshot from the
+protected preview, captured during the checks completed at
+`2026-10-24T15:31:56.152Z`. It uses a 390 × 844 CSS-pixel iPhone 13 viewport at
+DPR 1 and source `5c4640074f7ddb5bdb3170d30e0ff8f06529c079`. The actual phone-entry
+help button opens the dialog; browser selection and steps, rendered 48px touch
+target, focus and close behavior were checked. No camera was requested, and no
+public data was written. The PNG is copied byte-for-byte without image editing.
+
+This illustrates Pulse Painting's help, not the operating system's controls or
+a physical iPhone permission prompt. The SVG inside the dialog is explicitly a
+schematic. See [camera verification](../validation/camera-guidance-2026-10-24.md).
+
 ## Emerging landscape capture
 
 `pulse-painting-capture.jpg` is the direct native-browser JPEG (quality 92) from

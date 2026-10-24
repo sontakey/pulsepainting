@@ -1,6 +1,43 @@
 # Pulse Painting handoff
 
-## Current production release: emerging landscape
+## Current production release: illustrated camera guidance
+
+The phone entry screen offers **Need help with camera access?** and a calm
+waiting panel while permission is unresolved. Failures open an illustrated
+native dialog with browser-specific site and phone-settings instructions, an
+overridable browser selector and a copy-link fallback for in-app browsers.
+Safari's selector has a verified 48px touch target. No emoji or automatic
+permission retry is added. An ignored prompt remains tracked after cancellation
+so a second tap cannot open competing camera requests.
+
+If camera recovery fails during capture, the accepted painting and report are
+preserved. People can keep that painting or explicitly start a new reading.
+The signal library, acceptance adapter, landscape renderer and gallery assets
+are unchanged.
+
+PR #12 merged as `96620dd1041b71ad3a0ef210309f09bbe2cae4a2` after full Linux CI
+`40107298589` passed tested source `5c4640074f7ddb5bdb3170d30e0ff8f06529c079`.
+The focused camera suite passed thirteen scenario groups in each of Chromium
+and WebKit. The full three-minute interruption replay passed, preserving reports
+and exact artwork parity; active painting measured 59.12 fps and reveal 58.89 fps.
+The timed replay preceded only browser-picker CSS polish and its regression
+assertion; capture logic and renderer hashes are identical. Final hosted preview
+checks passed at 390px and 1440px, with all 109 files matching the frozen build.
+Production `dpl_4NKJeY6WvSuZxvrAVg29ewtNcxWK` is READY at
+https://www.pulsepainting.com/. At `2026-10-24T15:48:45.800Z`, all 109 public
+files matched the tested build; anonymous Chromium/WebKit checks at 390px and
+1440px passed at `2026-10-24T15:48:57.862Z` without public writes or page/HTTP
+errors. The Git integration did not queue the merge, so the authenticated CLI/API
+explicitly deployed that exact Git SHA to the existing production project.
+
+These are browser checks, not physical-phone permission-menu, camera/flash,
+native-share or thermal validation. See
+`docs/validation/camera-guidance-2026-10-24.md` and the official-source research in
+`docs/design/camera-guidance.md`. Later documentation-only deployments may have
+different IDs while serving the same verified runtime. npm 0.3.1 publication
+remains pending.
+
+## Previous production release: emerging landscape
 
 A pale version of the accepted-data landscape gradually develops behind the
 continuous pulse brush. Its composition and pigment stay fixed around a clear
