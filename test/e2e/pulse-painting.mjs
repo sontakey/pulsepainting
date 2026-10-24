@@ -13,6 +13,7 @@ import { chromium, webkit, devices } from 'playwright';
 import { instrumentReportGraphText, checkReportGraphs } from './report-graph-checks.mjs';
 import { checkCaptureEntry } from './capture-entry-checks.mjs';
 import { checkArtwork, openReportMenu, checkEmptyArtworkActions } from './artwork-checks.mjs';
+import { checkLiveReadings } from './live-readings-checks.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const log = JSON.parse(readFileSync(process.env.PPG_SESSION_LOG || path.join(root, 'test/fixtures/iphone-200s.json'), 'utf8'));
@@ -64,8 +65,9 @@ try {
             t: metrics.t, good: metrics.quality.good, segments: manuscript.segments.length,
             score: metrics.qualityScore, meter: Number(document.getElementById('signal-meter').getAttribute('aria-valuenow')),
             signalText: document.getElementById('quality-text').textContent,
-            values: ['hr-value', 'rmssd-value', 'sdnn-value'].map(id => document.getElementById(id).textContent),
-            expected: [metrics.heartRate, metrics.rmssd, metrics.sdnn].map(value => metrics.quality.good && Number.isFinite(value) ? String(Math.round(value)) : '--'),
+            values: ['hr-value', 'rmssd-value', 'resp-value'].map(id => document.getElementById(id).textContent),
+            expected: [metrics.heartRate, metrics.rmssd].map(value => metrics.quality.good && Number.isFinite(value) ? String(Math.round(value)) : '--').concat(
+              metrics.quality.good && !metrics.gap && metrics.respiration?.basis === 'agreement' && metrics.respiration.confidence >= .5 && metrics.respiration.confidence <= 1 && Number.isFinite(metrics.respiration.rateBpm) && metrics.respiration.rateBpm > 0 ? String(Math.round(metrics.respiration.rateBpm)) : '--'),
           });
         };
       }
@@ -168,6 +170,7 @@ try {
     {value:'0',description:'Signal quality unavailable',bars:0,text:'Finding signal'},
     {value:'0',description:'Signal quality unavailable',bars:0,text:''},
   ], 'signal display gates rejected data, keeps issue prompts brief, and never invents a missing score');
+  await checkLiveReadings(page);
   // Accepted source advances on moving paper under a fixed brush. Presentation
   // must preserve earlier source strokes and save the final landscape for finish.
   await page.emulateMedia({ reducedMotion: 'no-preference' });
@@ -229,7 +232,7 @@ try {
         cancelledMonitorActive: monitor === __cancelledMonitor,
         manuscript, landscape, lastMetrics, elapsedMeasuringMs, lastMeasuringFrame,
         measuringStartedAt, portraitStartedAt, sessionTimerId, waveBuf, placementWaveBuf,
-        readings: ['hr-value', 'rmssd-value', 'sdnn-value', 'quality-text', 'painting-state', 'session-countdown'].map(id => document.getElementById(id).textContent),
+        readings: ['hr-value', 'rmssd-value', 'resp-value', 'resp-status', 'quality-text', 'painting-state', 'session-countdown'].map(id => document.getElementById(id).textContent),
         torchHidden: document.getElementById('torch-note').hidden,
       });
       const before = snapshot(), oldAlert = window.alert, alerts = [];
