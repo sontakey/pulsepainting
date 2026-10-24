@@ -35,7 +35,7 @@
 .ch-content{padding:0 30px 18px}
 .ch-browser-label{display:block;font-size:16px;font-weight:600;color:var(--ch-ink)}
 .ch-browser-label span{display:block;margin-top:3px;color:var(--ch-muted);font-size:14px;line-height:1.5;font-weight:400}
-.ch-browser{display:block;width:100%;min-height:48px;margin:10px 0 20px;padding:10px 38px 10px 13px;border:1px solid #c5d6df;border-radius:10px;background:#fffefa;color:var(--ch-ink);font-size:16px!important;line-height:1.5;white-space:normal}
+.ch-browser{appearance:none;-webkit-appearance:none;display:block;width:100%;min-height:48px;margin:10px 0 20px;padding:10px 38px 10px 13px;border:1px solid #c5d6df;border-radius:10px;background-color:#fffefa;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none' stroke='%23526b78' stroke-width='1.7' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m5 7 5 5 5-5'/%3E%3C/svg%3E");background-repeat:no-repeat;background-size:16px 16px;background-position:right 13px center;color:var(--ch-ink);font-size:16px!important;line-height:1.5;white-space:normal}
 .ch-steps{display:grid;gap:19px;margin:0;padding:0;list-style:none}
 .ch-steps li{display:grid;grid-template-columns:27px minmax(0,1fr);gap:11px;align-items:start}
 .ch-step-number{display:grid;place-items:center;width:27px;height:27px;border:1px solid #ccdae6;border-radius:50%;background:#edf3fa;color:#315c86;font-size:14px;line-height:1.2}

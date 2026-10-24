@@ -134,6 +134,8 @@ try {
       for (const width of [320, 390]) {
         await page.setViewportSize({ width, height: 700 });
         await assertFits(page, `${name} ${width}px`);
+        const browserControl = await page.locator('#camera-help-browser').boundingBox();
+        assert.ok(browserControl && browserControl.height >= 44, `${name} ${width}px: browser picker has a rendered touch target at least 44px tall`);
       }
       await page.addStyleTag({ content: '.pulse-camera-help { font-size: 20px !important; } .pulse-camera-help p, .pulse-camera-help li, .pulse-camera-help button, .pulse-camera-help select { font-size: 1em !important; }' });
       await page.setViewportSize({ width: 320, height: 700 });
