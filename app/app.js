@@ -666,6 +666,51 @@ let measuringStartedAt = null; // Date.now() ms when MEASURING was first reached
 let portraitStartedAt = null;
 let sessionTimerId = null;
 let lastMetrics = null; // last per-window metrics object (for the report's floor/respiration)
+let latestBreathingTime = null;
+let breathingMeasuredAt = null;
+const BREATHING_FRESH_MS = 2500;
+
+function clearLiveBreathing(status = 'Estimating') {
+  breathingMeasuredAt = null;
+  const value = document.getElementById('resp-value');
+  const hint = document.getElementById('resp-status');
+  if (value.textContent !== '--') value.textContent = '--';
+  if (hint.textContent !== status) hint.textContent = status;
+}
+
+function resetLiveBreathing() {
+  latestBreathingTime = null;
+  clearLiveBreathing();
+}
+
+function expireLiveBreathing() {
+  if (breathingMeasuredAt != null && performance.now() - breathingMeasuredAt > BREATHING_FRESH_MS) {
+    clearLiveBreathing('Finding signal');
+  }
+}
+
+function updateLiveBreathing(metrics) {
+  const time = metrics.t;
+  const fresh = Number.isFinite(time) && (latestBreathingTime == null || time > latestBreathingTime);
+  if (fresh) latestBreathingTime = time;
+  if (metrics.quality?.good !== true || metrics.gap || document.hidden) {
+    clearLiveBreathing('Finding signal');
+    return;
+  }
+  if (!Number.isFinite(time)) { clearLiveBreathing(); return; }
+  // Camera recovery can re-emit the old metrics object. Only a newer source
+  // window can replace a number or restore one cleared by a signal interruption.
+  if (!fresh) { expireLiveBreathing(); return; }
+  const r = metrics.respiration;
+  if (!r || !Number.isFinite(r.rateBpm) || r.rateBpm <= 0 || r.basis !== 'agreement' ||
+      !Number.isFinite(r.confidence) || r.confidence < 0.5 || r.confidence > 1) {
+    clearLiveBreathing();
+    return;
+  }
+  breathingMeasuredAt = performance.now();
+  document.getElementById('resp-value').textContent = String(Math.round(r.rateBpm));
+  document.getElementById('resp-status').textContent = 'Estimated';
+}
 
 function settleSec() {
   return monitor && monitor.engine && monitor.engine.fingerState ? monitor.engine.fingerState.settleSec : SETTLE_SEC;
@@ -803,25 +848,13 @@ function updateMeasuringScreen(metrics) {
   const good = metrics.quality && metrics.quality.good;
   document.getElementById('hr-value').textContent = good && Number.isFinite(metrics.heartRate) ? Math.round(metrics.heartRate) : '--';
   document.getElementById('rmssd-value').textContent = good && Number.isFinite(metrics.rmssd) ? Math.round(metrics.rmssd) : '--';
-  document.getElementById('sdnn-value').textContent = good && Number.isFinite(metrics.sdnn) ? Math.round(metrics.sdnn) : '--';
-  const floorEl = document.getElementById('rmssd-floor');
-  if (floorEl) floorEl.textContent = good && metrics.rmssdFloorMs ? `Estimated timing-noise floor: ${Math.round(metrics.rmssdFloorMs)} ms` : '';
-  const respEl = document.getElementById('resp-value');
-  if (respEl) {
-    const r = metrics.respiration;
-    if (r && r.rateBpm != null) {
-      // Below 0.5 the rate rests on one modulation source or a recent hold.
-      respEl.textContent = `${r.confidence < 0.5 ? '≈' : ''}${r.rateBpm.toFixed(0)} br/min`;
-    } else {
-      respEl.textContent = '--';
-    }
-  }
+  updateLiveBreathing(metrics);
 
   updateCaptureSignal(metrics);
   const state = manuscript.paused ? 'Artwork paused' : good ? 'Painting' : 'Waiting';
   const stateEl = document.getElementById('painting-state');
   if (stateEl.textContent !== state) stateEl.textContent = state;
-  drawTachogram();
+  if (signalPreviewVisible()) drawTachogram();
 }
 
 // Fixed 3-minute protocol: starts counting down the moment MEASURING is
@@ -854,8 +887,12 @@ function advanceSessionClock(time, isProcessing) {
   }
   lastMeasuringFrame = { time, deliveredAt: now };
 }
-document.addEventListener('visibilitychange', () => { lastMeasuringFrame = null; });
+document.addEventListener('visibilitychange', () => {
+  lastMeasuringFrame = null;
+  if (document.hidden) clearLiveBreathing('Finding signal');
+});
 function tickSessionCountdown() {
+  expireLiveBreathing();
   const el = document.getElementById('session-countdown');
   if (measuringStartedAt == null) {
     el.textContent = fmtCountdown(SESSION_SEC);
@@ -1556,7 +1593,9 @@ function startSession() {
   setCameraPending(true);
   resetWaveBuffer();
   resetManuscript();
+  resetLiveBreathing();
   document.querySelector('.live-details').open = false;
+  setSignalPreview(false);
   elapsedMeasuringMs = 0; lastMeasuringFrame = null;
   measuringStartedAt = null;
   portraitStartedAt = null;
@@ -1592,6 +1631,7 @@ function startSession() {
         if (screens.measuring.hidden) showScreen('measuring');
         updateMeasuringScreen(metrics);
       } else {
+        clearLiveBreathing('Finding signal');
         if (screens.placement.hidden && screens.measuring.hidden === false) {
           // dropped back out of MEASURING (lift/drift) — show placement coaching again
           showScreen('placement');
@@ -1602,13 +1642,14 @@ function startSession() {
     onSignalUpdate: ({ time, value, isProcessing }) => {
       if (generation !== sessionGeneration) return;
       advanceSessionClock(time, isProcessing);
+      if (!isProcessing) clearLiveBreathing('Finding signal');
       if (isProcessing && Number.isFinite(value)) manuscript.pending.push({ t:time, v:value });
       if (manuscript.pending.length > 1800) manuscript.pending.shift();
       waveBuf.push(value);
       waveBuf.shift();
       placementWaveBuf.push(value);
       placementWaveBuf.shift();
-      if (!screens.measuring.hidden && document.querySelector('.live-details').open) drawWave();
+      if (signalPreviewVisible()) drawWave();
       if (!screens.placement.hidden) drawPlacementWave();
     },
     onError: (err) => {
@@ -1690,8 +1731,22 @@ if (!isPhone) {
   document.getElementById('desktop-phone-panel').hidden = false;
 }
 syncScreenChrome('ready');
+function signalPreviewVisible() {
+  return !screens.measuring.hidden && document.querySelector('.live-details').open && !document.getElementById('signal-preview').hidden;
+}
+function setSignalPreview(open) {
+  document.getElementById('signal-preview').hidden = !open;
+  const button = document.getElementById('btn-signal-preview');
+  button.setAttribute('aria-expanded', String(open));
+  button.textContent = open ? 'Hide signal' : 'View signal';
+  if (signalPreviewVisible()) { drawWave(); drawTachogram(); }
+}
+document.getElementById('btn-signal-preview').addEventListener('click', () => {
+  setSignalPreview(document.getElementById('signal-preview').hidden);
+});
 document.querySelector('.live-details').addEventListener('toggle', event => {
-  if (event.currentTarget.open) { drawWave(); drawTachogram(); }
+  if (!event.currentTarget.open) setSignalPreview(false);
+  else if (signalPreviewVisible()) { drawWave(); drawTachogram(); }
 });
 document.getElementById('btn-start').addEventListener('click', startSession);
 function cancelSession() {
@@ -1717,6 +1772,7 @@ function cancelSession() {
   manuscript.pending = []; manuscript.segments = []; manuscript.raster = null; manuscript.scroll = null;
   manuscript.lastWindow = -1; manuscript.paused = false;
   resetWaveBuffer();
+  resetLiveBreathing();
   elapsedMeasuringMs = 0; measuringStartedAt = null; portraitStartedAt = null; lastMetrics = null;
   showScreen('ready');
   document.getElementById('btn-start').focus({ preventScroll: true });
@@ -1900,7 +1956,7 @@ window.__demoState = function (name) {
     drawWave();
     monitor = monitor || { getTachogram: () => Array.from({ length: 40 }, (_, i) => ({ ibiMs: 800 + 40 * Math.sin(i / 3), valid: i % 7 !== 0, good: true })) };
     drawTachogram();
-    updateMeasuringScreen({ heartRate: 72, rmssd: 45, sdnn: 52, qualityScore: 88, rmssdFloorMs: 9, respiration: { rateBpm: 13.5, confidence: 0.8 }, quality: { good: true, reason: null } });
+    updateMeasuringScreen({ t:60, heartRate:72, rmssd:45, sdnn:52, qualityScore:88, rmssdFloorMs:9, respiration:{ rateBpm:13.5, confidence:0.8, basis:'agreement' }, quality:{ good:true, reason:null } });
     return;
   }
   if (name === 'summary') {

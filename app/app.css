@@ -884,8 +884,15 @@ h1,.capture-title{font-size:clamp(54px,9vw,92px);line-height:.92;letter-spacing:
 .live-details > summary::after { content:'+'; font-size:21px; font-weight:400; line-height:1; }
 .live-details[open] > summary::after { content:'−'; }
 .live-details-body { padding:4px 0 16px; }
-.live-breathing { display:flex; justify-content:space-between; gap:16px; color:#52627c; font-size:13px; }
-.live-breathing strong { font-weight:500; font-variant-numeric:tabular-nums; white-space:nowrap; color:#233b62; }
+.metric-status { display:block; color:#60718e; font-size:14px; line-height:1.4; margin-top:2px; }
+.reading-guide { margin:0; padding:12px 16px; border-radius:14px; background:#eaf0ed80; }
+.reading-guide > div { display:grid; grid-template-columns:76px minmax(0,1fr); gap:10px; padding:8px 0; }
+.reading-guide dt { color:#264b59; font-size:14px; font-weight:600; line-height:1.5; }
+.reading-guide dd { margin:0; color:#52627c; font-size:14px; line-height:1.5; }
+.reading-actions { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-top:10px; }
+.signal-preview-toggle { padding:8px 0; min-height:44px; background:none; border:0; color:#42618f; font:inherit; font-size:14px; text-decoration:underline; text-underline-offset:4px; }
+.signal-preview-toggle:focus-visible { outline:2px solid var(--accent); outline-offset:4px; border-radius:4px; }
+.reading-actions .capture-detail-tools { margin:0; }
 .detail-wave { margin-top:18px; }
 .detail-wave > span { font-size:11px; color:#52627c; }
 .detail-wave .wave-canvas, .detail-wave .tacho-canvas { display:block; margin-top:5px; border-bottom:1px solid #e5eaf2; }
@@ -987,7 +994,6 @@ h1,.capture-title{font-size:clamp(54px,9vw,92px);line-height:.92;letter-spacing:
 .ans-line,
 .floor,
 .rmssd-floor,
-.live-breathing,
 .placement-reassurance,
 #screen-placement .state-line,
 #screen-placement .torch-note {
@@ -1004,7 +1010,6 @@ h1,.capture-title{font-size:clamp(54px,9vw,92px);line-height:.92;letter-spacing:
 .capture-camera figcaption { font-size:14px; line-height:20px; letter-spacing:.025em; }
 .live-metric p { flex-wrap:wrap; gap:0 4px; }
 .metric-number, .metric-unit { white-space:nowrap; }
-.live-breathing { flex-wrap:wrap; gap:4px 16px; }
 #screen-measuring .painting-actions button { font-size:16px; }
 #screen-measuring #pause-note { font-size:14px; min-height:21px; }
 #screen-measuring.capture-screen { min-height:660px; }
