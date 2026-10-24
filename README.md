@@ -4,21 +4,27 @@ Your pulse, made into a place.
 
 > Live at [pulsepainting.com](https://www.pulsepainting.com/): sixteen pulse-derived
 > watercolor landscapes, crisp measured pulse strokes, a pointed brush and soft
-> trailing pigment, a calm zoom-out reveal, and shareable artwork.
+> pigment fixed to the paper, a continuous recording view, and shareable artwork.
 > Browser replay and deployed-asset checks passed; physical-phone validation remains separate.
-> See [current release verification](docs/validation/keepsake-card-2026-10-23.md)
-> and [painting performance](docs/validation/slow-phone-2026-10-23.md).
+> See [current release verification](docs/validation/continuous-brush-2026-10-23.md)
+> and [painting performance](docs/validation/continuous-brush-2026-10-23.md).
 > The [mobile gallery](https://www.pulsepainting.com/#landscapes) is now live too;
 > see [mobile verification](docs/validation/mobile-gallery-2026-10-23.md).
 > Community publishing and artwork sharing are live;
 > see [sharing release checks](docs/validation/community-sharing-2026-10-23.md).
 > Existing sketchbook links remain supported; see [recipient-page checks](docs/validation/shareable-sketchbooks-2026-10-23.md).
 
-Pulse Painting is a three-minute phone-camera capture experience by [ChatPPG](https://chatppg.com), powered by [ppg-js](https://github.com/sontakey/ppg-js). Accepted pulse waveforms paint one of sixteen landscapes, with layered watercolor washes and recognizable pulse contours. A close-up follows the brush during capture, then pulls back to reveal the same painting, ready to share alongside an expandable HRV report.
+Pulse Painting is a three-minute phone-camera capture experience by [ChatPPG](https://chatppg.com), powered by [ppg-js](https://github.com/sontakey/ppg-js). During recording, a pointed brush follows one continuous accepted pulse trace as paper moves beneath it. The line and its soft pigment stay together; scenery remains hidden. Finishing pulls back to the recorded strokes, then arranges those same measurements into one of sixteen landscapes, ready to share alongside an expandable HRV report.
+
+Painting uses quality-approved five-second windows from the selected camera
+channel, so it follows the live measurements with a short buffer. Ordinary
+verified window boundaries connect smoothly. Missing samples, rejected windows
+and explicit breaks remain pen lifts; decorative connections never add accepted
+data or recording time. The original waveform manuscript remains available.
 
 <p align="center">
   <img src="docs/media/pulse-painting-ready.jpg" width="230" alt="Pulse Painting phone capture instructions">
-  <img src="docs/media/pulse-painting-capture.jpg" width="230" alt="Quiet Lake painting, live metrics, and floating capture controls">
+  <img src="docs/media/pulse-painting-capture.jpg" width="230" alt="Continuous measured pulse brush, live metrics, and floating capture controls">
   <img src="docs/media/pulse-painting-report.jpg" width="230" alt="Shareable Pulse Painting artwork and report">
 </p>
 
@@ -145,7 +151,7 @@ private export and example gallery work without these credentials.
 ## What is implemented
 
 - Sixteen seeded landscape families made from accepted waveform paths, with curved terrain, flowing brush strokes and within-stroke gradients. Artistic mapping preserves the original samples; the original manuscript and computed report remain unchanged.
-- During capture, a fine pulse contour follows the recording's actual time and value on a steady baseline. A pointed brush and textured wet pigment trail sit above the quieter landscape; each completed trace settles into its scenic placement. This treatment applies to all sixteen families.
+- During capture, a fine pulse contour follows the recording's actual time and value on a steady baseline. A pointed brush lays down permanent textured pigment on quiet paper. Scenery appears only after recording, when the measured strokes reconstruct the landscape. This treatment applies to all sixteen families.
 - Density based on usable recorded time: sparse sessions keep open paper; longer sessions fill interleaved slots without moving earlier strokes.
 - A close-up artwork camera and a continuous zoom-out reveal of the same accumulated painting. Cached layers keep the main thread available for capture.
 - Optional WebGPU/WebGL2 painted entry transitions and an independent Canvas2D landscape compositor.
@@ -192,7 +198,7 @@ The QR suite uses Python OpenCV, Pillow, and NumPy for bounded image perturbatio
 ## Source map
 
 - `app/`: ready, placement, capture, report, export, local fonts, and static QR assets.
-- `app/landscape.js`: scene planning, accepted-source coverage, pigment rendering and the live artwork camera.
+- `app/landscape.js`: scene planning, accepted-source coverage, pigment rendering, continuous pulse paper and the final reconstruction.
 - `app/portrait.js`: same-scene export and native sharing with download fallback.
 - `app/share-sheet.js` and `app/community.js`: private sharing, optional publication, public browsing, removal and reporting.
 - `api/` and `server/`: persistent community endpoints, script-free painting pages and public sketchbook pages; `db/` records schema and operator procedures.

@@ -81,6 +81,7 @@ try {
   await page.evaluate(({ log, originalLength }) => {
     window.__sessionMetrics = { intervals: [], uninterruptedIntervals: [], paintIntervals: [], interruptions: [], checkpointAt: 60,
       stopCalls: 0, originalLength, extensionUsed: false, droppedSamples: 0,
+      flow: { samples:0, advances:0, paperChanges:0, regressions:0, invalid:0, futureFrontiers:0, nibSamples:0, maxNibXError:0, maxScenicRasters:0 },
       camera: { samples: 0, changes: 0, invalid: 0, maxCachedPixels: 0, pixelBudget: 0, maxScale: 1, maxContinuousStep: 0, examples: [] } };
     window.PPGMonitor = class extends PPG.PPGMonitor {
       constructor(host, options) {
@@ -96,6 +97,8 @@ try {
         const metrics = window.__sessionMetrics;
         let previous = 0, previousPaint = 0, previousPaintFrames = 0, previousPaintWasActive = false;
         let previousCamera = null;
+        let previousStreamTime,previousPaperTransform;
+        let captureWidth = 0;
         let framePauseDone = false, stalled = false, hidden = false;
         let activeFeedPause = null, activeHidden = null, pendingResume = null, restoreVisibility = null;
         const pump = now => {
@@ -133,6 +136,26 @@ try {
           }
           metrics.extensionUsed ||= this.i > originalLength;
           const surface = window.__pulseLandscapeStats;
+          const flow = metrics.flow;
+          if (surface.mode !== 'recording') flow.invalid++;
+          flow.maxScenicRasters = Math.max(flow.maxScenicRasters,surface.rasterFrames);
+          if (Number.isFinite(surface.streamTime)) {
+            flow.samples++;
+            if (previousStreamTime !== undefined) {
+              if (surface.streamTime > previousStreamTime) flow.advances++;
+              if (surface.streamTime < previousStreamTime - 1e-9) flow.regressions++;
+            }
+            previousStreamTime = surface.streamTime;
+          }
+          if (surface.frontier?.t > landscape.strokes.at(-1)?.sourceEnd + 1e-9) flow.futureFrontiers++;
+          const paper=document.querySelector('.landscape-paper-trace'),paperTransform=paper&&(paper.getAttribute('transform')||paper.style.transform);
+          if(paperTransform){if(previousPaperTransform!==undefined&&paperTransform!==previousPaperTransform)flow.paperChanges++;previousPaperTransform=paperTransform;}
+          if (surface.nib) {
+            if (!captureWidth) captureWidth=document.getElementById('landscape-view').getBoundingClientRect().width;
+            flow.nibSamples++;
+            if (![surface.nib.x,surface.nib.y].every(Number.isFinite)) flow.invalid++;
+            flow.maxNibXError = Math.max(flow.maxNibXError,Math.abs(surface.nib.x-captureWidth*.78));
+          }
           // Scalar diagnostics avoid GPU readback/layout during timing samples.
           const camera = surface.camera, tracking = metrics.camera;
           if (camera) {
@@ -194,14 +217,31 @@ try {
               countdown: document.getElementById('session-countdown').textContent, engineState: this.currentMetrics.fingerState,
               samples: this.fedSamples, consumedSamples: this.i, droppedSamples: metrics.droppedSamples, acceptedSegments: manuscript.segments.length, backend: window.__paintGpuStats.backend,
               landscapeFrames: surface.frames, hidden: document.hidden, camera: surface.camera,
-              cachedPixels: surface.cachedPixels, cameraSteps: metrics.camera.changes }));
+              cachedPixels: surface.cachedPixels, mode:surface.mode,streamTime:surface.streamTime,sourceAdvances:flow.advances,scenicRasters:surface.rasterFrames }));
             metrics.checkpointAt += 60;
           }
           this.replayFrame = requestAnimationFrame(pump);
         };
         this.replayFrame = requestAnimationFrame(pump);
       }
-      stop() { this.stopped = true; window.__sessionMetrics.stopCalls++; window.__sessionMetrics.wallElapsedSec = (performance.now() - this.started) / 1000; }
+      stop() {
+        this.stopped = true;
+        const metrics=window.__sessionMetrics;metrics.stopCalls++;metrics.wallElapsedSec=(performance.now()-this.started)/1000;
+        const source=JSON.stringify(landscape),captureMs=elapsedMeasuringMs,started=performance.now();
+        const reveal=metrics.reveal={phases:{},intervals:[],complete:false};
+        let previous=0,previousFrames=__pulseLandscapeStats.frames;
+        const sample=now=>{
+          const surface=__pulseLandscapeStats,phase=reveal.phases[surface.mode]||={frames:0,intervals:[],cpu:[]};
+          phase.frames++;
+          if(previous)reveal.intervals.push(now-previous);
+          if(surface.frames>previousFrames){if(previous)phase.intervals.push(now-previous);phase.cpu.push(surface.frameMs);}
+          previous=now;previousFrames=surface.frames;
+          if(!document.getElementById('screen-summary').hidden){
+            reveal.complete=true;reveal.elapsedMs=now-started;reveal.sourceStable=source===JSON.stringify(landscape);reveal.measurementStable=captureMs===elapsedMeasuringMs;
+          }else requestAnimationFrame(sample);
+        };
+        requestAnimationFrame(sample);
+      }
       destroy() {}
       getMetrics() { return this.currentMetrics; }
       getSessionSummary() { return this.engine.getSessionSummary(); }
@@ -233,6 +273,7 @@ try {
   console.log('SESSION_START', new Date().toISOString());
   await page.locator('#btn-start').click();
   await page.waitForFunction(() => !document.getElementById('screen-summary').hidden, null, { timeout: timeoutSeconds * 1000 });
+  await page.waitForFunction(() => window.__sessionMetrics.reveal?.complete);
   // The summary appears after the same-scene landscape reveal. Confirm no
   // entry overlay remains before exercising report layout and exports.
   await page.waitForFunction(() => entryTransition === null);
@@ -257,11 +298,18 @@ try {
   }
   assert.ok(evidence.session.droppedSamples > 0, 'interruption stimuli actually removed camera frames');
   const camera = evidence.session.camera;
-  assert.ok(camera.samples > 100 && camera.changes > 20 && camera.maxScale > 2, 'live view follows actual scene strokes through intermediate macro camera positions');
+  const flow = evidence.session.flow;
+  assert.ok(flow.samples>100&&flow.advances>20&&flow.paperChanges>20&&flow.nibSamples>20,'full recording advances accepted source and actual paper translation under the continuous brush');
+  assert.equal(flow.regressions+flow.invalid+flow.futureFrontiers,0,'recording flow stays finite, forward and within accepted data across interruptions');
+  assert.ok(flow.maxNibXError<1,'paper moves beneath the fixed horizontal brush anchor');
+  assert.equal(flow.maxScenicRasters,0,'recording does no scenic raster work');
   assert.equal(camera.invalid, 0, 'camera remains finite within its intended zoom bounds');
   assert.ok(camera.maxCachedPixels <= camera.pixelBudget, 'live scene raster memory remains bounded');
-  assert.ok(camera.maxContinuousStep < 250, 'healthy frames damp scene camera movements');
+  assert.ok(evidence.session.reveal.phases.pullback?.frames>2&&evidence.session.reveal.phases.reconstructing?.frames>2,'automatic finish visibly pulls back and rearranges the recorded strokes');
+  assert.ok(evidence.session.reveal.sourceStable&&evidence.session.reveal.measurementStable,'reconstruction preserves accepted source and the stopped capture clock');
+  assert.ok(evidence.session.reveal.elapsedMs<20000,'automatic reconstruction has bounded completion time');
   assert.equal(evidence.session.landscape.finished, true, 'same-scene completion reveal settles');
+  assert.equal(evidence.session.landscape.mode,'finished');
   assert.deepEqual(evidence.session.landscape.camera, { x:540, y:540, scale:1 }, 'completion reveals the full saved composition');
   assert.equal(evidence.session.landscape.painted, evidence.session.scene.strokeCount, 'completion includes every accepted scene stroke');
   assert.equal(evidence.session.stopCalls, 1, 'automatic completion stopped exactly once');
@@ -322,9 +370,10 @@ try {
   assert.deepEqual(evidence.firstPartyRequestFailures, [], 'no failed first-party requests');
   await checkpointCapture;
   assert.ok(evidence.midSessionCapture && !evidence.evidenceCaptureError, '60s measuring screenshot was captured');
-  const cadence = samples => { const ordered = [...samples].sort((a,b) => a-b); return { frames: samples.length, fps: 1000*samples.length/samples.reduce((sum,n)=>sum+n,0), p50Ms: ordered[Math.floor(ordered.length*.5)], p95Ms: ordered[Math.floor(ordered.length*.95)], maxMs: ordered.at(-1), over33Ms: samples.filter(n=>n>33.34).length }; };
+  const cadence = samples => { const ordered = [...samples].sort((a,b) => a-b); return { frames: samples.length, fps: samples.length?1000*samples.length/samples.reduce((sum,n)=>sum+n,0):null, p50Ms: ordered[Math.floor(ordered.length*.5)], p95Ms: ordered[Math.floor(ordered.length*.95)], maxMs: ordered.at(-1), over33Ms: samples.filter(n=>n>33.34).length }; };
   evidence.cadence = { allFramesIncludingDeliberateStall: cadence(evidence.session.intervals),
-    excludingDeliberateMainThreadStall: cadence(evidence.session.uninterruptedIntervals), activePainting: cadence(evidence.session.paintIntervals) };
+    excludingDeliberateMainThreadStall: cadence(evidence.session.uninterruptedIntervals), activePainting: cadence(evidence.session.paintIntervals),reveal:cadence(evidence.session.reveal.intervals),revealPhases:Object.fromEntries(Object.entries(evidence.session.reveal.phases).map(([mode,phase])=>{const cpu=cadence(phase.cpu);return [mode,{frames:phase.frames,cadence:cadence(phase.intervals),submissionCPU:{samples:cpu.frames,p50Ms:cpu.p50Ms,p95Ms:cpu.p95Ms,maxMs:cpu.maxMs}}];})) };
+  delete evidence.session.reveal.intervals;for(const phase of Object.values(evidence.session.reveal.phases)){delete phase.intervals;delete phase.cpu;}
   delete evidence.session.intervals; delete evidence.session.uninterruptedIntervals; delete evidence.session.paintIntervals;
   evidence.passed = true; evidence.completedAt = new Date().toISOString();
   writeFileSync(`${out}/result.json`, JSON.stringify(evidence, null, 2) + '\n');

@@ -9,6 +9,7 @@
 #landscape-view { position: absolute; inset: 0; width: 100%; height: 100%; }
 #screen-measuring.is-revealing .capture-camera { opacity: .45; }
 #screen-measuring.is-revealing .capture-camera figcaption { visibility: hidden; }
+#screen-measuring.is-revealing .capture-time { display: none; }
 #screen-measuring.is-revealing .quality-dot { background: #2855ff; }
 #screen-measuring.is-revealing #btn-cancel-reading { opacity: .65; }
 

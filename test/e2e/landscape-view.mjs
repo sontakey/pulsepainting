@@ -1,5 +1,5 @@
 // Presentation regression stimuli are synthetic, test-only paths. This checks
-// geometry retention and camera behavior, not physiological validity or beauty.
+// geometry retention and the recording/reconstruction lifecycle, not physiology.
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 const hash=value=>createHash('sha256').update(value).digest('hex');
@@ -24,7 +24,7 @@ try {
    window.view=PulseLandscape.createView(document.getElementById('view'),scene);
    PulseLandscape.append(scene,testSegment(0,5));view.sync();
  });
- await page.waitForFunction(()=>__pulseLandscapeStats.frames>5&&__pulseLandscapeStats.camera.scale>1.1);
+ await page.waitForFunction(()=>__pulseLandscapeStats.frames>5&&__pulseLandscapeStats.mode==='recording');
  const paused=await page.evaluate(()=>{view.pause(true);return{image:view.canvas.toDataURL(),frames:__pulseLandscapeStats.frames,source:JSON.stringify(scene),count:scene.strokes.length};});
  await page.evaluate(()=>{PulseLandscape.append(scene,testSegment(8,5));view.sync();});
  await page.waitForTimeout(100);
@@ -38,15 +38,23 @@ try {
    assert.equal(hash(await page.evaluate(()=>JSON.stringify(scene))),hash(sourceBefore),'resize never reseeds/repositions source geometry');
  }
  await page.setViewportSize({width:390,height:844});
- await page.evaluate(()=>{view.pause(false);window.revealSamples=[];window.revealStarted=performance.now();window.revealDone=false;window.finishedScene=null;const sample=()=>{revealSamples.push({...__pulseLandscapeStats.camera});if(!revealDone)requestAnimationFrame(sample);};requestAnimationFrame(sample);view.finish().then(value=>{finishedScene=value;revealDone=true;});});
- await page.waitForFunction(()=>revealDone,null,{timeout:10000});
+ await page.evaluate(()=>{view.pause(false);window.revealSamples=[];window.revealStarted=performance.now();window.revealDone=false;window.finishedScene=null;const sample=()=>{const stats=__pulseLandscapeStats;revealSamples.push({mode:stats.mode,morphProgress:stats.morphProgress,camera:{...stats.camera},points:structuredClone(stats.revealSamples||[])});if(!revealDone)requestAnimationFrame(sample);};requestAnimationFrame(sample);view.finish().then(value=>{finishedScene=value;revealDone=true;});});
+ await page.waitForFunction(()=>performance.now()-revealStarted>250&&__pulseLandscapeStats.mode==='pullback');
+ for(const width of [320,390]){
+   await page.setViewportSize({width,height:844});
+   await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));
+   assert.equal(await page.evaluate(()=>revealDone),false,'a real responsive resize reprojects the ongoing reveal instead of skipping to the final painting');
+ }
+ await page.waitForFunction(()=>revealDone,null,{timeout:12000});
  const finished=await page.evaluate(()=>({same:finishedScene===scene,source:JSON.stringify(scene),stats:__pulseLandscapeStats,samples:revealSamples,elapsed:performance.now()-revealStarted}));
  assert.equal(finished.same,true,'zoom-out resolves the exact capture scene object');
  assert.equal(hash(finished.source),hash(sourceBefore),'completion does not substitute or mutate the composition');
  assert.equal(finished.stats.finished,true);assert.equal(finished.stats.painted,finished.stats.strokes);
  assert.deepEqual(finished.stats.camera,{x:540,y:540,scale:1});
- assert.ok(finished.samples.length>30&&finished.samples.some(s=>s.scale>1.1),'normal motion contains a real continuous reveal');
- assert.ok(finished.elapsed>=3400&&finished.elapsed<6000,'normal reveal remains near its intended 3.5 second duration');
+ assert.equal(finished.stats.mode,'finished');
+ assert.ok(finished.samples.length>60&&finished.samples.some(s=>s.mode==='pullback')&&finished.samples.some(s=>s.mode==='reconstructing'),'finish pulls back to the manuscript before reconstructing its landscape');
+ assert.ok(finished.samples.some(s=>s.mode==='reconstructing'&&s.morphProgress>.2&&s.morphProgress<.8&&s.points.length>0),'normal reconstruction includes real intermediate pulse geometry');
+ assert.ok(finished.elapsed>=5700&&finished.elapsed<8000,'the two-stage reveal stays within its intended 5.8 seconds plus bounded raster preparation');
  assert.ok(finished.stats.cachedPixels<=finished.stats.pixelBudget,'raster storage stays bounded');
  assert.ok(finished.stats.materialPixels<=finished.stats.materialPixelBudget,'pigment canvases and pattern snapshots stay bounded');
  const raster=await page.evaluate(()=>{const c=document.createElement('canvas');c.width=c.height=view.canvas.width;PulseLandscape.render(scene,c);const a=view.canvas.getContext('2d').getImageData(0,0,c.width,c.height).data,b=c.getContext('2d').getImageData(0,0,c.width,c.height).data;let different=0,max=0,sum=0;for(let i=0;i<a.length;i++){const delta=Math.abs(a[i]-b[i]);different+=delta>0?1:0;max=Math.max(max,delta);sum+=delta;}return{live:view.canvas.toDataURL(),direct:c.toDataURL(),different,max,mean:sum/a.length};});
@@ -80,7 +88,7 @@ try {
  assert.equal(fragmentedBefore.painted,0,'paused stress input has not silently drained the paint queue');
  const fragmentedFinish=await page.evaluate(async()=>{const started=performance.now();const resolved=await view.finish();return{same:resolved===scene,source:JSON.stringify(scene),duration:performance.now()-started,stats:{...__pulseLandscapeStats}};});
  assert.equal(fragmentedFinish.same,true);assert.equal(hash(fragmentedFinish.source),hash(fragmentedBefore.source),'fragmented completion preserves every stored source run');
- assert.ok(fragmentedFinish.duration>=3400&&fragmentedFinish.duration<8000,'fragmented finish uses one bounded reveal rather than replaying each pending path');
+ assert.ok(fragmentedFinish.duration>=5700&&fragmentedFinish.duration<8000,'fragmented finish uses one bounded reveal rather than replaying each pending path');
  assert.equal(fragmentedFinish.stats.finished,true);assert.equal(fragmentedFinish.stats.painted,fragmentedBefore.strokes);
  assert.ok(fragmentedFinish.stats.cachedPixels<=fragmentedFinish.stats.pixelBudget,'fragmentation cannot grow the live raster cache');
  assert.deepEqual(fragmentedFinish.stats.camera,{x:540,y:540,scale:1});
@@ -127,5 +135,5 @@ try {
  assert.ok(await page.evaluate(()=>__pulseLandscapeStats.cachedPixels)<=4,'dispose releases all layer raster storage');
  assert.deepEqual(errors,[]);
  if(out){mkdirSync(out,{recursive:true});writeFileSync(path.join(out,'view.json'),JSON.stringify({scope:'Synthetic test-only view regression; not a public personal artwork',finished:{...finished,source:undefined,samples:finished.samples.slice(0,10)},reduced,fragmented:{strokes:fragmentedBefore.strokes,slots:fragmentedBefore.slots,usableSeconds:fragmentedBefore.usableSeconds,duration:fragmentedFinish.duration,stats:fragmentedFinish.stats},families:all.map(({png,...rest})=>rest)},null,2));}
- console.log('PASS landscape view: stable geometry, pause/resume, responsive camera, continuous same-scene reveal, direct render parity, reduced motion, bounded fragmented recording, 16 distinct family rasters and disposal');
+ console.log('PASS landscape view: stable geometry, pause/resume, responsive recording, manuscript pullback and reconstruction, direct render parity, reduced motion, bounded fragmented recording, 16 distinct family rasters and disposal');
 }finally{await browser.close();}

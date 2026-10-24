@@ -135,16 +135,36 @@ try {
     assert.ok(captureLayout.details.bottom <= captureLayout.dock.top - 4,
       `capture ${viewport.width}x${viewport.height}: details remain reachable above floating controls`);
   }
-  // Follow actual scene geometry with a bounded raster; the source descriptor
-  // is independent of presentation and never moves previously accepted strokes.
+  // Accepted source advances on moving paper under a fixed brush. Presentation
+  // must preserve earlier source strokes and keep scenery hidden until finish.
   await page.emulateMedia({ reducedMotion: 'no-preference' });
   await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
-  const beforeFollow = await page.evaluate(() => ({ frames: __pulseLandscapeStats.frames, strokes: JSON.stringify(landscape.strokes) }));
+  const beforeFlow = await page.evaluate(() => {
+    const paper = document.querySelector('.landscape-paper-trace');
+    return { frames: __pulseLandscapeStats.frames, streamTime: __pulseLandscapeStats.streamTime,
+      paperTransform: paper.getAttribute('transform') || paper.style.transform,
+      strokes: JSON.stringify(landscape.strokes) };
+  });
   await page.evaluate(() => monitor.feedUntil(75));
-  await page.waitForFunction(frames => __pulseLandscapeStats.frames > frames && __pulseLandscapeStats.camera.scale > 1.05, beforeFollow.frames);
-  const follow = await page.evaluate(previous => ({ stats: __pulseLandscapeStats, stable: JSON.stringify(landscape.strokes.slice(0, JSON.parse(previous).length)) === previous }), beforeFollow.strokes);
-  assert.equal(follow.stable, true, 'new accepted strokes preserve all earlier placements and materials');
-  assert.ok(follow.stats.cachedPixels <= follow.stats.pixelBudget, 'live landscape cache stays within its pixel budget');
+  await page.waitForFunction(previous => {
+    const state = __pulseLandscapeStats, paper = document.querySelector('.landscape-paper-trace');
+    return state.frames > previous.frames && state.streamTime > previous.streamTime && state.nib
+      && (paper.getAttribute('transform') || paper.style.transform) !== previous.paperTransform;
+  }, beforeFlow);
+  const flow = await page.evaluate(previous => ({
+    stats: __pulseLandscapeStats,
+    width: document.getElementById('landscape-view').getBoundingClientRect().width,
+    acceptedEnd: landscape.strokes.at(-1).sourceEnd,
+    scenicHidden: getComputedStyle(document.querySelector('.landscape-stage')).opacity === '0',
+    stable: JSON.stringify(landscape.strokes.slice(0, JSON.parse(previous).length)) === previous,
+  }), beforeFlow.strokes);
+  assert.equal(flow.stable, true, 'new accepted strokes preserve all earlier placements and materials');
+  assert.equal(flow.stats.mode, 'recording');
+  assert.equal(flow.stats.projection.kind, 'continuous-source-time-value');
+  assert.ok(Math.abs(flow.stats.nib.x - flow.width * .78) < 1, 'the brush keeps its horizontal anchor as real source paper advances');
+  assert.ok(flow.stats.frontier.t <= flow.acceptedEnd + 1e-9, 'the brush cannot paint beyond accepted source');
+  assert.equal(flow.scenicHidden, true, 'recording shows source ink before the landscape reveal');
+  assert.ok(flow.stats.cachedPixels <= flow.stats.pixelBudget, 'live landscape cache stays within its pixel budget');
   await page.emulateMedia({ reducedMotion: 'reduce' });
   await page.evaluate(() => {
     window.__cancelledMonitor = monitor;
@@ -257,7 +277,7 @@ try {
   await page.evaluate(() => useManuscriptFallback());
   assert.equal(fingerprint(await page.evaluate(() => JSON.stringify(landscape))), fingerprint(completeScene), 'visual fallback preserves the scene identity and every accepted source stroke');
 
-  // Navigate away while the genuine final camera animation is active. Capture
+  // Navigate away while the final landscape reconstruction is active. Capture
   // has already stopped; page lifecycle must settle, never strand the report.
   await page.locator('#btn-again').click();
   await page.emulateMedia({ reducedMotion: 'no-preference' });
