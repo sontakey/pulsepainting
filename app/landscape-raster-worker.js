@@ -37,11 +37,12 @@ self.onmessage = ({ data }) => {
         raster = self.PulseLandscape.createRaster({ ...data.scene, strokes: [] }, 800);
       }
       // Append only the accepted descriptor supplied by the main thread.
-      raster.append(data.stroke);
+      const revealNodes = raster.append(data.stroke);
       count += 1;
       const bitmap = data.snapshot ? raster.snapshot(data.snapshot) : undefined;
       send({
         type: 'painted',
+        revealNodes,
         snapshot: data.snapshot,
         ...(bitmap ? { bitmap } : {}),
         count,

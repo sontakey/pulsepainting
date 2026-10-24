@@ -51,7 +51,7 @@ try {
       await page.evaluate(() => {
         const nativeWorker = window.Worker, nativeSetTimeout = window.setTimeout.bind(window), nativeClearTimeout = window.clearTimeout.bind(window);
         const frames = new Map(), watchdogs = new Map(); let frameId = 0, clock = 0, timerId = -1;
-        window.workerTest = { mode: 'real', created: 0, terminated: 0, alive: 0, pending: 0, maxPending: 0, requests: 0, received: 0, bitmaps: 0, closed: 0, urls: [] };
+        window.workerTest = { mode: 'real', created: 0, terminated: 0, alive: 0, pending: 0, maxPending: 0, requests: 0, received: 0, bitmaps: 0, closed: 0, revealNodesChecked: 0, revealGeometryError: 0, urls: [] };
         const bitmapClose = ImageBitmap.prototype.close;
         ImageBitmap.prototype.close = function () { workerTest.closed++; return bitmapClose.call(this); };
         window.requestAnimationFrame = callback => { frames.set(++frameId, callback); return frameId; };
@@ -86,6 +86,18 @@ try {
           deliver(event) {
             this.clearBusy(); workerTest.received++;
             if (event.data.bitmap) workerTest.bitmaps++;
+            if (event.data.type === 'painted') {
+              const stroke = scene.strokes[event.data.count - 1], nodes = event.data.revealNodes;
+              if (!Array.isArray(nodes) || nodes.length !== stroke.points.length) throw Error('Worker omitted measured reveal knots');
+              nodes.forEach((node, i) => {
+                const source = stroke.points[i];
+                if (node.t !== source.t || node.v !== source.v) throw Error('Worker changed a measured reveal knot');
+                const expected = PulseLandscape.strokeFrontier(stroke, (node.t - stroke.sourceStart) / (stroke.sourceEnd - stroke.sourceStart));
+                const error = Math.hypot(node.x - expected.x, node.y - expected.y);
+                if (!Number.isFinite(error) || error > 1e-7) throw Error('Worker changed canonical reveal geometry');
+                workerTest.revealNodesChecked++; workerTest.revealGeometryError = Math.max(workerTest.revealGeometryError, error);
+              });
+            }
             this.onmessage?.(event);
           }
           postMessage(message, transfer) {
@@ -268,6 +280,8 @@ try {
       }
       result.transport = await page.evaluate(() => inspectWorker());
       assert.equal(result.transport.maxPending, 1);
+      assert.ok(result.transport.revealNodesChecked > 10000, 'full recordings reuse verified worker reveal geometry');
+      assert.ok(result.transport.revealGeometryError < 1e-7);
       assert.equal(result.transport.alive, 0); assert.equal(result.transport.pending, 0);
       assert.equal(result.transport.bitmaps, result.transport.closed, 'each received bitmap is closed after use');
       assert.ok(result.transport.urls.every(url => url === `${origin}/app/landscape-raster-worker.js`));
