@@ -1,6 +1,32 @@
 # Pulse Painting handoff
 
-## Current production release: continuous pulse brush
+## Current production release: emerging landscape
+
+A pale version of the accepted-data landscape gradually develops behind the
+continuous pulse brush. Its composition and pigment stay fixed around a clear
+foreground corridor. Brief captions accompany real additions; elapsed time,
+rejected samples and signal gaps cannot invent more detail. Finishing removes
+the ambient view and preserves the existing full-strength reconstruction.
+All sixteen completed landscapes, gallery images, reports and exports remain
+unchanged. This is a released phone-preview improvement; the visual review
+reached 7.4/10 and further watercolor texture polish remains open.
+
+PR #11 merged as `7d6fb388971d3371b5422bdfbc3e0d448690ef01` after full Linux CI
+`40104454982` passed tested source `5b113185e3fafccd4c37e1f44ef2e1ed582cc6f2`.
+Production `dpl_Ep6WeXRWFz6jMhjWAfKvbbZZafJL` is READY at https://www.pulsepainting.com/.
+At `2026-10-24T15:06:27.083Z`, all 107 public files matched the tested build;
+anonymous Chromium/WebKit checks at 390px and 1440px passed at
+`2026-10-24T15:06:38.735Z` without public writes or page/HTTP errors.
+
+The full three-minute WebKit replay passed all interruption recoveries,
+report/export and exact artwork parity: 58.71 fps capture and 59.93 fps reveal.
+Chrome measured about 60 fps normally; 4× CPU stress retained 59.70–59.75 fps
+capture and 52.57–54.12 fps reveal. These are browser checks, not physical-phone,
+thermal or native-share validation. See `docs/validation/emerging-landscape-2026-10-24.md`.
+Later documentation commits may advance deployment IDs without changing runtime
+bytes. npm publication remains pending.
+
+## Previous production release: continuous pulse brush
 
 Recording draws one continuous accepted PPG trace across quiet moving paper.
 A pointed brush deposits crisp ink and permanent soft pigment; no landscape is

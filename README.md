@@ -4,17 +4,17 @@ Your pulse, made into a place.
 
 > Live at [pulsepainting.com](https://www.pulsepainting.com/): sixteen pulse-derived
 > watercolor landscapes, crisp measured pulse strokes, a pointed brush and soft
-> pigment fixed to the paper, a continuous recording view, and shareable artwork.
+> pigment fixed to the paper, a gradually emerging background, and shareable artwork.
 > Browser replay and deployed-asset checks passed; physical-phone validation remains separate.
-> See [current release verification](docs/validation/continuous-brush-2026-10-23.md)
-> and [painting performance](docs/validation/continuous-brush-2026-10-23.md).
+> See [current release verification](docs/validation/emerging-landscape-2026-10-24.md)
+> and [painting performance](docs/validation/emerging-landscape-2026-10-24.md).
 > The [mobile gallery](https://www.pulsepainting.com/#landscapes) is now live too;
 > see [mobile verification](docs/validation/mobile-gallery-2026-10-23.md).
 > Community publishing and artwork sharing are live;
 > see [sharing release checks](docs/validation/community-sharing-2026-10-23.md).
 > Existing sketchbook links remain supported; see [recipient-page checks](docs/validation/shareable-sketchbooks-2026-10-23.md).
 
-Pulse Painting is a three-minute phone-camera capture experience by [ChatPPG](https://chatppg.com), powered by [ppg-js](https://github.com/sontakey/ppg-js). During recording, a pointed brush follows one continuous accepted pulse trace as paper moves beneath it. The line and its soft pigment stay together; scenery remains hidden. Finishing pulls back to the recorded strokes, then arranges those same measurements into one of sixteen landscapes, ready to share alongside an expandable HRV report.
+Pulse Painting is a three-minute phone-camera capture experience by [ChatPPG](https://chatppg.com), powered by [ppg-js](https://github.com/sontakey/ppg-js). During recording, a pointed brush follows one continuous accepted pulse trace as paper moves beneath it. The line and its soft pigment stay together while a faint landscape gradually emerges behind it. The scenery stays still, leaving clear paper around the live brush. Finishing pulls back to the recorded strokes, then arranges those same measurements into the full-strength landscape, ready to share alongside an expandable HRV report.
 
 Painting uses quality-approved five-second windows from the selected camera
 channel, so it follows the live measurements with a short buffer. Ordinary
@@ -22,13 +22,19 @@ verified window boundaries connect smoothly. Missing samples, rejected windows
 and explicit breaks remain pen lifts; decorative connections never add accepted
 data or recording time. The original waveform manuscript remains available.
 
+The background grows from accepted pulse data in quiet stages, roughly every
+twenty usable seconds after the first discovery. Occasional short captions mark
+visible new details. Signal interruptions pause that growth; existing
+colors and shapes stay in place. The finished painting retains its complete
+detail and stronger pigment for the final reveal.
+
 <p align="center">
   <img src="docs/media/pulse-painting-ready.jpg" width="230" alt="Pulse Painting phone capture instructions">
-  <img src="docs/media/pulse-painting-capture.jpg" width="230" alt="Continuous measured pulse brush, live metrics, and floating capture controls">
+  <img src="docs/media/pulse-painting-capture.jpg" width="230" alt="Crisp measured pulse brush with a faint emerging landscape, live metrics, and floating capture controls">
   <img src="docs/media/pulse-painting-report.jpg" width="230" alt="Shareable Pulse Painting artwork and report">
 </p>
 
-The capture screenshot shows the compact LIVE/signal header and crisp pulse brush with forty seconds of the public recording preloaded through the actual app. The report shows the framed Glacial fjord keepsake, with summary metrics calculated from the public recording. Both use browser replay; see [capture provenance](docs/media/README.md). They are not physical-phone measurements or session benchmarks.
+The capture screenshot shows the actual app with its crisp pulse brush and pale emerging landscape. The public recording was fed through the real signal engine in one accelerated chunk, yielding 153.85 usable seconds; the foreground animation continued at normal speed. This is a composition capture, not a three-minute wall-clock session. The report shows the framed Glacial fjord keepsake, with summary metrics calculated from the public recording. Both use browser replay; see [capture provenance](docs/media/README.md). They are not physical-phone measurements or performance benchmarks.
 
 The primary destination is [pulsepainting.com](https://www.pulsepainting.com/), a separate Vercel project connected to this repository. The apex domain redirects to www. The simple library demo remains at [ChatPPG](https://chatppg.com/ppg-js-demo). Release and public verification status are tracked in [HANDOFF.md](HANDOFF.md).
 
@@ -151,9 +157,9 @@ private export and example gallery work without these credentials.
 ## What is implemented
 
 - Sixteen seeded landscape families made from accepted waveform paths, with curved terrain, flowing brush strokes and within-stroke gradients. Artistic mapping preserves the original samples; the original manuscript and computed report remain unchanged.
-- During capture, a fine pulse contour follows the recording's actual time and value on a steady baseline. A pointed brush lays down permanent textured pigment on quiet paper. Scenery appears only after recording, when the measured strokes reconstruct the landscape. This treatment applies to all sixteen families.
+- During capture, a fine pulse contour follows the recording's actual time and value on a steady baseline. A pointed brush lays down permanent textured pigment while a faint, stationary preview of the accepted landscape develops around a clear foreground. Brief captions mark new details. This treatment applies to all sixteen families.
 - Density based on usable recorded time: sparse sessions keep open paper; longer sessions fill interleaved slots without moving earlier strokes.
-- A close-up artwork camera and a continuous zoom-out reveal of the same accumulated painting. Cached layers keep the main thread available for capture.
+- On finish, the view pulls back along the recorded pulse paper, then reconstructs those same measured strokes into the complete landscape at full pigment strength. Cached layers keep the main thread available for capture.
 - Optional WebGPU/WebGL2 painted entry transitions and an independent Canvas2D landscape compositor.
 - Placement coaching, a small live finger preview, real-time pulse/RMSSD/SDNN, and floating mobile controls.
 - Report charts, a 1080 × 1350 shareable artwork, native file sharing with download fallback, and optional metrics on the artwork.
@@ -174,9 +180,14 @@ The temporary pinned browser artifact in [`vendor/ppg-js/0.3.1`](vendor/ppg-js/0
 
 ## Verification
 
+[The current verification record](docs/validation/emerging-landscape-2026-10-24.md)
+separates visual replay, source-data checks, full sessions and performance evidence.
+Deployment status remains in [HANDOFF.md](HANDOFF.md).
+
 ```sh
 npm test
 npm run test:safari-session
+npm run test:emergence
 npm run test:paint-performance
 npm run test:qr
 npm run test:gallery
@@ -198,7 +209,7 @@ The QR suite uses Python OpenCV, Pillow, and NumPy for bounded image perturbatio
 ## Source map
 
 - `app/`: ready, placement, capture, report, export, local fonts, and static QR assets.
-- `app/landscape.js`: scene planning, accepted-source coverage, pigment rendering, continuous pulse paper and the final reconstruction.
+- `app/landscape.js`: scene planning, accepted-source coverage, pigment rendering, continuous pulse paper, the staged background and final reconstruction.
 - `app/portrait.js`: same-scene export and native sharing with download fallback.
 - `app/share-sheet.js` and `app/community.js`: private sharing, optional publication, public browsing, removal and reporting.
 - `api/` and `server/`: persistent community endpoints, script-free painting pages and public sketchbook pages; `db/` records schema and operator procedures.

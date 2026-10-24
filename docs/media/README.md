@@ -1,7 +1,8 @@
 # Pulse Painting screenshots
 
 These are direct browser captures of the actual static app. The capture image
-was refreshed on October 23, 2026 for continuous source-time ink on quiet paper. The report and sharing
+was refreshed on October 24, 2026 for continuous source-time ink with a slowly
+emerging landscape behind it. The report and sharing
 images show the October 23 framed keepsake card. The desktop image retains the
 October 22 foreground release. Ready and QR retain their
 unchanged first-release images.
@@ -10,26 +11,42 @@ described below. Its release was subsequently verified on the public site;
 the screenshot itself was captured locally.
 See [HANDOFF.md](../../HANDOFF.md) for deployment status.
 
-## Continuous brush capture
+## Emerging landscape capture
 
 `pulse-painting-capture.jpg` is the direct native-browser JPEG (quality 92) from
-`2026-10-24T04:01:53.583Z` (October 23 locally). Chrome 155.0.8059.85 through
-Playwright captured the actual app at 390 × 844 CSS pixels, DPR 1, with normal
-motion and loaded fonts. No image pixels or UI values were edited.
+`2026-10-24T14:50:33.737Z`. Chrome 155.0.8059.85 through Playwright captured the
+actual app at 390 × 844 CSS pixels, DPR 1, with normal motion and loaded fonts.
+The JPEG was copied byte-for-byte; no image pixels or UI values were edited.
 
-The public recording was preloaded through forty seconds using the real signal
-engine, acceptance adapter and app callbacks, followed by six seconds of
-wall-clock replay. The screenshot shows a continuous measured PPG line on paper,
-a pointed brush and permanent pigment; landscape geometry remains hidden.
-The countdown is 2:34; computed values are 70 bpm, 43 ms RMSSD and 33 ms SDNN.
-Camera I/O is mocked, so the thumbnail is empty. No samples were duplicated and
-no metrics were substituted. There were no runtime errors.
+This is an **accelerated-source composition capture**, not a three-minute
+wall-clock recording. The public fixture was fed in one chunk through 181.989
+recorded seconds using the real signal engine, acceptance adapter and app
+callbacks. Its 31 accepted segments supply 153.85 usable seconds and 61 terrain
+strokes in Quiet Lake, seed 39293. The foreground continued at normal animation
+speed and had drawn 11.70 seconds when this frame was captured. The screenshot
+shows a continuous measured PPG line, a pointed brush and permanent pigment,
+with a faint landscape copied from the same accepted source geometry. Its
+position and pigment texture remain fixed while newly accepted details appear.
+
+The actual countdown is **0:17**; computed values are **81 bpm, 61 ms RMSSD and
+59 ms SDNN**. Camera I/O is mocked, so the thumbnail is empty. No samples were
+duplicated and no metrics were substituted. There were no runtime errors or
+horizontal overflow, and previously painted source paths remained unchanged.
+The selected frame shows the settled background after the caption has faded.
+A companion native PNG captured **“A place that is yours alone.”** at
+`2026-10-24T14:50:28.565Z`, while the new wash was appearing.
 
 Source and distribution renderer SHA-256:
-`dda5c8ba24dca41761f39cc233ffe27eed7416ea91992edae02af874eaeca85c`.
-The native JPEG, full motion recording and metadata are in ignored
-`.dream-loop/continuous-brush/pass4/`. This is presentation evidence, separate
-from [full-session and performance checks](../validation/continuous-brush-2026-10-23.md).
+`7d1d2abb53ee40e7d8c9fcab773aefdc7fb749c77cbf10494d93a8e190e8cba1`.
+Source and distribution landscape stylesheet SHA-256:
+`cedd1762c2a157ce60a055f0990f89eed0dc7b49fe1c7eb98fae551212b9cbee`.
+Public fixture SHA-256:
+`5f09524bc151460d1a1a1fa58c30681dd84eaf30d989f4637edf6183e4a03b66`.
+
+The native JPEG, caption PNG, motion clip and exact metadata are in ignored
+`.dream-loop/emerging-landscape/composition-pass6/`. This is browser presentation
+evidence, separate from [session and performance validation](../validation/emerging-landscape-2026-10-24.md),
+physical-phone testing, physiological-accuracy checks and native sharing.
 
 ## Earlier artwork images
 
@@ -181,7 +198,7 @@ social-post delivery or sustained frame-rate evidence.
 | `pulse-painting-desktop-candidate.jpg` | 188941 | `71f997d63b0146af03e7cebbaea9b092c927ffd8c044959c591d36365a01fd4f` |
 | `pulse-painting-qr.jpg` | 81054 | `56374f21d8c42f2edc94165adb7b06a762b95fae80e95c147e157f7038c52898` |
 | `pulse-painting-ready.jpg` | 51933 | `1da91b18ec49b70eebb09af1fcea4dff9f87078637b8ffcc70adf00e375a1ddf` |
-| `pulse-painting-capture.jpg` | 52023 | `99a0fcbf0565654a7eafc2b346c26e88744f1c2ef4526472bdc5d7561f6a9835` |
+| `pulse-painting-capture.jpg` | 58923 | `6f2fb575a9ada8b51dee5a9697614ea29581b8ae1aeb3ee532ff3f02ce026d68` |
 | `pulse-painting-report.jpg` | 72429 | `00bf687a8592d16f0848eebf5bc756dee6e90191fba23b052715274f2c6eff93` |
 | `pulse-painting-mobile-gallery.png` | 469347 | `2f7f07374fb73399156555da8a86281d6b982db7714efe9a7bd2b4d4caa1889b` |
 | `pulse-painting-sharing.png` | 112629 | `2108b3314600dcda8a89d8e1aa0fe9b19e550fece694c7abfca10ec26ff664d3` |
