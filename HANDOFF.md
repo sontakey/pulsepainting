@@ -1,6 +1,29 @@
 # Pulse Painting handoff
 
-## Current production release: illustrated camera guidance
+## Current production release: measured signal bars
+
+The recording header shows a five-bar signal meter under LIVE instead of healthy
+signal text. It uses the engine's real quality score; rejected or missing scores
+never look strong. Brief issue prompts appear only when needed. The title/camera
+and countdown/meter each share one aligned row. The normal recording footer is
+removed, while fallback and reveal notices remain available.
+
+PR #13 merged as `c0a3c5028c9259a2e5352876e042ab65e8ac4254` after full Linux CI
+`40109481742` passed feature head `9f1058c1e5cade5c76d2d3f654857931d19792dd`.
+Chromium/WebKit app checks and 18 mobile header states at 320/390/430px passed.
+Production `dpl_GryR4JVFhes2oV16LMz44YT6Mfir` is READY at
+https://www.pulsepainting.com/. All 109 public files matched the tested build at
+`2026-10-24T16:14:43.015Z`; the anonymous mobile checks also passed.
+
+Only `app.css`, `app.js`, and `index.html` changed in the runtime. Measurement,
+accepted-data handling, renderer and artwork exports are unchanged. This layout
+release did not repeat the full timed session; the earlier camera-guidance replay
+is documented below. Browser checks do not certify a physical phone. The README
+capture image is refreshed. See `docs/validation/capture-signal-bar-2026-10-24.md`.
+Later documentation-only deployments may have different IDs with the same runtime.
+npm 0.3.1 publication remains pending.
+
+## Previous production release: illustrated camera guidance
 
 The phone entry screen offers **Need help with camera access?** and a calm
 waiting panel while permission is unresolved. Failures open an illustrated

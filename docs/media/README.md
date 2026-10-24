@@ -2,7 +2,7 @@
 
 These are direct browser captures of the actual static app. The capture image
 was refreshed on October 24, 2026 for continuous source-time ink with a slowly
-emerging landscape behind it. The report and sharing
+emerging landscape behind it, then refreshed again for the signal-bar header. The report and sharing
 images show the October 23 framed keepsake card. The desktop image retains the
 October 22 foreground release. Ready and QR retain their
 unchanged first-release images.
@@ -25,9 +25,29 @@ This illustrates Pulse Painting's help, not the operating system's controls or
 a physical iPhone permission prompt. The SVG inside the dialog is explicitly a
 schematic. See [camera verification](../validation/camera-guidance-2026-10-24.md).
 
-## Emerging landscape capture
+## Capture header refresh
 
-`pulse-painting-capture.jpg` is the direct native-browser JPEG (quality 92) from
+`pulse-painting-capture.jpg` was refreshed from source
+`9f1058c1e5cade5c76d2d3f654857931d19792dd` at
+`2026-10-24T16:07:44.520Z` to show the signal bars, balanced
+header and removed recording footer. This is the direct Chrome native JPEG
+(quality 92, 390 × 844, DPR 1), copied byte-for-byte without image editing.
+
+The same public fixture and real signal engine supplied 31 accepted segments
+and 153.85 usable seconds for Quiet Lake, seed 39293. The actual countdown is
+0:17; live computed values are 81 bpm, RMSSD 61 ms, and SDNN 59 ms. The foreground
+was at 11.78 seconds. Camera I/O is mocked, and the source
+was supplied in one accelerated chunk; this is composition evidence, not a real
+three-minute capture or performance measurement. No metrics or UI values were
+substituted. There were no page errors or viewport overflow. Evidence is in
+ignored `.dream-loop/capture-signal-bar/readme/`.
+
+Native JPEG SHA-256: `f9bd2cea222ab037c68db9526e4d0d92c292339fd9f847d346091449d3b4cbba`.
+The renderer and public-fixture hashes below are unchanged.
+
+## Earlier emerging landscape capture
+
+The preceding `pulse-painting-capture.jpg` was the direct native-browser JPEG (quality 92) from
 `2026-10-24T14:50:33.737Z`. Chrome 155.0.8059.85 through Playwright captured the
 actual app at 390 × 844 CSS pixels, DPR 1, with normal motion and loaded fonts.
 The JPEG was copied byte-for-byte; no image pixels or UI values were edited.

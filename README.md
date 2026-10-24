@@ -6,7 +6,7 @@ Your pulse, made into a place.
 > watercolor landscapes, crisp measured pulse strokes, a pointed brush and soft
 > pigment fixed to the paper, a gradually emerging background, and shareable artwork.
 > Browser replay and deployed-asset checks passed; physical-phone validation remains separate.
-> See [current release verification](docs/validation/camera-guidance-2026-10-24.md)
+> See [current release verification](docs/validation/capture-signal-bar-2026-10-24.md)
 > and [painting performance](docs/validation/emerging-landscape-2026-10-24.md).
 > The [mobile gallery](https://www.pulsepainting.com/#landscapes) is now live too;
 > see [mobile verification](docs/validation/mobile-gallery-2026-10-23.md).
@@ -49,7 +49,7 @@ it is not a screenshot or validation of the phone's native permission controls.
   <img src="docs/media/pulse-painting-report.jpg" width="230" alt="Shareable Pulse Painting artwork and report">
 </p>
 
-The capture screenshot shows the actual app with its crisp pulse brush and pale emerging landscape. The public recording was fed through the real signal engine in one accelerated chunk, yielding 153.85 usable seconds; the foreground animation continued at normal speed. This is a composition capture, not a three-minute wall-clock session. The report shows the framed Glacial fjord keepsake, with summary metrics calculated from the public recording. Both use browser replay; see [capture provenance](docs/media/README.md). They are not physical-phone measurements or performance benchmarks.
+The capture screenshot shows the actual app with its crisp pulse brush, pale emerging landscape, and measured signal bars beneath LIVE. Healthy capture keeps that area word-free; short prompts appear only when attention is needed. The public recording was fed through the real signal engine in one accelerated chunk, yielding 153.85 usable seconds; the foreground animation continued at normal speed. This is a composition capture, not a three-minute wall-clock session. The report shows the framed Glacial fjord keepsake, with summary metrics calculated from the public recording. Both use browser replay; see [capture provenance](docs/media/README.md). They are not physical-phone measurements or performance benchmarks.
 
 The primary destination is [pulsepainting.com](https://www.pulsepainting.com/), a separate Vercel project connected to this repository. The apex domain redirects to www. The simple library demo remains at [ChatPPG](https://chatppg.com/ppg-js-demo). Release and public verification status are tracked in [HANDOFF.md](HANDOFF.md).
 
