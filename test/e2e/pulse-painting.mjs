@@ -62,6 +62,8 @@ try {
           update(metrics);
           if (metrics.fingerState === 'MEASURING') this.metricUpdates.push({
             t: metrics.t, good: metrics.quality.good, segments: manuscript.segments.length,
+            score: metrics.qualityScore, meter: Number(document.getElementById('signal-meter').getAttribute('aria-valuenow')),
+            signalText: document.getElementById('quality-text').textContent,
             values: ['hr-value', 'rmssd-value', 'sdnn-value'].map(id => document.getElementById(id).textContent),
             expected: [metrics.heartRate, metrics.rmssd, metrics.sdnn].map(value => metrics.quality.good && Number.isFinite(value) ? String(Math.round(value)) : '--'),
           });
@@ -107,6 +109,8 @@ try {
   assert.equal(await page.evaluate(() => 'windowStartSec' in monitor.getMetrics()), false, 'replay uses the real public callback payload');
   assert.ok(await page.evaluate(() => manuscript.segments.length > 0), 'accepted real signal paints');
   const cadence = await page.evaluate(() => ({ updates: monitor.metricUpdates, hop: monitor.engine.opts.hopSec, window: monitor.engine.opts.windowSec }));
+  assert.ok(cadence.updates.every(update => update.meter === (update.good ? Math.round(Math.max(0, Math.min(100, update.score))) : 0)), 'signal meter follows the real gate-aware quality score');
+  assert.ok(cadence.updates.filter(update => update.good).every(update => update.signalText === ''), 'healthy capture shows bars without signal copy');
   assert.equal(cadence.hop, 1, 'capture requests genuine computed updates once a second');
   assert.equal(cadence.window, 5, 'signal analysis retains five-second windows');
   assert.ok(cadence.updates.every(update => update.values.join() === update.expected.join()), 'readouts display the actual quality-gated metrics, without interpolation');
@@ -126,15 +130,44 @@ try {
       };
       return {
         metrics: rect('.live-metrics'),
+        status: rect('.painting-status'),
+        signal: rect('#signal-meter'),
+        title: rect('.capture-title'),
+        camera: rect('.capture-camera'),
         details: rect('.live-details > summary'),
         dock: rect('.painting-actions'),
       };
     });
+    assert.ok(Math.abs(captureLayout.status.top - captureLayout.signal.top) <= 1, 'timer and signal bars share a row');
+    assert.ok(Math.abs((captureLayout.title.top + captureLayout.title.bottom) / 2 - (captureLayout.camera.top + captureLayout.camera.bottom) / 2) <= 1, 'title and camera are vertically balanced');
     assert.ok(captureLayout.metrics.top >= 0 && captureLayout.metrics.bottom <= captureLayout.dock.top - 4,
       `capture ${viewport.width}x${viewport.height}: live metrics stay above floating controls without scrolling`);
     assert.ok(captureLayout.details.bottom <= captureLayout.dock.top - 4,
       `capture ${viewport.width}x${viewport.height}: details remain reachable above floating controls`);
   }
+  const signalCases = await page.evaluate(() => {
+    const read = metrics => {
+      updateCaptureSignal(metrics);
+      return { value: document.getElementById('signal-meter').getAttribute('aria-valuenow'),
+        description: document.getElementById('signal-meter').getAttribute('aria-valuetext'),
+        bars: document.querySelectorAll('#signal-meter .filled').length,
+        text: document.getElementById('quality-text').textContent };
+    };
+    const cases = [
+      read({ quality: {good:true}, qualityScore:41 }),
+      read({ quality: {good:false, code:'motion'}, qualityScore:99 }),
+      read({ quality: {good:false, code:'irregular', reason:'Long internal quality explanation'} }),
+      read({ quality: {good:true}, qualityScore:NaN }),
+    ];
+    updateMeasuringScreen(monitor.getMetrics());
+    return cases;
+  });
+  assert.deepEqual(signalCases, [
+    {value:'41',description:'41 out of 100',bars:3,text:''},
+    {value:'0',description:'0 out of 100',bars:0,text:'Hold still'},
+    {value:'0',description:'Signal quality unavailable',bars:0,text:'Finding signal'},
+    {value:'0',description:'Signal quality unavailable',bars:0,text:''},
+  ], 'signal display gates rejected data, keeps issue prompts brief, and never invents a missing score');
   // Accepted source advances on moving paper under a fixed brush. Presentation
   // must preserve earlier source strokes and save the final landscape for finish.
   await page.emulateMedia({ reducedMotion: 'no-preference' });
@@ -324,7 +357,7 @@ try {
       const region=document.getElementById(id).closest('[role="status"]');
       return {role:region?.getAttribute('role'),live:region?.getAttribute('aria-live'),atomic:region?.getAttribute('aria-atomic')};
     });
-    return { match, rejected, malformed, resetNote: document.getElementById('pause-note').textContent, liveRegions,
+    return { match, rejected, malformed, resetNote: document.getElementById('pause-note').textContent, resetNoteHidden: document.getElementById('pause-note').hidden, liveRegions,
       countdownAnnounced:!!document.getElementById('session-countdown').closest('[role="status"],[aria-live="polite"],[aria-live="assertive"]') };
   });
   assert.equal(attribution.match, true, 'geometry and pigment quality use the selected analysis channel');
@@ -332,7 +365,8 @@ try {
   assert.ok(attribution.malformed.strokes>=2&&attribution.malformed.finite,'valid portions survive a malformed sample as separate finite source runs');
   assert.equal(attribution.malformed.bridgesHole,false,'app adapter never connects across a nonfinite filtered sample');
   assert.ok(Math.abs(attribution.malformed.usableSeconds-1.7)<1e-7,'nonfinite sample hole contributes no accepted source duration');
-  assert.equal(attribution.resetNote, '3-minute recording · Not a medical device', 'a fresh manuscript restores the recording notice');
+  assert.equal(attribution.resetNote, '', 'a fresh manuscript clears stale recording notices');
+  assert.equal(attribution.resetNoteHidden, true, 'normal capture reserves no space for a footer notice');
   assert.deepEqual(attribution.liveRegions,Array(2).fill({role:'status',live:'polite',atomic:'true'}),'painting state and camera signal remain accessible live statuses');
   assert.equal(attribution.countdownAnnounced,false,'timer updates do not repeatedly announce the capture header');
 

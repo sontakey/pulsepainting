@@ -170,13 +170,13 @@
         <div class="capture-heading">
           <h2 class="capture-title">Pulse Painting</h2>
           <div class="painting-status">
-            <strong id="painting-state" role="status" aria-live="polite" aria-atomic="true">Waiting for clear signal</strong>
+            <strong id="painting-state" role="status" aria-live="polite" aria-atomic="true">Finding signal</strong>
             <p class="capture-time"><span id="session-countdown" class="session-countdown">3:00</span><span class="countdown-label">remaining</span></p>
           </div>
         </div>
         <div class="capture-monitor">
           <figure class="capture-camera"><div id="capture-camera-preview" class="camera-feed" aria-label="Live rear camera preview"></div><figcaption><span aria-hidden="true"></span>Live</figcaption></figure>
-          <div class="quality-pill" id="quality-pill"><span id="quality-dot" class="quality-dot" aria-hidden="true"></span><span id="quality-text" role="status" aria-live="polite" aria-atomic="true">Settling</span></div>
+          <div class="quality-pill" id="quality-pill"><span id="signal-meter" class="signal-meter" role="meter" aria-label="Signal quality" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" aria-valuetext="Signal quality unavailable"><i aria-hidden="true"></i><i aria-hidden="true"></i><i aria-hidden="true"></i><i aria-hidden="true"></i><i aria-hidden="true"></i></span><span id="quality-text" role="status" aria-live="polite" aria-atomic="true">Finding signal</span></div>
         </div>
       </div>
       <div class="manuscript-frame"><div id="landscape-view" aria-label="A close-up of your accepted pulse strokes painting a landscape"></div><canvas id="manuscript" width="1000" height="840" aria-label="Your pulse manuscript. Deeper pigment represents clearer measured recording quality." hidden></canvas><p id="manuscript-empty">Your first brushstroke is on its way.<br><span>Hold still while we check the signal.</span></p></div>
@@ -197,7 +197,7 @@
         </div>
       </details>
     </div>
-    <div class="painting-actions mobile-action-dock" aria-label="Recording actions"><button id="btn-cancel-reading" class="btn-secondary" type="button">Cancel reading</button><button id="btn-stop" class="btn-primary" type="button">Finish painting</button></div><p id="pause-note" class="disclaimer">3-minute recording · Not a medical device</p>
+    <div class="painting-actions mobile-action-dock" aria-label="Recording actions"><button id="btn-cancel-reading" class="btn-secondary" type="button">Cancel reading</button><button id="btn-stop" class="btn-primary" type="button">Finish painting</button></div><p id="pause-note" class="disclaimer" hidden></p>
   </section>
 
   <!-- SUMMARY / HRV REPORT -->

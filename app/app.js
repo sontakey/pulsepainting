@@ -39,6 +39,7 @@ function useManuscriptFallback() {
   document.getElementById('landscape-view').hidden = true;
   document.getElementById('manuscript').hidden = false;
   document.getElementById('pause-note').textContent = 'Showing your pulse strokes. Your recording is preserved.';
+  document.getElementById('pause-note').hidden = false;
 }
 function recoverLandscapeCoverage() {
   if (!landscape || landscapeCoverageComplete) return landscapeCoverageComplete;
@@ -118,7 +119,9 @@ function resetManuscript() {
   cancelAnimationFrame(manuscript.frame);
   manuscript.pending = []; manuscript.segments = []; manuscript.lastWindow = -1; manuscript.paused = false;
   manuscript.viewFirstRow = 0; manuscript.scroll = null;
-  document.getElementById('pause-note').textContent = '3-minute recording · Not a medical device';
+  document.getElementById('pause-note').textContent = '';
+  document.getElementById('pause-note').hidden = true;
+  updateCaptureSignal({});
   document.getElementById('manuscript-empty').hidden = false;
   resetLandscape();
   if (!landscapeView) paintManuscript(document.getElementById('manuscript'));
@@ -773,6 +776,29 @@ function updatePlacementScreen(metrics) {
   drawPlacementWave();
 }
 
+// The meter follows the engine's gate-aware 0–100 quality score. It never
+// invents strength from an accepted flag or continuously announces score changes.
+const CAPTURE_SIGNAL_HINTS = {
+  no_finger: 'Cover camera', motion: 'Hold still', saturated: 'Ease pressure',
+  double_count: 'Adjust finger', missed_beats: 'Adjust finger',
+};
+function updateCaptureSignal(metrics) {
+  const good = metrics.quality?.good === true;
+  const known = Number.isFinite(metrics.qualityScore);
+  const score = good && known ? Math.round(Math.max(0, Math.min(100, metrics.qualityScore))) : 0;
+  const meter = document.getElementById('signal-meter');
+  meter.setAttribute('aria-valuenow', String(score));
+  meter.setAttribute('aria-valuetext', known ? `${score} out of 100` : 'Signal quality unavailable');
+  const strength = Math.ceil(score / 20);
+  Array.from(meter.children).forEach((bar, i) => bar.classList.toggle('filled', i < strength));
+  const pill = document.getElementById('quality-pill');
+  pill.classList.toggle('good', good);
+  pill.classList.toggle('bad', !good);
+  const hint = good ? '' : CAPTURE_SIGNAL_HINTS[metrics.quality?.code] || 'Finding signal';
+  const status = document.getElementById('quality-text');
+  if (status.textContent !== hint) status.textContent = hint;
+}
+
 function updateMeasuringScreen(metrics) {
   const good = metrics.quality && metrics.quality.good;
   document.getElementById('hr-value').textContent = good && Number.isFinite(metrics.heartRate) ? Math.round(metrics.heartRate) : '--';
@@ -791,15 +817,10 @@ function updateMeasuringScreen(metrics) {
     }
   }
 
-  const pill = document.getElementById('quality-pill');
-  pill.classList.toggle('good', !!good);
-  pill.classList.toggle('bad', !good);
-  document.getElementById('quality-text').textContent = good
-    ? 'Good signal'
-    : findingSignal(metrics) ? 'Finding signal'
-    : (metrics.quality ? metrics.quality.reason : metrics.guidanceMessage) || 'Settling';
-
-  document.getElementById('painting-state').textContent = manuscript.paused ? 'Artwork paused' : good ? 'Painting' : 'Waiting for clear signal';
+  updateCaptureSignal(metrics);
+  const state = manuscript.paused ? 'Artwork paused' : good ? 'Painting' : 'Waiting';
+  const stateEl = document.getElementById('painting-state');
+  if (stateEl.textContent !== state) stateEl.textContent = state;
   drawTachogram();
 }
 
@@ -1644,10 +1665,11 @@ function stopSession() {
   clearEntryTransition('landscape-reveal');
   document.getElementById('screen-measuring').classList.add('is-revealing');
   document.getElementById('painting-state').textContent = 'Your landscape, revealed';
-  document.getElementById('quality-text').textContent = 'Recording complete';
+  document.getElementById('quality-text').textContent = '';
   document.getElementById('btn-cancel-reading').disabled = true;
   document.getElementById('btn-stop').textContent = 'Skip reveal';
   document.getElementById('pause-note').textContent = 'Every accepted stroke, in one place.';
+  document.getElementById('pause-note').hidden = false;
   let finish;
   try { finish = landscapeView.finish(); }
   catch { useManuscriptFallback(); finish = Promise.resolve(); }
