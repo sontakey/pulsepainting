@@ -365,6 +365,72 @@ let entryTransition = null;
 let sessionStarting = false;
 let sessionGeneration = 0;
 const pendingMonitorStarts = new Set();
+let cameraPending = false, cameraPendingTimer = null, cameraHelpContext = null;
+
+function setCameraPending(pending) {
+  cameraPending = pending;
+  clearTimeout(cameraPendingTimer); cameraPendingTimer = null;
+  screens.placement.classList.toggle('is-camera-pending', pending);
+  document.getElementById('camera-connection').hidden = !pending;
+  const status = document.getElementById('camera-pending-status');
+  status.textContent = 'Your browser may ask to use the camera. Choose Allow when you see that request.';
+  if (pending) cameraPendingTimer = setTimeout(() => {
+    if (cameraPending) status.textContent = 'Still waiting? Check for a browser prompt. Camera help is here if you need it.';
+  }, 10000);
+}
+
+function openCameraHelp(reason = 'guide') {
+  cameraHelpContext = cameraPending || reason === 'waiting' ? 'pending' : reason;
+  const hasRecording = !screens.summary.hidden && (manuscript.segments.length > 0 || elapsedMeasuringMs > 0);
+  window.PulseCameraHelp.open({
+    reason: cameraPending ? 'waiting' : reason,
+    hasRecording,
+    canRetry: isPhone && !cameraPending && reason !== 'waiting' && (reason !== 'guide' || !pendingMonitorStarts.size),
+    onRetry: () => { cameraHelpContext = null; cancelSession(); startSession(); },
+    onKeep: hasRecording ? () => { cameraHelpContext = null; focusCameraReturn(); } : undefined,
+    onClose: () => { cameraHelpContext = null; if (reason !== 'guide' && reason !== 'waiting') focusCameraReturn(); },
+  });
+}
+
+function focusCameraReturn() {
+  const target = !screens.summary.hidden ? document.querySelector('#report-content h2, #report-content h1') : document.getElementById('btn-start');
+  if (!target || !target.getClientRects().length) return;
+  if (target.tagName !== 'BUTTON') target.tabIndex = -1;
+  target.focus({ preventScroll: true });
+}
+
+function clearSettledCameraHelp() {
+  if (!pendingMonitorStarts.size && !cameraPending && cameraHelpContext === 'pending') {
+    window.PulseCameraHelp.close(); cameraHelpContext = null; focusCameraReturn();
+  }
+}
+
+function handleCameraFailure(err, generation) {
+  if (generation !== sessionGeneration) return;
+  // start() emits onError and rejects; recovery may only emit onError. One
+  // generation boundary handles both and stops recurring frame callbacks.
+  sessionGeneration++;
+  setCameraPending(false);
+  lastMeasuringFrame = null;
+  if (sessionTimerId) { clearInterval(sessionTimerId); sessionTimerId = null; }
+  measuringStartedAt = null;
+  clearEntryTransition('camera-help');
+  sessionStarting = false;
+  if (monitor) {
+    monitor.stop();
+    if (!pendingMonitorStarts.has(monitor)) monitor.destroy();
+  }
+  cancelAnimationFrame(manuscript.frame);
+  if (manuscript.segments.length || elapsedMeasuringMs > 0) {
+    // A fresh camera start creates a fresh signal engine. Preserve this reading
+    // as a report instead of silently combining it with a replacement session.
+    cancelLandscapeReveal();
+    recoverLandscapeCoverage();
+    manuscript.segments.forEach(segment => { segment.reveal = 1; });
+    completeSessionReport();
+  } else showScreen('ready');
+  openCameraHelp(err?.code || 'unknown');
+}
 
 // Diagnostics describe browser animation cadence and CPU submission only;
 // they deliberately make no claim about physical-phone or GPU execution time.
@@ -1456,12 +1522,17 @@ function startSession() {
   // Ready-screen UI disable, so this can never be invoked (e.g. via the
   // console or a future button) on desktop and grab getUserMedia there.
   if (!isPhone || sessionStarting) return;
+  // A cancelled browser prompt can still resolve later. Keep its tracked
+  // operation until it settles instead of starting a competing acquisition.
+  if (pendingMonitorStarts.size) { openCameraHelp('waiting'); return; }
+  window.PulseCameraHelp.close(); cameraHelpContext = null;
   window.PulseCommunity?.closePublication();
   if (portraitHost) { window.PulsePortrait?.clear(portraitHost); portraitHost = null; }
   sessionStarting = true;
   const generation = ++sessionGeneration;
   beginEntryTransition();
   showScreen('placement');
+  setCameraPending(true);
   resetWaveBuffer();
   resetManuscript();
   document.querySelector('.live-details').open = false;
@@ -1484,6 +1555,11 @@ function startSession() {
     motion: true, // accelerometer motion gate (asks permission on iOS)
     onReady: ({ torchSupported }) => {
       if (generation !== sessionGeneration) return;
+      setCameraPending(false);
+      if (cameraHelpContext === 'pending') {
+        window.PulseCameraHelp.close(); cameraHelpContext = null;
+        const heading = document.querySelector('.placement-title'); heading.tabIndex = -1; heading.focus({ preventScroll: true });
+      }
       document.getElementById('torch-note').hidden = torchSupported !== false;
     },
     onQualityUpdate: (metrics) => {
@@ -1515,12 +1591,7 @@ function startSession() {
       if (!screens.placement.hidden) drawPlacementWave();
     },
     onError: (err) => {
-      if (generation !== sessionGeneration) return;
-      if (sessionTimerId) { clearInterval(sessionTimerId); sessionTimerId = null; }
-      clearEntryTransition();
-      // PPGError carries a stable code and user-facing guidance.
-      alert(err && err.guidance ? err.guidance : 'Camera error: ' + (err && err.message ? err.message : err));
-      showScreen('ready');
+      handleCameraFailure(err, generation);
     },
   });
 
@@ -1528,14 +1599,12 @@ function startSession() {
   pendingMonitorStarts.add(currentMonitor);
   currentMonitor.start().then(() => {
     pendingMonitorStarts.delete(currentMonitor);
-    if (generation !== sessionGeneration) { currentMonitor.destroy(); return; }
+    if (generation !== sessionGeneration) { currentMonitor.destroy(); clearSettledCameraHelp(); return; }
     syncScreenChrome(screens.measuring.hidden ? 'placement' : 'measuring');
   }).catch((err) => {
     pendingMonitorStarts.delete(currentMonitor);
-    if (generation !== sessionGeneration) { currentMonitor.destroy(); return; }
-    if (sessionTimerId) { clearInterval(sessionTimerId); sessionTimerId = null; }
-    console.error('start() failed', err);
-    showScreen('ready');
+    if (generation !== sessionGeneration) { currentMonitor.destroy(); clearSettledCameraHelp(); return; }
+    handleCameraFailure(err, generation);
   });
 }
 
@@ -1605,6 +1674,8 @@ document.querySelector('.live-details').addEventListener('toggle', event => {
 document.getElementById('btn-start').addEventListener('click', startSession);
 function cancelSession() {
   sessionGeneration++;
+  window.PulseCameraHelp.close(); cameraHelpContext = null;
+  setCameraPending(false);
   cancelLandscapeReveal();
   lastMeasuringFrame = null;
   clearEntryTransition();
@@ -1629,6 +1700,8 @@ function cancelSession() {
   document.getElementById('btn-start').focus({ preventScroll: true });
 }
 document.getElementById('btn-cancel-placement').addEventListener('click', cancelSession);
+document.getElementById('btn-camera-help').addEventListener('click', event => { event.currentTarget.focus({ preventScroll: true }); openCameraHelp(); });
+document.getElementById('btn-camera-pending-help').addEventListener('click', event => { event.currentTarget.focus({ preventScroll: true }); openCameraHelp('waiting'); });
 document.getElementById('btn-cancel-reading').addEventListener('click', cancelSession);
 document.getElementById('btn-save-artwork').addEventListener('click', () => closeDebugSheet());
 document.getElementById('btn-save-manuscript').addEventListener('click', () => {

@@ -23,6 +23,7 @@
 <link rel="stylesheet" href="gallery.css">
 <link rel="stylesheet" href="share-sheet.css">
 <link rel="stylesheet" href="community.css">
+<link rel="stylesheet" href="camera-help.css">
 </head>
 <body>
 <div id="app" class="screen-host">
@@ -77,6 +78,7 @@
         </span>
       </li>
     </ol>
+    <button id="btn-camera-help" class="camera-help-link" type="button" aria-haspopup="dialog">Need help with camera access?</button>
     <p class="disclaimer">Not a medical device. For personal curiosity only, not diagnosis or treatment.</p>
   </div>
   <div class="ready-actions mobile-action-dock" aria-label="Capture actions"><button id="btn-gallery-back" class="btn-secondary" type="button" aria-label="Back to capture" hidden><span aria-hidden="true">←</span> Back</button><button id="btn-start" class="btn-primary paint-start" type="button" aria-label="Begin pulse capture"><span>Begin pulse capture</span><svg class="paint-start-arrow" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12h15m-6-6 6 6-6 6"/></svg></button></div>
@@ -134,6 +136,13 @@
   <!-- PLACEMENT -->
   <section id="screen-placement" class="screen placement-screen" data-screen="placement" hidden>
     <h2 class="placement-title">Find your pulse<span class="blue-period">.</span></h2>
+    <div id="camera-connection" class="camera-connection" hidden>
+      <div class="camera-connection-art" aria-hidden="true"><svg viewBox="0 0 160 120" fill="none"><path d="M21 38C10 18 58 9 90 15c28 5 55 18 50 43s-25 48-65 43S10 70 21 38Z" fill="#d9e8eb"/><path d="m50 38 8-12h34l8 12h18v54H32V38Z" fill="#fdfbf7" stroke="#285e6b" stroke-width="2" stroke-linejoin="round"/><circle cx="75" cy="64" r="18" stroke="#285e6b" stroke-width="2"/><circle cx="75" cy="64" r="10" fill="#cadde4"/><path d="M107 47h3" stroke="#285e6b" stroke-width="3" stroke-linecap="round"/></svg></div>
+      <h3>A moment for your camera</h3>
+      <p id="camera-pending-status" role="status">Your browser may ask to use the camera. Choose Allow when you see that request.</p>
+      <p class="camera-connection-privacy">Your camera preview stays on this device. No microphone needed.</p>
+      <button id="btn-camera-pending-help" class="camera-help-link" type="button" aria-haspopup="dialog">Camera help</button>
+    </div>
     <div class="content placement-content">
       <figure class="placement-camera">
         <div class="camera-preview-wrap">
@@ -216,6 +225,7 @@
 <script src="share-sheet.js"></script>
 <script src="community.js"></script>
 <script src="portrait.js"></script>
+<script src="camera-help.js"></script>
 <script src="app.js"></script>
 <script type="module" src="gallery.js"></script>
 </body>

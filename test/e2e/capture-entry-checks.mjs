@@ -81,6 +81,9 @@ export async function checkCaptureEntry(browser, url) {
     assert.equal(await page.locator('#screen-ready').isVisible(), true, 'denial returns to ready');
     assert.equal(await page.evaluate(() => entryTransition), null, 'denial clears the pigment transition');
     assert.equal(await page.locator('#btn-start').getAttribute('aria-busy'), null, 'denial clears the busy state');
+    assert.equal(await page.locator('.pulse-camera-help[open]').count(), 1, 'camera failure opens one accessible recovery guide');
+    await page.getByRole('button', { name: 'Close camera help', exact: true }).click();
+    assert.equal(await page.locator('.pulse-camera-help').count(), 0, 'dismissing guidance restores the underlying app controls');
     // Screen state, interruptions and accessible controls stay independent of
     // the optional paint. These exercise the production transitions, not mocks.
     if (reducedMotion === 'no-preference') {
