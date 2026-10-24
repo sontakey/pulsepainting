@@ -1,5 +1,5 @@
 // Reproducible browser benchmark: optional GPU entry compositor plus the
-// cached Canvas2D landscape and compositor-driven camera.
+// continuous source-time brush, moving paper and final landscape reconstruction.
 // npm run build && node test/e2e/paint-performance.mjs
 // PPG_PERF_URL=http://127.0.0.1:5173 tests the host's script URLs.
 // Camera I/O is mocked; the streaming engine and monitor callbacks are real.
@@ -105,7 +105,7 @@ async function installReplay(page) {
   }, log);
 }
 let browser;
-const results = { generatedAt: new Date().toISOString(), scope: 'Desktop Chrome with mobile viewport and real streaming replay; camera I/O mocked; no physical-phone or GPU execution-time claim.', threeVersion: JSON.parse(readFileSync(path.join(root, 'node_modules/three/package.json'), 'utf8')).version, viewport: { width: 390, height: 844, deviceScaleFactor: 3 }, family, seed, preloadSeconds, durationSeconds: duration, cases: [] };
+const results = { generatedAt: new Date().toISOString(), nodeVersion:process.version, scope: 'Desktop Chrome with mobile viewport and real streaming replay; camera I/O mocked; no physical-phone or GPU execution-time claim.', threeVersion: JSON.parse(readFileSync(path.join(root, 'node_modules/three/package.json'), 'utf8')).version, viewport: { width: 390, height: 844, deviceScaleFactor: 3 }, family, seed, preloadSeconds, durationSeconds: duration, cases: [] };
 try {
   browser = await chromium.launch(process.env.PPG_CHROMIUM ? { executablePath: process.env.PPG_CHROMIUM } : process.platform === 'darwin' ? { channel: 'chrome' } : {});
   results.browser = await browser.version();
@@ -145,15 +145,41 @@ try {
     assert.equal(await page.evaluate(() => landscape.family), family, `${name}: selected landscape is active`);
     assert.ok(await page.evaluate(() => manuscript.segments.length > 0), `${name}: accepted replay waveform is present`);
     const replay = await page.evaluate(({ seconds, preload }) => new Promise(resolve => {
-      const intervals = [], activeIntervals = [], renderCPU = [], engineCPU = [];
+      const intervals = [], activeIntervals = [], renderCPU = [], engineCPU = [], warmCPU = [];
       const started = performance.now(), initialFrames = window.__pulseLandscapeStats.frames;
+      const initialRasters = window.__pulseLandscapeStats.rasterFrames;
+      const initialWarmStrokes = window.__pulseLandscapeStats.warmStrokes || 0;
       const initialSegments = manuscript.segments.length, initialSamples = monitor.i;
+      const width = document.getElementById('landscape-view').getBoundingClientRect().width;
+      const flow = { samples:0, advances:0, paperChanges:0, regressions:0, invalid:0, futureFrontiers:0, nibSamples:0, maxNibXError:0 };
+      let previousStreamTime,previousPaperTransform,previousWarmStrokes=initialWarmStrokes;
       let previous = 0, previousDraw = 0, previousFrames = initialFrames, previousDrawWasActive = false;
       function frame(now) {
         if (previous) intervals.push(now - previous);
         previous = now;
         const began = performance.now(); monitor.feedUntil(preload + (now - started) / 1000); engineCPU.push(performance.now() - began);
         const surface = window.__pulseLandscapeStats;
+        if ((surface.warmStrokes || 0) > previousWarmStrokes) {
+          if (Number.isFinite(surface.warmFrameMs)) warmCPU.push(surface.warmFrameMs);
+          previousWarmStrokes = surface.warmStrokes;
+        }
+        if (surface.mode !== 'recording') flow.invalid++;
+        if (Number.isFinite(surface.streamTime)) {
+          flow.samples++;
+          if (previousStreamTime !== undefined) {
+            if (surface.streamTime > previousStreamTime) flow.advances++;
+            if (surface.streamTime < previousStreamTime - 1e-9) flow.regressions++;
+          }
+          previousStreamTime = surface.streamTime;
+        }
+        if (surface.frontier?.t > landscape.strokes.at(-1)?.sourceEnd + 1e-9) flow.futureFrontiers++;
+        const paper=document.querySelector('.landscape-paper-trace'),paperTransform=paper&&(paper.getAttribute('transform')||paper.style.transform);
+        if(paperTransform){if(previousPaperTransform!==undefined&&paperTransform!==previousPaperTransform)flow.paperChanges++;previousPaperTransform=paperTransform;}
+        if (surface.nib) {
+          flow.nibSamples++;
+          if (![surface.nib.x,surface.nib.y].every(Number.isFinite)) flow.invalid++;
+          flow.maxNibXError = Math.max(flow.maxNibXError,Math.abs(surface.nib.x-width*.78));
+        }
         if (surface.frames > previousFrames) {
           // Use actual renderer state to exclude idle windows. Keep long active
           // intervals: a main-thread stall must remain visible in the results.
@@ -161,12 +187,17 @@ try {
           previousDraw = now; previousFrames = surface.frames; renderCPU.push(surface.frameMs);
         }
         previousDrawWasActive = surface.active;
-        if (now - started >= seconds * 1000) resolve({ intervals, activeIntervals, renderCPU, engineCPU, frames: surface.frames - initialFrames, elapsedMs: now - started, initialSegments, finalSegments: manuscript.segments.length, samplesFed: monitor.i - initialSamples, surface: { ...surface }, stats: JSON.parse(JSON.stringify(window.__paintGpuStats)) });
+        if (now - started >= seconds * 1000) resolve({ intervals, activeIntervals, renderCPU, engineCPU, warmCPU, initialWarmStrokes, flow, rasterFrames:surface.rasterFrames-initialRasters, frames: surface.frames - initialFrames, elapsedMs: now - started, initialSegments, finalSegments: manuscript.segments.length, samplesFed: monitor.i - initialSamples, surface: { ...surface }, stats: JSON.parse(JSON.stringify(window.__paintGpuStats)) });
         else requestAnimationFrame(frame);
       }
       requestAnimationFrame(frame);
     }), { seconds: duration, preload: preloadSeconds });
-    assert.ok(replay.frames > duration * 10, `${name}: cached landscape renders actual live reveal`);
+    writeFileSync(path.join(output,`${name}-checkpoint.json`),JSON.stringify({stage:'capture',nodeVersion:process.version,replay},null,2)+'\n');
+    assert.ok(replay.frames > duration * 10, `${name}: continuous accepted-source brush receives presentation frames`);
+    assert.ok(replay.flow.samples > 20 && replay.flow.advances > 10 && replay.flow.paperChanges > 10 && replay.flow.nibSamples > 10, `${name}: recorded source and actual paper translation advance under a visible brush`);
+    assert.equal(replay.flow.regressions + replay.flow.invalid + replay.flow.futureFrontiers, 0, `${name}: recording presentation stays finite, forward and within accepted data`);
+    assert.ok(replay.flow.maxNibXError < 1, `${name}: the brush stays at its horizontal anchor while paper advances`);
+    assert.equal(replay.rasterFrames, 0, `${name}: capture does not redraw scenic landscape layers`);
     assert.ok(replay.finalSegments > replay.initialSegments && replay.samplesFed > duration * 20, `${name}: real engine keeps accepting waveform during measurement`);
     assert.ok(replay.surface.cachedPixels <= replay.surface.pixelBudget, `${name}: live landscape raster is bounded independently of session length`);
     assert.ok(replay.surface.materialPixels <= replay.surface.materialPixelBudget, `${name}: pigment canvases and immutable patterns stay bounded`);
@@ -175,6 +206,41 @@ try {
       assert.equal(surface.backend, test.backend, `${name}/${surfaceName}: backend remains active`);
       assert.ok(surface.pixels <= replay.stats.pixelBudget + 2000, `${name}/${surfaceName}: drawing buffer stays bounded (rounding tolerance)`);
     }
+    const reveal = await page.evaluate(() => new Promise(resolve => {
+      const source = JSON.stringify(landscape), measurementMs = elapsedMeasuringMs, started = performance.now();
+      const phases = {}, intervals = [], renderCPU = [];
+      let previous = 0, previousFrames = __pulseLandscapeStats.frames, done = false, firstFrameDelayMs;
+      const timeout = setTimeout(() => { done=true;resolve({timedOut:true}); },20000);
+      const sample = now => {
+        if (done) return;
+        if (firstFrameDelayMs === undefined) firstFrameDelayMs = performance.now()-started;
+        const surface = __pulseLandscapeStats;
+        if (previous) intervals.push(now-previous);
+        const phase = phases[surface.mode] ||= {frames:0,intervals:[],cpu:[]};
+        phase.frames++;
+        if (surface.frames > previousFrames) {
+          if (previous) phase.intervals.push(now-previous);
+          phase.cpu.push(surface.frameMs);renderCPU.push(surface.frameMs);
+        }
+        previous=now;previousFrames=surface.frames;
+        requestAnimationFrame(sample);
+      };
+      // Preparation happens before finish returns; frame-only timing misses it.
+      const finishCallStarted = performance.now(), finishing = stopSession();
+      const finishCallMs = performance.now()-finishCallStarted;
+      requestAnimationFrame(sample);
+      Promise.resolve(finishing).then(() => {
+        done=true;clearTimeout(timeout);
+        resolve({elapsedMs:performance.now()-started,finishCallMs,firstFrameDelayMs,intervals,renderCPU,phases,sourceStable:source===JSON.stringify(landscape),measurementStable:measurementMs===elapsedMeasuringMs,surface:{...__pulseLandscapeStats},strokeCount:landscape.strokes.length,summaryVisible:!document.getElementById('screen-summary').hidden});
+      });
+    }));
+    writeFileSync(path.join(output,`${name}-checkpoint.json`),JSON.stringify({stage:'reveal',nodeVersion:process.version,replay,reveal},null,2)+'\n');
+    assert.equal(reveal.timedOut, undefined, `${name}: finish settles within its bounded animation budget`);
+    assert.ok(reveal.phases.pullback?.frames > 2 && reveal.phases.reconstructing?.frames > 2, `${name}: finish visibly pulls back and reconstructs the recorded landscape`);
+    assert.ok(reveal.sourceStable && reveal.measurementStable, `${name}: reveal changes neither accepted source nor the capture clock`);
+    assert.equal(reveal.surface.mode,'finished');assert.equal(reveal.surface.finished,true);
+    assert.equal(reveal.surface.painted,reveal.strokeCount);assert.equal(reveal.summaryVisible,true);
+    assert.ok(reveal.surface.cachedPixels<=reveal.surface.pixelBudget&&reveal.surface.materialPixels<=reveal.surface.materialPixelBudget,`${name}: completed reveal stays within raster/material budgets`);
     assert.deepEqual(errors, [], `${name}: no runtime errors`);
     assert.deepEqual(consoleErrors, [], `${name}: no browser console errors`);
     await cdp.send('Emulation.setCPUThrottlingRate', { rate: 1 });
@@ -182,12 +248,14 @@ try {
     const result = {
       ...test, actualBackend,
       entry: { cadence: timing(entry.intervals), frames: entry.frames, elapsedMs: Math.round(entry.elapsedMs), submissionCPU: { p50Ms: percentile(entry.cpu, .5), p95Ms: percentile(entry.cpu, .95), maxMs: percentile(entry.cpu, 1) }, surface: entry.surface },
-      replay: { raf: timing(replay.intervals), activePaintCadence: timing(replay.activeIntervals), frames: replay.frames, elapsedMs: Math.round(replay.elapsedMs), initialSegments: replay.initialSegments, finalSegments: replay.finalSegments, samplesFed: replay.samplesFed, submissionCPU: { p50Ms: percentile(replay.renderCPU, .5), p95Ms: percentile(replay.renderCPU, .95), maxMs: percentile(replay.renderCPU, 1) }, engineBatchCPU: { p50Ms: percentile(replay.engineCPU, .5), p95Ms: percentile(replay.engineCPU, .95), maxMs: percentile(replay.engineCPU, 1) }, surface: replay.surface },
+      replay: { raf: timing(replay.intervals), activePaintCadence: timing(replay.activeIntervals), frames: replay.frames, rasterFrames:replay.rasterFrames, flow:replay.flow, elapsedMs: Math.round(replay.elapsedMs), initialSegments: replay.initialSegments, finalSegments: replay.finalSegments, samplesFed: replay.samplesFed, submissionCPU: { p50Ms: percentile(replay.renderCPU, .5), p95Ms: percentile(replay.renderCPU, .95), maxMs: percentile(replay.renderCPU, 1) }, engineBatchCPU: { p50Ms: percentile(replay.engineCPU, .5), p95Ms: percentile(replay.engineCPU, .95), maxMs: percentile(replay.engineCPU, 1) }, surface: replay.surface },
+      warming: { initialStrokes:replay.initialWarmStrokes, finalStrokes:replay.surface.warmStrokes || 0, sampledCallbacks:replay.warmCPU.length, cpu:{p50Ms:percentile(replay.warmCPU,.5),p95Ms:percentile(replay.warmCPU,.95),maxMs:percentile(replay.warmCPU,1)} },
+      reveal: { elapsedMs:Math.round(reveal.elapsedMs),finishCallMs:Number(reveal.finishCallMs.toFixed(2)),firstFrameDelayMs:Number(reveal.firstFrameDelayMs.toFixed(2)),cadence:timing(reveal.intervals),submissionP95Ms:percentile(reveal.renderCPU,.95),submissionMaxMs:percentile(reveal.renderCPU,1),phases:Object.fromEntries(Object.entries(reveal.phases).map(([phase,value])=>[phase,{frames:value.frames,cadence:timing(value.intervals),submissionP95Ms:percentile(value.cpu,.95),submissionMaxMs:percentile(value.cpu,1)}])),sourceStable:reveal.sourceStable,measurementStable:reveal.measurementStable,surface:reveal.surface },
       errors, consoleErrors,
     };
     results.cases.push(result);
     writeFileSync(path.join(output, 'results.json'), JSON.stringify(results, null, 2) + '\n');
-    console.log(JSON.stringify({ name, entry: result.entry.cadence, replay: result.replay.raf, paint: result.replay.activePaintCadence, submissionP95Ms: result.replay.submissionCPU.p95Ms, pixels: result.replay.surface.cachedPixels }));
+    console.log(JSON.stringify({ name, entry: result.entry.cadence, replay: result.replay.raf, paint: result.replay.activePaintCadence, submissionP95Ms: result.replay.submissionCPU.p95Ms, warming:result.warming, reveal:result.reveal.cadence,finishCallMs:result.reveal.finishCallMs,firstRevealFrameDelayMs:result.reveal.firstFrameDelayMs,revealPhases:result.reveal.phases,pixels: result.replay.surface.cachedPixels }));
     await context.close();
   }
   // A separate visual run avoids screenshot readback affecting timing samples.
@@ -200,7 +268,7 @@ try {
   await page.waitForTimeout(350);
   await page.screenshot({ path: path.join(output, 'entry-spreading.png') });
   await context.close();
-  console.log(`PASS: entry used requested GPU backends; real replay painted the cached landscape; results in ${path.relative(root, output)}/results.json. Frame rates are measurements, not a universal CI guarantee.`);
+  console.log(`PASS: requested GPU entry backends, continuous accepted-source capture and pullback/reconstruction reveal; results in ${path.relative(root, output)}/results.json. Frame rates are measurements, not a universal CI guarantee.`);
 } finally {
   await browser?.close();
   await new Promise(resolve => server.close(resolve));

@@ -9,7 +9,9 @@ import { chromium, webkit } from 'playwright';
 import { replayPublicFixture } from '../landscape-fixture.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
-// The focused CI regression catches the established active-layer blend bug.
+// Recording is source ink on paper, not a partial scenic raster. The focused
+// regression therefore completes reconstruction from early, late and undrained
+// recording states, and keeps the established canonical/repeated-export gates.
 // The default invocation remains the broader all-family diagnostic, including
 // known WebKit residuals; a focused pass must not stand in for that result.
 const regression = process.argv.includes('--compositor-regression');
@@ -64,17 +66,16 @@ for (const name of engines) {
           const scene = PulseLandscape.create({ seed, family });
           segments.forEach(segment => PulseLandscape.append(scene, segment));
           const original = JSON.stringify(scene);
-          const view = PulseLandscape.createView(document.querySelector('main'), scene);
+          let view;
           const eligible = scene.strokes.map((stroke, index) => ({ stroke, index }))
             .filter(({ stroke }) => stroke.sourceEnd - stroke.sourceStart > .12);
           const targets = [.12, .85].map(fraction => eligible[Math.floor(eligible.length * fraction)].index);
           const phases = [];
-          const compare = (label, complete = false) => {
+          const compare = label => {
             const state = view.captureState;
-            const options = complete ? {} : { through: state.painted + 1, progress: state.progress };
             const direct = document.createElement('canvas'), repeat = document.createElement('canvas');
             direct.width = direct.height = repeat.width = repeat.height = view.canvas.width;
-            PulseLandscape.render(scene, direct, options); PulseLandscape.render(scene, repeat, options);
+            PulseLandscape.render(scene, direct); PulseLandscape.render(scene, repeat);
             const pixels = canvas => canvas.getContext('2d').getImageData(0, 0, canvas.width, canvas.height).data;
             const a = pixels(view.canvas), b = pixels(direct), c = pixels(repeat);
             let max = 0, sum = 0, repeatMax = 0, changedChannels = 0, channelsAboveOne = 0;
@@ -92,7 +93,7 @@ for (const name of engines) {
           };
           try {
             for (let phase = 0; phase < targets.length; phase++) {
-              if (phase) view.pause(false);
+              view = PulseLandscape.createView(document.querySelector('main'), scene);
               const target = targets[phase]; let reached = false;
               for (let frame = 0; frame < 20000; frame++) {
                 const state = view.captureState;
@@ -102,18 +103,26 @@ for (const name of engines) {
                 if (state.painted > target || !advancePaint()) throw Error('Missed actual partial paint checkpoint');
               }
               if (!reached) throw Error('Partial paint checkpoint exceeded its frame bound');
-              phases.push(compare(phase ? 'late' : 'early'));
+              const recording = { ...view.captureState, mode: __pulseLandscapeStats.mode, streamTime: __pulseLandscapeStats.streamTime };
+              if(recording.mode !== 'recording')throw Error('Landscape reconstructed before finish was requested');
+              const finishing = view.finish(); view.cancelFinish();
+              if(await finishing !== scene)throw Error('Finish substituted another scene');
+              phases.push({ ...compare(phase ? 'finish-from-late-recording' : 'finish-from-early-recording'), recording });
+              view.dispose();view=null;
             }
+            view = PulseLandscape.createView(document.querySelector('main'), scene);
             const finishing = view.finish(); view.cancelFinish();
             if (await finishing !== scene) throw Error('Finish substituted another scene');
-            phases.push(compare('complete', true));
+            phases.push(compare('finish-with-undrained-recording'));
             return { family, seed, segments: segments.length, usableSeconds: scene.usableSeconds, phases };
-          } finally { view.dispose(); }
+          } finally { view?.dispose(); }
         }, { family, seed, segments: segments.slice(0, count) });
         result.cases.push(item);
         for (const phase of item.phases) {
           const checkpoint = { family, seed, count, phase: phase.label };
           assert.ok(phase.sourceStable, 'painting and exporting retain every original source field');
+          assert.equal(phase.stats.mode,'finished','canonical scenery is checked only after reconstruction completes');
+          assert.equal(phase.stats.finished,true,'every completion checkpoint reaches a final artwork');
           if (phase.repeatMax !== 0) result.failures.push({ ...checkpoint, check: 'repeated-export', max: phase.repeatMax });
           assert.ok(phase.stats.cachedPixels <= 2560000, 'live raster memory remains bounded');
           // Existing pigment cache plus one 256² decoded live-wash mask.
@@ -123,7 +132,7 @@ for (const name of engines) {
       }
     }
     assert.deepEqual(result.errors, []);
-    assert.deepEqual(result.failures, [], 'early, late and completed live painting match direct exports, and repeated exports are exact');
+    assert.deepEqual(result.failures, [], 'reconstruction from early, late and undrained recordings matches canonical exports, and repeated exports are exact');
     result.passed = true;
   } catch (error) {
     // Preserve a failing exit status while still recording the other engine.

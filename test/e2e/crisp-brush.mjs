@@ -81,220 +81,260 @@ for(const engine of engines){
    }
    return results;
   },{regular:recording.segments,fragmented:fragmented.segments});
-  // Drive presentation at known intervals, without making a wall-clock frame
-  // rate claim. Scenic work may skip frames; measured ink must not share that
-  // slower clock, and explicit rest boundaries must expose an exact raster.
-  result.cadence=await page.evaluate(segments=>{
-   const scene=PulseLandscape.create({family:'quiet-lake',seed:39293});
-   segments.forEach(segment=>PulseLandscape.append(scene,segment));
-   const before=JSON.stringify(scene),view=PulseLandscape.createView(document.querySelector('main'),scene);
-   if(!Number.isFinite(__pulseLandscapeStats.rasterFrames)||!Number.isFinite(__pulseLandscapeStats.rasterProgress))throw Error('Scenic raster cadence must be observable separately from the measured foreground');
-   const observations={frames:0,skippedForegroundAdvances:0,slowSkippedAdvances:0,maxPresentationLagMs:0,maxEndpointError:0,maxCameraStep:0,phases:[]};
-   let previous=null;
-   const step=dt=>{
-    if(!advancePaint(dt))throw Error('Cadence recording exhausted before the lifecycle checks');
-    const stats=__pulseLandscapeStats,state=view.captureState,core=document.querySelector('.landscape-live-core');
-    const current={painted:state.painted,progress:state.progress,rasterFrames:stats.rasterFrames,frontier:stats.frontier?.t,path:core.getAttribute('d'),camera:{...stats.camera}};
-    observations.frames++;
-    if(stats.nib&&!stats.settling&&state.progress>0){
-     const end=core.getPointAtLength(core.getTotalLength());
-     observations.maxEndpointError=Math.max(observations.maxEndpointError,Math.hypot(end.x-stats.nib.x,end.y-stats.nib.y));
-     if(stats.rasterPainted!==state.painted)throw Error('The scenic raster belongs to an obsolete stroke');
-     const lag=(state.progress-stats.rasterProgress)*(stats.playbackMs-stats.settleDurationMs);
-     if(lag< -1e-7)throw Error('Scenic pigment advanced beyond the measured foreground');
-     observations.maxPresentationLagMs=Math.max(observations.maxPresentationLagMs,lag);
-     if(previous&&previous.painted===state.painted&&state.progress>previous.progress&&stats.rasterFrames===previous.rasterFrames){
-      if(current.path===previous.path||!(current.frontier>previous.frontier))throw Error('Measured ink stopped when only scenic paint was skipped');
-      observations.skippedForegroundAdvances++;
-      if(stats.rasterIntervalMs>=49)observations.slowSkippedAdvances++;
-     }
-    }
-    if(previous)observations.maxCameraStep=Math.max(observations.maxCameraStep,Math.hypot(current.camera.x-previous.camera.x,current.camera.y-previous.camera.y));
-    previous=current;
+  await page.evaluate(()=>{
+   window.inkVertices=path=>Array.from(path.getAttribute('d').matchAll(/[ML]\s*(-?[\d.]+)[ ,]+(-?[\d.]+)/g),match=>({x:Number(match[1]),y:Number(match[2])}));
+   window.fitInk=(source,rendered)=>{
+    const mean=values=>values.reduce((sum,value)=>sum+value,0)/values.length;
+    const a=mean(source),b=mean(rendered),variance=source.reduce((sum,value)=>sum+(value-a)**2,0);
+    const slope=source.reduce((sum,value,i)=>sum+(value-a)*(rendered[i]-b),0)/variance;
+    return {slope,offset:b-a*slope,residual:Math.max(...source.map((value,i)=>Math.abs(rendered[i]-(b+(value-a)*slope))))};
    };
-   const phase=(name,frames,dt)=>{
-    const before={frames:__pulseLandscapeStats.frames,rasters:__pulseLandscapeStats.rasterFrames,skips:__pulseLandscapeStats.rasterSkipped};
-    for(let i=0;i<frames;i++)step(dt);
-    const stats=__pulseLandscapeStats,result={name,interval:stats.rasterIntervalMs,foregroundFrames:stats.frames-before.frames,rasterFrames:stats.rasterFrames-before.rasters,skips:stats.rasterSkipped-before.skips};
-    observations.phases.push(result);return result;
+   window.inspectRecording=(scene,view)=>{
+    const stats=__pulseLandscapeStats,state=view.captureState,box=document.querySelector('main').getBoundingClientRect();
+    const stage=document.querySelector('.landscape-stage'),style=stage&&getComputedStyle(stage);
+    const snapshot={mode:stats.mode,state:{...state},bridging:!!stats.bridging,streamTime:stats.streamTime,paperOffsetX:stats.paperOffsetX,anchorX:stats.anchorX,projection:structuredClone(stats.projection),frontier:structuredClone(stats.frontier),nib:structuredClone(stats.nib),visibleIntervals:structuredClone(stats.visibleIntervals||[]),
+     scenicHidden:!stage||stage.hidden||style.display==='none'||style.visibility==='hidden'||Number(style.opacity)===0,
+     cachedPixels:stats.cachedPixels,materialPixels:stats.materialPixels,pixelBudget:stats.pixelBudget,materialPixelBudget:stats.materialPixelBudget,viewport:{width:box.width,height:box.height}};
+    if(!stats.nib||!stats.frontier||state.painted>=scene.strokes.length)return snapshot;
+    if(stats.bridging)return snapshot;
+    const stroke=scene.strokes[state.painted],path=document.querySelector(`.landscape-live-core[data-stroke-index="${state.painted}"]`);
+    if(!path)throw Error('Active measured source has no inspectable cached core path');
+    const original=PulseLandscape.sampleStroke(stroke),vertices=inkVertices(path);
+    if(vertices.length!==original.length)throw Error('Cached foreground omitted original source/interpolation vertices');
+    const timeFit=fitInk(original.map(point=>point.t),vertices.map(point=>point.x)),valueFit=fitInk(original.map(point=>point.v),vertices.map(point=>point.y));
+    const expected=PulseLandscape.strokeFrontier(stroke,state.progress),matrix=path.getScreenCTM();
+    const point=new DOMPoint(expected.t*timeFit.slope+timeFit.offset,expected.v*valueFit.slope+valueFit.offset).matrixTransform(matrix);
+    const group=path.closest('.landscape-record'),clipId=group.getAttribute('clip-path').match(/#([^)]*)/)[1],clip=document.getElementById(clipId).querySelector('rect');
+    const clipRight=new DOMPoint(Number(clip.getAttribute('x'))+Number(clip.getAttribute('width')),0).matrixTransform(matrix).x-box.x;
+    snapshot.core={timeFit,valueFit,width:parseFloat(getComputedStyle(path).strokeWidth),endpoint:{x:point.x-box.x,y:point.y-box.y},clipRight,sourceError:Math.max(Math.abs(expected.t-stats.frontier.t),Math.abs(expected.v-stats.frontier.v))};
+    const tip=document.querySelector('.landscape-tip'),tipBox=tip?.getBoundingClientRect();
+    snapshot.tipBounds=tipBox&&{width:tipBox.width,height:tipBox.height};
+    return snapshot;
    };
-   const normal=phase('normal',60,1000/60);
-   phase('brief interruption',2,1000/30);
-   const briefRecovery=phase('brief recovery',20,1000/60);
-   const pressure=phase('sustained pressure',36,1000/30);
-   const seekStaleFrame=()=>{
-    for(let i=0;i<30;i++){
-     step(1000/60);const stats=__pulseLandscapeStats,state=view.captureState;
-     if(!stats.settling&&state.progress>0&&stats.rasterPainted===state.painted&&state.progress-stats.rasterProgress>1e-7)return {...state};
-    }
-    throw Error('No deferred scenic frame was available to test the explicit flush');
+   window.inspectJoin=(scene,stats)=>{
+    const join=document.querySelector(`.landscape-source-join[data-stroke-index="${stats.painted}"]`);
+    if(!join)throw Error('Presentation handoff lacks an explicitly owned connector');
+    const fromIndex=Number(join.dataset.fromStrokeIndex),toIndex=Number(join.dataset.strokeIndex),before=scene.strokes[fromIndex],after=scene.strokes[toIndex];
+    if(toIndex!==fromIndex+1||!before||!after||before.channel!==after.channel||after.sourceStart-before.sourceEnd<0||after.sourceStart-before.sourceEnd>.1500001)throw Error('Presentation connector crossed an unverified source gap or channel');
+    const vertices=inkVertices(join),previous=inkVertices(document.querySelector(`.landscape-live-core[data-stroke-index="${fromIndex}"]`)).at(-1),next=inkVertices(document.querySelector(`.landscape-live-core[data-stroke-index="${toIndex}"]`))[0];
+    if(vertices.length!==2||JSON.stringify(vertices)!==JSON.stringify([previous,next]))throw Error('Handoff geometry does not join the two actual cached measured endpoints');
+    let start=0;
+    for(let i=0;i<=fromIndex;i++){const stroke=scene.strokes[i];start+=(i?Math.min(.45,Math.max(0,stroke.sourceStart-scene.strokes[i-1].sourceEnd)):0)+stroke.sourceEnd-stroke.sourceStart;}
+    const [a,b]=vertices,end=start+after.sourceStart-before.sourceEnd,u=(stats.streamTime-start)/(end-start);
+    const matrix=join.getScreenCTM(),q=new DOMPoint(a.x+(b.x-a.x)*u,a.y+(b.y-a.y)*u).matrixTransform(matrix),box=document.querySelector('main').getBoundingClientRect();
+    const group=join.closest('.landscape-record'),clipId=group.getAttribute('clip-path').match(/#([^)]*)/)[1],clip=document.getElementById(clipId).querySelector('rect');
+    const clipRight=new DOMPoint(Number(clip.getAttribute('x'))+Number(clip.getAttribute('width')),0).matrixTransform(matrix).x-box.x;
+    const sourceA=before.points.at(-1),sourceB=after.points[0],t=sourceA.t+(sourceB.t-sourceA.t)*u,v=sourceA.v+(sourceB.v-sourceA.v)*u;
+    if(!stats.nib||Math.hypot(q.x-box.x-stats.nib.x,q.y-box.y-stats.nib.y)>.04||Math.abs(clipRight-stats.nib.x)>.05)throw Error('Brush left the clipped presentation handoff endpoint');
+    if(Math.abs(t-stats.frontier.t)>1e-8||Math.abs(v-stats.frontier.v)>1e-8)throw Error('Handoff used an invented source time/value instead of its two recorded endpoints');
+    if(stats.activeStroke!==null||stats.visibleIntervals.some(interval=>interval.index===toIndex))throw Error('Presentation handoff was falsely counted as accepted source coverage');
+    return {fromIndex,toIndex,sourceGap:after.sourceStart-before.sourceEnd,endpointError:Math.hypot(q.x-box.x-stats.nib.x,q.y-box.y-stats.nib.y)};
    };
-   const pausedState=seekStaleFrame(),beforePauseRaster=__pulseLandscapeStats.rasterFrames;
-   view.pause(true);
-   const pause={flushed:__pulseLandscapeStats.rasterFrames>beforePauseRaster,exact:__pulseLandscapeStats.rasterPainted===pausedState.painted&&__pulseLandscapeStats.rasterProgress===pausedState.progress,pending:pendingPaint()};
-   const pausedFrames=__pulseLandscapeStats.frames,pausedImage=view.canvas.toDataURL();
-   advancePaint(5000);pause.stable=__pulseLandscapeStats.frames===pausedFrames&&view.canvas.toDataURL()===pausedImage;
-   view.pause(false);
-   const resume=phase('early resume',15,1000/60),recovered=phase('sustained recovery',150,1000/60);
-   const hiddenState=seekStaleFrame(),beforeHiddenRaster=__pulseLandscapeStats.rasterFrames;
-   Object.defineProperty(document,'hidden',{configurable:true,get:()=>true});document.dispatchEvent(new Event('visibilitychange'));
-   const hidden={flushed:__pulseLandscapeStats.rasterFrames>beforeHiddenRaster,exact:__pulseLandscapeStats.rasterPainted===hiddenState.painted&&__pulseLandscapeStats.rasterProgress===hiddenState.progress,pending:pendingPaint()};
-   const hiddenFrames=__pulseLandscapeStats.frames;advancePaint(5000);hidden.stable=__pulseLandscapeStats.frames===hiddenFrames;
-   delete document.hidden;document.dispatchEvent(new Event('visibilitychange'));step(1000/60);
-   hidden.recovered=__pulseLandscapeStats.frames>hiddenFrames;
-   const output={...observations,normal,briefRecovery,pressure,resume,recovered,pause,hidden,sourceStable:JSON.stringify(scene)===before};
-   view.dispose();return output;
-  },recording.segments);
-  assert.ok(result.cadence.normal.interval>=33&&result.cadence.normal.interval<=34&&result.cadence.normal.skips>0,'normal presentation budgets scenic raster work to 30 Hz');
-  assert.equal(result.cadence.briefRecovery.interval,result.cadence.normal.interval,'one brief presentation interruption does not lower scenic cadence');
-  assert.ok(result.cadence.pressure.interval>=49&&result.cadence.pressure.interval<=50.1&&result.cadence.slowSkippedAdvances>0,'sustained presentation pressure reduces only scenic raster work to 20 Hz');
-  assert.equal(result.cadence.resume.interval,result.cadence.pressure.interval,'resuming does not immediately oscillate the scenic budget');
-  assert.equal(result.cadence.recovered.interval,result.cadence.normal.interval,'sustained healthy presentation restores scenic cadence');
-  assert.ok(result.cadence.skippedForegroundAdvances>20&&result.cadence.maxEndpointError<.03&&result.cadence.maxPresentationLagMs<=50.01,'real source ink and attached nib advance through skipped scenic frames with at most 50 ms presentation lag');
-  assert.deepEqual(result.cadence.pause,{flushed:true,exact:true,pending:0,stable:true},'pause flushes the current exact pigment once and leaves no scheduled work');
-  assert.deepEqual(result.cadence.hidden,{flushed:true,exact:true,pending:0,stable:true,recovered:true},'visibility interruption flushes the exact pigment and resumes without hidden catch-up');
-  assert.ok(result.cadence.maxCameraStep<250&&result.cadence.sourceStable,'raster budgeting preserves source data and continuous camera damping');
+  });
   const families=await page.evaluate(()=>PulseLandscape.FAMILIES);
   for(const family of families){
    const item=await page.evaluate(({family,segments})=>{
     window.view?.dispose();window.scene=PulseLandscape.create({family:family.id,seed:39293});
     segments.slice(0,7).forEach(segment=>PulseLandscape.append(scene,segment));
     const before=JSON.stringify(scene);window.view=PulseLandscape.createView(document.querySelector('main'),scene);
-    const target=scene.strokes.length-1,frames=[],cameraSteps={samples:0,maxContinuousStep:0,worst:null};
-    let previousCamera=null,previousStroke=0;
-    for(let i=0;i<12000;i++){
-     const state=view.captureState,camera={...__pulseLandscapeStats.camera};
-     if(previousCamera){
-      const step=Math.hypot(camera.x-previousCamera.x,camera.y-previousCamera.y);cameraSteps.samples++;
-      if(step>cameraSteps.maxContinuousStep){cameraSteps.maxContinuousStep=step;cameraSteps.worst={fromStroke:previousStroke,toStroke:state.painted,from:previousCamera,to:camera};}
+    const target=scene.strokes.length-1,frames=[],cache=new Map(),textureCache=new Map(),transitions=[];
+    let previous=null,immutableChecks=0,maxAnchorStep=0,maxPaperStep=0,bridgeFrames=0,maxBridgeError=0;
+    for(let i=0;i<16000;i++){
+     const snapshot=inspectRecording(scene,view),state=snapshot.state;
+     if(snapshot.mode!=='recording')throw Error('Scenery started before the explicit finish action');
+     if(!snapshot.scenicHidden)throw Error('A decorative landscape remains visible during source recording');
+     for(const path of document.querySelectorAll('.landscape-live-core,.landscape-source-wash,.landscape-source-join,.landscape-source-blooms,.landscape-source-body,.landscape-source-edge')){
+      const d=path.getAttribute('d');if(cache.has(path)&&cache.get(path)!==d)throw Error('Previously deposited source ink or pigment changed shape while paper moved');
+      if(cache.has(path))immutableChecks++;else cache.set(path,d);
      }
-     previousCamera=camera;previousStroke=state.painted;
-     if(state.painted===target&&state.progress>=.12&&state.progress<=.88){
-      const core=document.querySelector('.landscape-live-core'),tip=document.querySelector('.landscape-tip'),ink=document.querySelector('.landscape-ink');
-      const end=core.getPointAtLength(core.getTotalLength()),bounds=tip.getBoundingClientRect(),container=document.querySelector('main').getBoundingClientRect();
-      const stats=__pulseLandscapeStats,vertices=Array.from(core.getAttribute('d').matchAll(/[ML](-?[\d.]+) (-?[\d.]+)/g),match=>({x:Number(match[1]),y:Number(match[2])}));
-      const original=PulseLandscape.sampleStroke(scene.strokes[target],state.progress).filter(point=>point.t>=stats.projection.start);
-      if(vertices.length!==original.length)throw Error('Foreground dropped measured/interpolated source vertices');
-      const mean=values=>values.reduce((sum,value)=>sum+value,0)/values.length;
-      const fit=(source,rendered)=>{const a=mean(source),b=mean(rendered),variance=source.reduce((sum,value)=>sum+(value-a)**2,0),slope=source.reduce((sum,value,i)=>sum+(value-a)*(rendered[i]-b),0)/variance;return{slope,residual:Math.max(...source.map((value,i)=>Math.abs(rendered[i]-(b+(value-a)*slope))))};};
-      const timeFit=fit(original.map(point=>point.t),vertices.map(point=>point.x)),valueFit=fit(original.map(point=>point.v),vertices.map(point=>point.y));
-      frames.push({...structuredClone({...stats}),inkVisible:!ink.hasAttribute('hidden'),core:{x:end.x,y:end.y,width:parseFloat(getComputedStyle(core).strokeWidth),length:core.getTotalLength(),timeFit,valueFit},tipBounds:{x:bounds.x-container.x,y:bounds.y-container.y,width:bounds.width,height:bounds.height},viewport:{width:container.width,height:container.height,dpr:devicePixelRatio}});
+     if(snapshot.bridging){const join=inspectJoin(scene,__pulseLandscapeStats);bridgeFrames++;maxBridgeError=Math.max(maxBridgeError,join.endpointError);}
+     for(const material of document.querySelectorAll('.landscape-ink pattern,.landscape-ink mask')){
+      const placement=['x','y','width','height','patternTransform','patternUnits','maskUnits','maskContentUnits'].map(name=>material.getAttribute(name)).join('|');
+      if(textureCache.has(material)&&textureCache.get(material)!==placement)throw Error('Paper texture shifted relative to its deposited waveform');
+      textureCache.set(material,placement);
      }
+     if(previous){
+      if(snapshot.streamTime<previous.streamTime-1e-9)throw Error('The session-wide cursor restarted at an accepted-window boundary');
+      if(snapshot.paperOffsetX>previous.paperOffsetX+.01)throw Error('Paper moved backwards during forward source recording');
+      maxPaperStep=Math.max(maxPaperStep,Math.abs(snapshot.paperOffsetX-previous.paperOffsetX));
+      if(snapshot.nib&&previous.nib)maxAnchorStep=Math.max(maxAnchorStep,Math.abs(snapshot.nib.x-previous.nib.x));
+      if(state.painted!==previous.state.painted)transitions.push({from:previous.state.painted,to:state.painted,streamBefore:previous.streamTime,streamAfter:snapshot.streamTime,anchorBefore:previous.nib?.x,anchorAfter:snapshot.nib?.x});
+     }
+     if(snapshot.core&&state.progress>=.12&&state.progress<=.88&&(state.painted===target||transitions.length<2))frames.push(snapshot);
+     previous=snapshot;
      if(state.painted===target&&state.progress>=.72)break;
-     if(!advancePaint())throw Error('The active paint queue stopped before the sampled source frontier');
+     if(!advancePaint())throw Error('The continuous source cursor stopped before the active checkpoint');
     }
-    if(frames.length<8)throw Error('No sustained active stroke was observed');
-    return{family:family.id,sourceStable:before===JSON.stringify(scene),frames,cameraSteps,sourceEnd:scene.strokes[target].sourceEnd,state:view.captureState};
+    if(frames.length<8)throw Error('No sustained active measured source was observed');
+    return{family:family.id,sourceStable:before===JSON.stringify(scene),frames,transitions,immutableChecks,maxAnchorStep,maxPaperStep,bridgeFrames,maxBridgeError,state:view.captureState};
    },{family,segments:recording.segments});
    assert.equal(item.sourceStable,true);
    const issues=new Set(),check=(condition,message)=>{if(!condition)issues.add(message)};
-   check(item.cameraSteps.samples>20&&item.cameraSteps.maxContinuousStep<250,`${family.id}: healthy frames damp camera movement across distant stroke boundaries`);
+   check(item.transitions.length>=5&&item.immutableChecks>100,`${family.id}: one recording crosses accepted windows while reusing deposited core and wash geometry`);
+   check(item.bridgeFrames>0&&item.maxBridgeError<.04,`${family.id}: clean accepted-window handoffs retain a continuously attached brush without changing source coverage`);
+   check(item.maxAnchorStep<.05&&item.maxPaperStep<8,`${family.id}: the brush stays anchored while its paper scrolls smoothly across windows`);
    for(const frame of item.frames){
-    check(frame.inkVisible&&frame.nib,`${family.id}: the ongoing stroke has visible ink and a brush tip`);
-    check(frame.nib&&Math.hypot(frame.core.x-frame.nib.x,frame.core.y-frame.nib.y)<.03,`${family.id}: pointed brush contacts the exact end of the drawn pulse`);
-    check(frame.core.width>=1.2&&frame.core.width<=2,`${family.id}: crisp core keeps a readable fixed CSS width`);
-    check(frame.tipBounds.width<=16&&frame.tipBounds.height<=16,`${family.id}: pointed nib stays below 16 CSS pixels despite terrain zoom`);
-    check(frame.nib&&frame.nib.x>=12&&frame.nib.x<=frame.viewport.width-12&&frame.nib.y>=12&&frame.nib.y<=frame.viewport.height-12,`${family.id}: active nib stays inside the mobile painting`);
-    check(frame.wetTrail&&frame.wetTrail.end<=frame.frontier.t-.249&&frame.wetTrail.end-frame.wetTrail.start<=1.351,`${family.id}: blooms remain behind the crisp frontier with bounded history`);
-    check(frame.wetTrail&&frame.wetTrail.deposits<=2&&frame.wetTrail.pores<=Math.ceil(frame.wetTrail.points/11)&&frame.wetTrail.branches<=Math.ceil(frame.wetTrail.points/10),`${family.id}: connected pigment and paper pores stay bounded as a session grows`);
-    check(frame.camera.scale<=2.31&&frame.camera.scale>=1.54,`${family.id}: calmer framing avoids extreme magnification`);
-    check(frame.projection.kind==='source-time-value'&&frame.projection.settle===0&&frame.projection.windowSeconds>=2.5&&frame.projection.windowSeconds<=3.5,`${family.id}: ongoing writing uses a short true time/value window`);
-    check(frame.core.timeFit.slope>0&&frame.core.timeFit.residual<.011&&frame.core.valueFit.slope<0&&frame.core.valueFit.residual<.011,`${family.id}: every foreground vertex preserves measured timing and relative amplitude without terrain distortion`);
-    // One additional 256-square decoded scan textures the small live wash.
-    // This is explicit allocation, separate from the unchanged scene caches.
-    check(frame.cachedPixels<=2560000&&frame.materialPixels<=4554752&&frame.liveTexturePixels===65536,`${family.id}: scene cache and explicit live texture stay within their budgets`);
-    check(frame.washBounds.height<=160&&frame.washBounds.width<=frame.viewport.width&&frame.liveMaskPixelEstimate<=Math.ceil(frame.viewport.width*frame.viewport.dpr)*Math.ceil(160*frame.viewport.dpr),`${family.id}: estimated transient mask surface stays confined to the short wet trail`);
+    check(frame.nib&&frame.core,`${family.id}: measured writing has a visible attached brush`);
+    check(frame.core.sourceError<1e-7,`${family.id}: presentation retains the exact canonical source frontier`);
+    check(Math.hypot(frame.core.endpoint.x-frame.nib.x,frame.core.endpoint.y-frame.nib.y)<.04,`${family.id}: brush contacts the actual clipped source path`);
+    check(Math.abs(frame.core.clipRight-frame.nib.x)<.05,`${family.id}: clipping reveals no future pulse ahead of the contact point`);
+    check(frame.core.width>=1.2&&frame.core.width<=2.5,`${family.id}: source ink has a readable crisp width`);
+    check(frame.nib.width>=32&&frame.nib.width<=52&&frame.tipBounds.width<=64&&frame.tipBounds.height<=64,`${family.id}: pointed brush is visible but bounded on mobile`);
+    check(Math.abs(frame.nib.x-frame.anchorX)<.04&&Math.abs(frame.anchorX-frame.viewport.width*.78)<.04,`${family.id}: contact stays at the fixed 78 percent horizontal anchor`);
+    check(frame.nib.y>=16&&frame.nib.y<=frame.viewport.height-16,`${family.id}: source excursions remain inside the painting viewport`);
+    check(frame.projection.kind==='continuous-source-time-value'&&frame.projection.windowSeconds===6,`${family.id}: recording has one continuous source-time/value projection`);
+    check(frame.core.timeFit.slope>0&&frame.core.timeFit.residual<.011&&frame.core.valueFit.slope<0&&frame.core.valueFit.residual<.011,`${family.id}: every cached vertex preserves measured time and amplitude without terrain distortion`);
+    check(frame.cachedPixels<=2560000&&frame.materialPixels<=4554752,`${family.id}: presentation keeps the established raster and material budgets`);
+    for(const interval of frame.visibleIntervals)check(interval.sourceStart<=interval.sourceEnd&&interval.start<=interval.end,`${family.id}: visible source intervals are finite ordered pen runs`);
    }
    for(let i=1;i<item.frames.length;i++){
-    const a=item.frames[i-1],b=item.frames[i],scale=b.viewport.width/1080*b.camera.scale;
-    check(Math.hypot(b.camera.x-a.camera.x,b.camera.y-a.camera.y)*scale<8,`${family.id}: framing does not jump after each measured peak`);
-    check(a.projection.baseline===b.projection.baseline&&a.projection.amplitude===b.projection.amplitude,`${family.id}: foreground does not bob or rescale each beat`);
+    const a=item.frames[i-1],b=item.frames[i];
+    check(a.projection.baseline===b.projection.baseline&&a.projection.amplitude===b.projection.amplitude,`${family.id}: paper baseline and amplitude do not jump at measured-window boundaries`);
    }
-   result.failures.push(...issues);
-   result.cases.push(item);
+   result.failures.push(...issues);result.cases.push(item);
    if(process.env.PPG_BRUSH_SCREENSHOTS==='1')await page.screenshot({path:path.join(out,`${engine}-${family.id}.png`)});
   }
   result.lifecycle=await page.evaluate(segments=>{
    const before=JSON.stringify(scene);view.pause(true);
-   const pausedImage=view.canvas.toDataURL(),frames=__pulseLandscapeStats.frames;
+   const pausedImage=view.canvas.toDataURL(),frames=__pulseLandscapeStats.frames,cursor=__pulseLandscapeStats.streamTime;
    PulseLandscape.append(scene,segments[7]);view.sync();
    for(let i=0;i<20;i++)advancePaint();
-   const paused={sameImage:pausedImage===view.canvas.toDataURL(),sameFrames:frames===__pulseLandscapeStats.frames,hidden:document.querySelector('.landscape-ink').hasAttribute('hidden'),pending:pendingPaint(),sourceGrew:JSON.stringify(scene)!==before};
+   const paused={sameImage:pausedImage===view.canvas.toDataURL(),sameFrames:frames===__pulseLandscapeStats.frames,sameCursor:cursor===__pulseLandscapeStats.streamTime,pending:pendingPaint(),sourceGrew:JSON.stringify(scene)!==before};
    view.pause(false);for(let i=0;i<5;i++)advancePaint();
    const resumed=__pulseLandscapeStats.frames>frames;
    Object.defineProperty(document,'hidden',{configurable:true,get:()=>true});document.dispatchEvent(new Event('visibilitychange'));
-   const hiddenFrames=__pulseLandscapeStats.frames;for(let i=0;i<20;i++)advancePaint();
-   const hidden={sameFrames:hiddenFrames===__pulseLandscapeStats.frames,hidden:document.querySelector('.landscape-ink').hasAttribute('hidden'),pending:pendingPaint()};
-   delete document.hidden;document.dispatchEvent(new Event('visibilitychange'));for(let i=0;i<5;i++)advancePaint();
-   return{paused,resumed,hidden,recovered:__pulseLandscapeStats.frames>hiddenFrames,source:JSON.stringify(scene)};
+   const hiddenFrames=__pulseLandscapeStats.frames,hiddenCursor=__pulseLandscapeStats.streamTime;advancePaint(5000);
+   const hidden={sameFrames:hiddenFrames===__pulseLandscapeStats.frames,sameCursor:hiddenCursor===__pulseLandscapeStats.streamTime,pending:pendingPaint()};
+   delete document.hidden;document.dispatchEvent(new Event('visibilitychange'));advancePaint();
+   hidden.resumeAdvance=__pulseLandscapeStats.streamTime-hiddenCursor;for(let i=0;i<5;i++)advancePaint();
+   return{paused,resumed,hidden,recovered:__pulseLandscapeStats.frames>hiddenFrames};
   },recording.segments);
-  assert.deepEqual(result.lifecycle.paused,{sameImage:true,sameFrames:true,hidden:true,pending:0,sourceGrew:true},'pause freezes visible pigment and brush while newly accepted source remains stored');
-  assert.ok(result.lifecycle.resumed&&result.lifecycle.recovered,'pause and document-visibility interruption both resume painting');
-  assert.deepEqual(result.lifecycle.hidden,{sameFrames:true,hidden:true,pending:0},'hidden document removes ink and leaves no scheduled paint work');
+  assert.deepEqual(result.lifecycle.paused,{sameImage:true,sameFrames:true,sameCursor:true,pending:0,sourceGrew:true},'pause freezes presentation but retains newly accepted samples');
+  assert.ok(result.lifecycle.resumed&&result.lifecycle.recovered,'pause and visibility interruption both recover');
+  assert.ok(result.lifecycle.hidden.sameFrames&&result.lifecycle.hidden.sameCursor&&result.lifecycle.hidden.pending===0&&result.lifecycle.hidden.resumeAdvance<=.021,'hidden time cannot create a backlog jump on resume, including bounded 1.2x stream catch-up');
   await page.emulateMedia({reducedMotion:'reduce'});
   await page.waitForFunction(()=>matchMedia('(prefers-reduced-motion: reduce)').matches&&pendingPaint()===0);
   result.reduced=await page.evaluate(async()=>{
    const before=JSON.stringify(scene),frames=__pulseLandscapeStats.frames;
    for(let i=0;i<20;i++)advancePaint();
    const resolved=await view.finish();
-   const result={sameScene:resolved===scene,sourceStable:JSON.stringify(scene)===before,framesStable:frames===__pulseLandscapeStats.frames,hidden:document.querySelector('.landscape-ink').hasAttribute('hidden'),pending:pendingPaint(),camera:__pulseLandscapeStats.camera};
+   const result={sameScene:resolved===scene,sourceStable:JSON.stringify(scene)===before,framesStable:frames===__pulseLandscapeStats.frames,pending:pendingPaint(),mode:__pulseLandscapeStats.mode,camera:__pulseLandscapeStats.camera};
    view.dispose();advancePaint();
-   result.disposed=document.querySelectorAll('.landscape-ink,.landscape-stage,.landscape-tip').length===0&&pendingPaint()===0&&__pulseLandscapeStats.cachedPixels===4&&__pulseLandscapeStats.liveTexturePixels===0&&__pulseLandscapeStats.liveMaskPixelEstimate===0;
+   result.disposed=document.querySelectorAll('.landscape-ink,.landscape-stage,.landscape-tip').length===0&&pendingPaint()===0&&__pulseLandscapeStats.cachedPixels<=4;
    return result;
   });
-  assert.deepEqual(result.reduced,{sameScene:true,sourceStable:true,framesStable:true,hidden:true,pending:0,camera:{x:540,y:540,scale:1},disposed:true},'reduced motion, finish and disposal remove live brush work while retaining the exact scene');
-  delete result.lifecycle.source;
+  assert.deepEqual(result.reduced,{sameScene:true,sourceStable:true,framesStable:true,pending:0,mode:'finished',camera:{x:540,y:540,scale:1},disposed:true},'reduced motion finishes the exact scene without a running animation and disposal releases its surfaces');
   result.empty=await page.evaluate(segment=>{
    const empty=PulseLandscape.create({family:'quiet-lake',seed:3});PulseLandscape.append(empty,{...segment,quality:{good:false}});
    const view=PulseLandscape.createView(document.querySelector('main'),empty);advancePaint();
-   const result={strokes:empty.strokes.length,frames:__pulseLandscapeStats.frames,inkHidden:document.querySelector('.landscape-ink').hasAttribute('hidden')};view.dispose();return result;
+   const result={strokes:empty.strokes.length,frames:__pulseLandscapeStats.frames,nib:__pulseLandscapeStats.nib,pending:pendingPaint()};view.dispose();return result;
   },recording.segments[0]);
-  assert.deepEqual(result.empty,{strokes:0,frames:0,inkHidden:true},'rejected data never produces a brush or a fabricated pulse');
+  assert.deepEqual(result.empty,{strokes:0,frames:0,nib:null,pending:0},'rejected source never produces a brush or invented pulse');
   await page.emulateMedia({reducedMotion:'no-preference'});
-  result.settling=await page.evaluate(segment=>{
-   const scene=PulseLandscape.create({family:'quiet-lake',seed:39293});PulseLandscape.append(scene,segment);
-   const source=JSON.stringify(scene),view=PulseLandscape.createView(document.querySelector('main'),scene),start=paintClock(),frames=[];
-   let writing=null;
-   for(let i=0;i<2000;i++){
-    advancePaint();const stats=__pulseLandscapeStats;
-    if(stats.settling){
-     const box=document.querySelector('main').getBoundingClientRect(),scale=Math.min(box.width,box.height)/1080*stats.camera.scale;
-     const terrain={x:box.width/2+(stats.frontier.x-stats.camera.x)*scale,y:box.height/2+(stats.frontier.y-stats.camera.y)*scale};
-     writing??={...stats.nib};
-     const t=stats.projection.settle,expected={x:writing.x*(1-t)+terrain.x*t,y:writing.y*(1-t)+terrain.y*t};
-     frames.push({settle:t,progress:stats.progress,frontier:stats.frontier.t,endpointError:Math.hypot(stats.nib.x-expected.x,stats.nib.y-expected.y),duration:stats.settleDurationMs});
-    }
-    if(view.captureState.painted>0)break;
+  result.continuityCases=await page.evaluate(segments=>{
+   const result=[];
+   for(const label of ['clean','explicit-lift','invalid-leading','invalid-trailing','rejected','channel-change','restored']){
+    let scene=PulseLandscape.create({family:'quiet-lake',seed:39293});
+    const first=structuredClone(segments[0]),next=structuredClone(segments[1]);
+    const missingTime=(first.points.at(-1).t+next.points[0].t)/2;
+    if(label==='invalid-trailing')first.points.push({t:missingTime,v:NaN});
+    PulseLandscape.append(scene,first);
+    if(label==='restored')scene=JSON.parse(JSON.stringify(scene));
+    if(label==='explicit-lift')next.points[0].breakBefore=true;
+    if(label==='invalid-leading')next.points.unshift({t:missingTime,v:NaN});
+    if(label==='rejected')PulseLandscape.append(scene,{quality:{good:false},points:[]});
+    if(label==='channel-change')next.channel=`different-${next.channel}`;
+    const previous=scene.strokes.at(-1),added=PulseLandscape.append(scene,next),snapshot=JSON.stringify(scene);
+    const view=PulseLandscape.createView(document.querySelector('main'),scene);
+    const join=document.querySelector(`.landscape-source-join[data-from-stroke-index="${previous.id}"][data-stroke-index="${added[0].id}"]`);
+    if(!!join!==(label==='clean'))throw Error(`${label}: live presentation ignored ingestion continuity proof`);
+    if(JSON.stringify(scene)!==snapshot)throw Error(`${label}: presentation connector altered saved source coverage`);
+    result.push({label,connected:!!join,sourceStable:true});view.dispose();
    }
-   const elapsed=paintClock()-start,expectedMs=Math.max(420,(scene.strokes[0].sourceEnd-scene.strokes[0].sourceStart)*1000);
-   const result={frames,elapsed,expectedMs,sourceEnd:scene.strokes[0].sourceEnd,sourceStable:JSON.stringify(scene)===source};view.dispose();return result;
-  },recording.segments[0]);
-  assert.ok(result.settling.frames.length>3&&result.settling.frames.some(frame=>frame.settle>.3&&frame.settle<.8),'completed source visibly settles into its own scenic projection');
-  assert.ok(result.settling.frames.every(frame=>frame.progress===1&&frame.frontier===result.settling.sourceEnd&&frame.endpointError<1e-7),'settling transforms the same completed pulse without advancing or inventing samples');
-  assert.ok(result.settling.elapsed<=result.settling.expectedMs+40,'settling fits inside source playback time instead of adding delay to every stroke');
-  assert.equal(result.settling.sourceStable,true,'settling retains the exact canonical scene for exports');
-  // Traverse the full accepted recording quickly through the normal backlog
-  // playback. Sampling only the middle of one line misses a hard camera jump
-  // when the next real stroke belongs to a distant layer. Every stepped frame
-  // remains a healthy 60 Hz frame; this is correctness, not wall-clock timing.
-  result.cameraTraversal=await page.evaluate(segments=>{
-   const scene=PulseLandscape.create({family:'quiet-lake',seed:39293});segments.forEach(segment=>PulseLandscape.append(scene,segment));
-   const before=JSON.stringify(scene),view=PulseLandscape.createView(document.querySelector('main'),scene);
-   const result={samples:0,transitions:0,maxContinuousStep:0,worst:null,strokes:scene.strokes.length};
-   let previous={...__pulseLandscapeStats.camera},previousStroke=0;
-   for(let i=0;i<15000&&view.captureState.painted<scene.strokes.length;i++){
-    if(!advancePaint())throw Error('Full-recording camera traversal stopped while accepted strokes remained');
-    const current={...__pulseLandscapeStats.camera},stroke=view.captureState.painted,step=Math.hypot(current.x-previous.x,current.y-previous.y);
-    result.samples++;if(stroke!==previousStroke)result.transitions++;
-    if(step>result.maxContinuousStep){result.maxContinuousStep=step;result.worst={fromStroke:previousStroke,toStroke:stroke,from:previous,to:current};}
-    previous=current;previousStroke=stroke;
-   }
-   result.complete=view.captureState.painted===scene.strokes.length;result.sourceStable=JSON.stringify(scene)===before;view.dispose();return result;
+   return result;
   },recording.segments);
-  assert.ok(result.cameraTraversal.complete&&result.cameraTraversal.transitions>30&&result.cameraTraversal.sourceStable,'full-recording traversal crosses distant real stroke layers without altering source');
-  assert.ok(result.cameraTraversal.maxContinuousStep<250,'healthy frames damp scene camera movement across the full accepted recording');
+  assert.equal(result.continuityCases.length,7,'normal handoffs connect while close-timestamp explicit, invalid, rejected, channel and restored barriers remain disconnected');
+  result.gaps=await page.evaluate(segments=>{
+   const scene=PulseLandscape.create({family:'quiet-lake',seed:39293});segments.slice(0,6).forEach(segment=>PulseLandscape.append(scene,segment));
+   const original=JSON.stringify(scene),view=PulseLandscape.createView(document.querySelector('main'),scene);
+   const sourceGaps=scene.strokes.slice(1).filter((stroke,index)=>stroke.sourceStart-scene.strokes[index].sourceEnd>.12).length;
+   const result={sourceGaps,strokes:scene.strokes.length,gapFrames:0,checkedIntervals:0,checkedPaths:0};
+   const explicitLifts=new Set(segments.flatMap(segment=>segment.points.filter(point=>point.breakBefore).map(point=>point.t)));
+   for(const group of document.querySelectorAll('.landscape-record')){
+    const index=Number(group.dataset.recordIndex),stroke=scene.strokes[index],core=group.querySelector('.landscape-live-core');
+    if(Number(core.dataset.strokeIndex)!==index||!stroke)throw Error('A cached record lost its accepted source owner');
+    if((core.getAttribute('d').match(/M/g)||[]).length!==1)throw Error('A source record contains an unowned connecting subpath');
+    if(explicitLifts.has(stroke.sourceStart)&&group.querySelector('.landscape-source-join'))throw Error('A real adapter pen lift acquired a presentation connector');
+    const vertices=inkVertices(core),source=PulseLandscape.sampleStroke(stroke);
+    if(vertices.length!==source.length)throw Error('A fragmented source path dropped measured/interpolated vertices');
+    const timeFit=fitInk(source.map(point=>point.t),vertices.map(point=>point.x)),valueFit=fitInk(source.map(point=>point.v),vertices.map(point=>point.y));
+    if(timeFit.residual>=.011||valueFit.residual>=.011)throw Error('Source delivery gaps altered the measured pulse geometry');
+    result.checkedPaths++;
+   }
+   for(let i=0;i<12000;i++){
+    const stats=__pulseLandscapeStats;
+    if(stats.mode!=='recording')throw Error('A delivery gap triggered premature scenic reconstruction');
+    if(stats.bridging)inspectJoin(scene,stats);
+    else if(stats.activeStroke===null&&stats.streamTime>0&&view.captureState.painted<scene.strokes.length){
+     result.gapFrames++;if(stats.nib!==null)throw Error('Brush continued drawing through a period with no accepted source');
+    }
+    for(const interval of stats.visibleIntervals){
+     const stroke=scene.strokes[interval.index];
+     if(!stroke||interval.sourceStart!==stroke.sourceStart||interval.sourceEnd>stroke.sourceEnd+1e-8||interval.sourceEnd<stroke.sourceStart-1e-8)throw Error('Visible paper interval invented or combined accepted source runs');
+     const group=document.querySelector(`.landscape-record[data-record-index="${interval.index}"]`);
+     if(!group||group.querySelectorAll('.landscape-live-core').length!==1)throw Error('A true pen lift was joined to a neighbouring source path');
+     result.checkedIntervals++;
+    }
+    if(!advancePaint())break;
+   }
+   result.sourceStable=JSON.stringify(scene)===original;result.mode=__pulseLandscapeStats.mode;view.dispose();return result;
+  },fragmented.segments);
+  assert.ok(result.gaps.sourceGaps>5&&result.gaps.gapFrames>10&&result.gaps.checkedIntervals>100&&result.gaps.checkedPaths===result.gaps.strokes&&result.gaps.sourceStable&&result.gaps.mode==='recording','dropped real delivery produces separate measured paths and visible pen lifts, never fabricated connecting pulses');
+  result.reconstruction=[];
+  for(const family of families){
+  const reconstructed=await page.evaluate(async({segments,family})=>{
+   const scene=PulseLandscape.create({family,seed:39293});segments.slice(0,7).forEach(segment=>PulseLandscape.append(scene,segment));
+   const original=JSON.stringify(scene),view=PulseLandscape.createView(document.querySelector('main'),scene);
+   for(let i=0;i<60;i++)advancePaint();
+   let complete=false,resolved;const start=paintClock(),completion=view.finish().then(value=>{complete=true;resolved=value});
+   const phases=new Set(),morphs=[];let checkedColors=0;
+   for(let i=0;i<600&&!complete;i++){
+    advancePaint();const stats=__pulseLandscapeStats;phases.add(stats.mode);
+    if(stats.mode==='reconstructing'&&stats.morphProgress>.02&&stats.morphProgress<.98){
+     for(const line of document.querySelectorAll('.landscape-reveal-core')){
+      const color=line.getAttribute('stroke');
+      if(!color||!CSS.supports('color',color)||getComputedStyle(line).stroke==='none')throw Error('Reconstruction pulse has an invalid or invisible stroke color');
+      checkedColors++;
+     }
+     for(const point of stats.revealSamples||[]){
+      const p=stats.morphProgress,expected={x:point.from.x*(1-p)+point.to.x*p,y:point.from.y*(1-p)+point.to.y*p};
+      const stroke=scene.strokes[point.strokeIndex],progress=(point.t-stroke.sourceStart)/(stroke.sourceEnd-stroke.sourceStart),source=PulseLandscape.strokeFrontier(stroke,progress);
+      const path=document.querySelector(`.landscape-reveal-core[data-stroke-index="${point.strokeIndex}"]`),vertex=path&&inkVertices(path)[point.pointIndex];
+      if(!vertex)throw Error('Reconstruction sample has no corresponding rendered source vertex');
+      const box=document.querySelector('main').getBoundingClientRect(),side=Math.min(box.width,box.height);
+      const target={x:(box.width-side)/2+source.x/1080*side,y:(box.height-side)/2+source.y/1080*side};
+      const rows=Math.max(1,scene.slots.length),rowH=860/rows,domain=stroke.transform.domain;
+      const unit=Math.min(1,Math.max(0,(point.v-domain.min)/(domain.max-domain.min||1)));
+      const manuscript={x:(box.width-side)/2+(100+880*Math.min(1,Math.max(0,(stroke.slotStart+point.t-stroke.sourceStart)/5)))/1080*side,y:(box.height-side)/2+(110+(stroke.slot+.5)*rowH+(.5-unit)*Math.min(34,rowH*.72))/1080*side};
+      morphs.push({progress:p,strokeIndex:point.strokeIndex,t:point.t,v:point.v,sourceError:Math.max(Math.abs(source.t-point.t),Math.abs(source.v-point.v)),interpolationError:Math.hypot(point.current.x-expected.x,point.current.y-expected.y),domError:Math.hypot(vertex.x-expected.x,vertex.y-expected.y),targetError:Math.hypot(point.to.x-target.x,point.to.y-target.y),manuscriptError:Math.hypot(point.from.x-manuscript.x,point.from.y-manuscript.y),travel:Math.hypot(point.from.x-point.to.x,point.from.y-point.to.y)});
+     }
+    }
+    if(i%30===0)await new Promise(resolve=>setTimeout(resolve,0));
+   }
+   if(!complete)throw Error('Reconstruction exceeded its bounded presentation duration');await completion;
+   const output={family,elapsed:paintClock()-start,phases:[...phases],morphs,checkedColors,sameScene:resolved===scene,sourceStable:JSON.stringify(scene)===original,finished:__pulseLandscapeStats.finished,mode:__pulseLandscapeStats.mode};
+   view.dispose();return output;
+  },{segments:recording.segments,family:family.id});
+  result.reconstruction.push(reconstructed);
+  assert.ok(reconstructed.sameScene&&reconstructed.sourceStable&&reconstructed.finished&&reconstructed.mode==='finished',`${family.id}: reconstruction resolves the same complete accepted scene`);
+  assert.ok(reconstructed.phases.includes('pullback')&&reconstructed.phases.includes('reconstructing'),`${family.id}: manuscript pullback precedes scenic reconstruction`);
+  assert.ok(reconstructed.elapsed>=5700&&reconstructed.elapsed<8000,`${family.id}: one bounded reconstruction replaces per-window settling`);
+  assert.ok(reconstructed.morphs.length>12&&reconstructed.checkedColors>50&&reconstructed.morphs.some(point=>point.progress>.3&&point.progress<.7&&point.travel>10),`${family.id}: valid visible pulse vertices pass through intermediate terrain geometry`);
+  assert.ok(reconstructed.morphs.every(point=>point.sourceError<1e-7&&point.interpolationError<1e-6),`${family.id}: morphing keeps source t/v and interpolates the same point between manuscript and terrain`);
+  assert.ok(reconstructed.morphs.every(point=>point.domError<.002&&point.targetError<1e-6&&point.manuscriptError<1e-6),`${family.id}: actual DOM vertices follow measured manuscript locations into canonical pulseCore terrain coordinates`);
+  }
   assert.deepEqual(result.errors,[]);
-  assert.deepEqual(result.failures,[],'all scene families preserve readable active ink, a visible pointed brush and calm bounded framing');
+  assert.deepEqual(result.failures,[],'all scene families preserve continuous measured ink, an anchored brush and immutable pigment on moving paper');
   result.passed=true;
  }catch(error){result.failure=String(error.stack||error);process.exitCode=1;}
  finally{writeFileSync(path.join(out,`${engine}.json`),JSON.stringify(result,null,2));await browser?.close();console.log(JSON.stringify({engine,passed:!!result.passed,cases:result.cases.length,provenance:result.provenance?.length,failure:result.failure,out}));}

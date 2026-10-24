@@ -5,8 +5,11 @@ import vm from 'node:vm';
 import { replayPublicFixture } from './landscape-fixture.mjs';
 const context = vm.createContext({ console });
 const rendererSource = readFileSync(new URL('../app/landscape.js', import.meta.url), 'utf8');
-vm.runInContext(rendererSource, context);
+const continuityMarker='global.PulseLandscape=Object.freeze({';
+assert.equal(rendererSource.split(continuityMarker).length,2,'observe private ingestion provenance at one module boundary');
+vm.runInContext(rendererSource.replace(continuityMarker,'global.__continuousPredecessor=continuousPredecessor;'+continuityMarker), context);
 const L = context.PulseLandscape;
+const continuousPredecessor=context.__continuousPredecessor;
 const plain = value => JSON.parse(JSON.stringify(value));
 const segment = (start, duration, hz = 60, convert = x => x) => ({ score: .8, channel: 'green', quality: { good: true }, points: Array.from({ length: Math.round(duration * hz) + 1 }, (_, i) => ({ t: start + i / hz, v: convert(Math.sin(i / hz * Math.PI * 2) + .3 * Math.sin(i / hz * Math.PI * 4)) })) });
 const merge = intervals => {
@@ -123,6 +126,53 @@ assert.deepEqual(plain(barrier.sourceIntervals),[{start:0,end:.04},{start:.12,en
 const explicitBreak=L.create({seed:'source-barrier'});
 L.append(explicitBreak,{points:[{t:0,v:0},{t:.04,v:1},{t:.08,v:0,breakBefore:true},{t:.12,v:1}]});
 assert.deepEqual(plain(explicitBreak.sourceIntervals),[{start:0,end:.04},{start:.08,end:.12}],'explicit adapter barriers retain the valid adjacent runs without drawing a missing edge');
+
+// Close timestamps alone do not prove a continuous camera stream. The live
+// presentation may connect a clean window handoff, but never add that connector
+// to accepted coverage or the saved scenic paths. Barrier proof stays private.
+const handoffCases=[];
+for(const [label,prepare,expected] of [
+  ['clean handoff',()=>{},true],
+  ['first sample pen lift',(_scene,next)=>{next.points[0].breakBefore=true;},false],
+  ['invalid first sample',(_scene,next)=>{next.points.unshift({t:.025,v:NaN});},false],
+  ['channel change',(_scene,next)=>{next.channel='red';},false],
+  ['150 ms boundary',(_scene,next)=>{next.points.forEach(point=>{point.t+=.1;});},true],
+  ['above 150 ms tolerance',(_scene,next)=>{next.points.forEach(point=>{point.t+=.1000002;});},false],
+  ['timestamp gap',(_scene,next)=>{next.points.forEach(point=>{point.t+=.2;});},false],
+  ['rejected quality',(scene)=>L.append(scene,{quality:{good:false},points:[]}),false],
+  ['rejected good flag',(scene)=>L.append(scene,{good:false,points:[]}),false],
+  ['rejected acceptance',(scene)=>L.append(scene,{accepted:false,points:[]}),false],
+  ['missing window',(scene)=>L.append(scene,null),false],
+  ['empty window',(scene)=>L.append(scene,{points:[]}),false],
+]){
+  const scene=L.create({seed:`handoff-${label}`}),first=segment(-1,1,20),next=segment(.05,1,20);
+  L.append(scene,first);const before=scene.strokes.at(-1),savedBefore=JSON.stringify(scene);
+  prepare(scene,next);const added=L.append(scene,next);
+  assert.ok(added.length>0,`${label}: the test includes actual drawable continuation`);
+  assert.equal(continuousPredecessor(added[0]),expected?before:null,`${label}: only a proven clean same-channel handoff can connect`);
+  verifyCoverage(scene,[first,next]);
+  assert.equal(JSON.stringify(scene.strokes.slice(0,JSON.parse(savedBefore).strokes.length)),JSON.stringify(JSON.parse(savedBefore).strokes),`${label}: continuity cannot alter earlier geometry`);
+  handoffCases.push(label);
+}
+for(const [label,barrierPoint] of [['trailing invalid',{t:.025,v:NaN}],['trailing explicit pen lift',{t:.025,v:NaN,breakBefore:true}]]){
+  const scene=L.create({seed:label}),first=segment(-1,1,20),next=segment(.05,1,20);
+  first.points.push(barrierPoint);L.append(scene,first);
+  assert.equal(continuousPredecessor(L.append(scene,next)[0]),null,`${label}: a later close timestamp cannot erase a trailing barrier`);
+  verifyCoverage(scene,[first,next]);
+}
+for(const scene of [barrier,explicitBreak])assert.ok(scene.strokes.every(stroke=>continuousPredecessor(stroke)===null),'internal invalid/breakBefore blocks cannot acquire presentation connectors');
+assert.equal(continuousPredecessor(crossing.strokes[1]),crossing.strokes[0],'slot splits retain a verified shared source endpoint');
+assert.equal(continuousPredecessor(overlap.strokes[1]),overlap.strokes[0],'accepted overlapping windows may continue from their known shared endpoint');
+const loadedLive=L.create({seed:'loaded-continuity'});L.append(loadedLive,segment(0,1,20));
+const loadedScene=plain(loadedLive),loadedNext=L.append(loadedScene,segment(1.05,1,20));
+assert.equal(continuousPredecessor(loadedScene.strokes[0]),null,'serialized strokes contain no invented continuity proof');
+assert.equal(continuousPredecessor(loadedNext[0]),null,'the first new append cannot infer a bridge from an unknown restored predecessor');
+assert.equal(continuousPredecessor(L.append(loadedScene,segment(2.1,1,20))[0]),loadedNext.at(-1),'new accepted data can establish trusted continuity after restoration');
+const handoffMutation=L.create({seed:'continuity-owned'}),mutableFirst=segment(0,1,20),mutableNext=segment(1.05,1,20);
+L.append(handoffMutation,mutableFirst);const mutableTail=handoffMutation.strokes.at(-1),mutableAdded=L.append(handoffMutation,mutableNext),continuitySnapshot=JSON.stringify(handoffMutation);
+mutableNext.points[0].breakBefore=true;mutableFirst.points.at(-1).t=999;
+assert.equal(continuousPredecessor(mutableAdded[0]),mutableTail,'caller mutations cannot change already recorded handoff proof');
+assert.equal(JSON.stringify(handoffMutation),continuitySnapshot,'private continuity metadata changes no saved source or coverage');
 const mutable=segment(0,2), retained=L.create({seed:'owned-data'});L.append(retained,mutable);const snapshot=JSON.stringify(retained);mutable.points[0].t=999;mutable.points[0].v=999;mutable.points.push({t:1000,v:4});assert.equal(JSON.stringify(retained),snapshot,'appending copies source points so later caller mutations cannot rewrite captured geometry');
 const seedA=L.create({seed:'one'}),seedB=L.create({seed:'two'});
 assert.notEqual(seedA.seed,seedB.seed,'session seeds vary without consulting physiological metrics');
@@ -159,6 +209,27 @@ for(const candidate of [dropped,fragmentedDelivery]){
   assert.ok(candidate.scene.usableSeconds<baseline.scene.usableSeconds,'missing delivery reduces usable accepted time');
   assert.ok(candidate.scene.slots.length<baseline.scene.slots.length,'fragmentation cannot add scene placements');
   assert.deepEqual(plain(candidate.scene.slots),plain(baseline.scene.slots.slice(0,candidate.scene.slots.length)),'source fragmentation leaves the seeded plan/material sequence unchanged');
+}
+const continuityEvidence=[];
+for(const [label,replay] of [['public',baseline],['dropped',dropped],['fragmented',fragmentedDelivery]]){
+  const scene=L.create({seed:replay.scene.seed,family:replay.scene.family});let linked=0,lifts=0;
+  for(const input of replay.segments){
+    const barriers=new Set(input.points.filter(point=>point.breakBefore).map(point=>point.t));
+    for(const stroke of L.append(scene,input)){
+      const predecessor=continuousPredecessor(stroke);
+      if(barriers.has(stroke.sourceStart))assert.equal(predecessor,null,`${label}: a real adapter breakBefore remains a pen lift`);
+      if(predecessor){
+        linked++;
+        assert.equal(predecessor,scene.strokes[stroke.id-1],`${label}: a connection can only use the immediately preceding measured stroke`);
+        assert.equal(predecessor.channel,stroke.channel,`${label}: channel switches cannot connect`);
+        assert.ok(stroke.sourceStart-predecessor.sourceEnd>=0&&stroke.sourceStart-predecessor.sourceEnd<=.1500001,`${label}: connector endpoints stay within one accepted sample interval`);
+      }else lifts++;
+    }
+  }
+  assert.equal(JSON.stringify(scene),JSON.stringify(replay.scene),`${label}: private presentation proof leaves the complete serialized source model unchanged`);
+  assert.ok(linked>0,`${label}: the public recording exercises clean handoffs`);
+  if(label!=='public')assert.ok(lifts>1,`${label}: real dropped frames retain pen lifts`);
+  continuityEvidence.push({label,linked,lifts});
 }
 
 // Observe the production brush helper without adding a public runtime export.
@@ -200,5 +271,6 @@ for(const family of ['coastal-cliffs','quiet-lake']){
   brushEvidence.push({family,strokes:strokes.length,knots,longStrokes});
 }
 console.log('LANDSCAPE_BRUSH_DIRECTION',JSON.stringify(brushEvidence));
+console.log('LANDSCAPE_CONTINUITY',JSON.stringify({cases:handoffCases,publicReplay:continuityEvidence}));
 console.log('LANDSCAPE_FRAGMENTATION',JSON.stringify([baseline,dropped,fragmentedDelivery].map(({scene,segments,...stats})=>({...stats,sourceFragments:scene.strokes.length,slots:scene.slots.length,usableSeconds:scene.usableSeconds,allocatedSeconds:scene.paintSeconds}))));
 console.log('PASS landscape model: 16 families, source provenance, usable-time slot allocation, public-recording adapter fragmentation, repeatability, immutable history, source-preserving organic curves, shared-window amplitudes, duplicates, overlaps, gaps, rejection and extreme amplitudes');

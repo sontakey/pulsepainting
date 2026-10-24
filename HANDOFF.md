@@ -1,6 +1,19 @@
 # Pulse Painting handoff
 
-## Current production release: framed keepsake cards
+## Current implementation: continuous pulse brush
+
+Recording now draws one continuous accepted pulse trace on moving paper, with a
+pointed brush and permanent pigment. The landscape stays hidden until the final
+manuscript-to-landscape reconstruction. All sixteen completed landscapes and
+report exports remain unchanged. Verified source handoffs connect without adding
+accepted duration; actual gaps remain brush lifts.
+
+Local correctness and the full interrupted WebKit replay have passed. Release
+CI, frozen-build performance and hosted verification are being completed; see
+`docs/validation/continuous-brush-2026-10-23.md`. This section does not yet claim
+production deployment. npm publication remains pending.
+
+## Previous production release: framed keepsake cards
 
 Finished artwork has a full warm ochre frame, padded brand lettering, a cursive
 scene name, a stable summary-metrics band and left date/right website footer.
@@ -39,8 +52,7 @@ At `2026-10-23T22:53:52.295Z`, all 107 public files matched the tested build;
 anonymous Chromium/WebKit phone/desktop checks passed with no public writes or
 runtime/HTTP errors. Later documentation commits can advance the deployment ID
 without changing the verified runtime. npm publication remains pending.
-See `docs/validation/simple-sharing-2026-10-23.md`. The new continuous-brush
-motion discussed from the user's video is a proposed next step, not implemented.
+See `docs/validation/simple-sharing-2026-10-23.md`. The continuous-brush recording view is covered in the current implementation above.
 
 ## Previous production release: adaptive painting and gallery polish
 

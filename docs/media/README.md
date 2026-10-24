@@ -1,7 +1,7 @@
 # Pulse Painting screenshots
 
 These are direct browser captures of the actual static app. The capture image
-was refreshed on October 23, 2026 for the compact capture header and adaptive scenic raster cadence. The report and sharing
+was refreshed on October 23, 2026 for continuous source-time ink on quiet paper. The report and sharing
 images show the October 23 framed keepsake card. The desktop image retains the
 October 22 foreground release. Ready and QR retain their
 unchanged first-release images.
@@ -10,26 +10,26 @@ described below. Its release was subsequently verified on the public site;
 the screenshot itself was captured locally.
 See [HANDOFF.md](../../HANDOFF.md) for deployment status.
 
-## Adaptive brush capture
+## Continuous brush capture
 
 `pulse-painting-capture.jpg` is the direct native-browser JPEG (quality 92) from
-`2026-10-23T20:44:52.347Z`. Chrome 155.0.8059.85 through Playwright captured the
-actual app at 390 × 844 CSS pixels, DPR 3, with normal motion and loaded fonts.
-The resulting image is 1170 × 2532. No image pixels or UI values were edited.
+`2026-10-24T04:01:53.583Z` (October 23 locally). Chrome 155.0.8059.85 through
+Playwright captured the actual app at 390 × 844 CSS pixels, DPR 1, with normal
+motion and loaded fonts. No image pixels or UI values were edited.
 
-The checked-in public recording was preloaded through forty seconds using the
-real signal engine, acceptance adapter and app callbacks. Quiet Lake seed 39293
-shows its active measured contour and pointed brush at source-stroke progress
-0.652–0.748. The countdown is 2:39; computed values are 69 bpm, 43 ms RMSSD and
-33 ms SDNN. Camera I/O is mocked, so the camera thumbnail is empty. No samples
-were duplicated and no metrics were substituted. There were no runtime errors.
+The public recording was preloaded through forty seconds using the real signal
+engine, acceptance adapter and app callbacks, followed by six seconds of
+wall-clock replay. The screenshot shows a continuous measured PPG line on paper,
+a pointed brush and permanent pigment; landscape geometry remains hidden.
+The countdown is 2:34; computed values are 70 bpm, 43 ms RMSSD and 33 ms SDNN.
+Camera I/O is mocked, so the thumbnail is empty. No samples were duplicated and
+no metrics were substituted. There were no runtime errors.
 
 Source and distribution renderer SHA-256:
-`2e7e417aeffe1cfef835bfbf49d80e49029de02314a00591a3366aa18d0df794`.
-The raw PNG, native JPEG and metadata are in ignored
-`.dream-loop/slow-phone/readme/public-replay-active-mobile.*`.
-This is presentation evidence, separate from the full-session and performance
-checks in [the optimization validation record](../validation/slow-phone-2026-10-23.md).
+`dda5c8ba24dca41761f39cc233ffe27eed7416ea91992edae02af874eaeca85c`.
+The native JPEG, full motion recording and metadata are in ignored
+`.dream-loop/continuous-brush/pass4/`. This is presentation evidence, separate
+from [full-session and performance checks](../validation/continuous-brush-2026-10-23.md).
 
 ## Earlier artwork images
 
@@ -181,7 +181,7 @@ social-post delivery or sustained frame-rate evidence.
 | `pulse-painting-desktop-candidate.jpg` | 188941 | `71f997d63b0146af03e7cebbaea9b092c927ffd8c044959c591d36365a01fd4f` |
 | `pulse-painting-qr.jpg` | 81054 | `56374f21d8c42f2edc94165adb7b06a762b95fae80e95c147e157f7038c52898` |
 | `pulse-painting-ready.jpg` | 51933 | `1da91b18ec49b70eebb09af1fcea4dff9f87078637b8ffcc70adf00e375a1ddf` |
-| `pulse-painting-capture.jpg` | 249074 | `e5aa4cc9195b77e495e7ae8755259cd429c8f9c323a1c8df5ca6f02eb952fbe4` |
+| `pulse-painting-capture.jpg` | 52023 | `99a0fcbf0565654a7eafc2b346c26e88744f1c2ef4526472bdc5d7561f6a9835` |
 | `pulse-painting-report.jpg` | 72429 | `00bf687a8592d16f0848eebf5bc756dee6e90191fba23b052715274f2c6eff93` |
 | `pulse-painting-mobile-gallery.png` | 469347 | `2f7f07374fb73399156555da8a86281d6b982db7714efe9a7bd2b4d4caa1889b` |
 | `pulse-painting-sharing.png` | 112629 | `2108b3314600dcda8a89d8e1aa0fe9b19e550fece694c7abfca10ec26ff664d3` |
