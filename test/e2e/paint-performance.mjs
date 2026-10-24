@@ -116,8 +116,9 @@ try {
   const cases = [
     { backend: 'webgpu', cpuRate: 1 }, { backend: 'webgl2', cpuRate: 1 },
     { backend: 'webgpu', cpuRate: 4 }, { backend: 'webgl2', cpuRate: 4 },
-  ].filter(test => !process.env.PPG_PERF_CASE || `${test.backend}-${test.cpuRate}x` === process.env.PPG_PERF_CASE);
-  assert.ok(cases.length, 'PPG_PERF_CASE must match webgpu-1x, webgl2-1x, webgpu-4x or webgl2-4x');
+    { backend: 'webgl2', cpuRate: 6 },
+  ].filter(test => process.env.PPG_PERF_CASE ? `${test.backend}-${test.cpuRate}x` === process.env.PPG_PERF_CASE : test.cpuRate <= 4);
+  assert.ok(cases.length, 'PPG_PERF_CASE must match webgpu-1x, webgl2-1x, webgpu-4x, webgl2-4x or webgl2-6x');
   for (const test of cases) {
     const name = `${test.backend}-${test.cpuRate}x`;
     const context = await browser.newContext({ ...devices['iPhone 13'], viewport: { width: 390, height: 844 }, deviceScaleFactor: 3, reducedMotion: 'no-preference' });
