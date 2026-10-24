@@ -1,6 +1,39 @@
 # Pulse Painting handoff
 
-## Current production release: measured signal bars
+## Current production release: responsive live watercolor
+
+Canonical watercolor deposits and soft background snapshots now render in a
+local worker when supported. The live SVG brush updates only its visible
+six-second window; Finish reuses canonical geometry prepared by the worker.
+Measured samples, crisp contours, fixed pigment and all sixteen scene mappings
+remain intact. Worker failures and unsupported browsers retain the main-thread
+fallback. Pause, hidden-tab recovery, disposal and bitmap ownership are covered.
+
+PR #14 merged as `e85a0dd48cb251749eb0b59feab1b154f7ced923` after complete Linux
+CI `40115878128` passed feature head `5c2419ba667e954f0645106b5ff72573a1e7bea3`.
+Production `dpl_7RM8UQbz1CAvVmyWkdBw386m45PT` is READY at
+https://www.pulsepainting.com/. All 110 public files matched the frozen build at
+`2026-10-24T17:35:40.942Z`; anonymous Chromium/WebKit checks at 390 and 1440px
+passed at `2026-10-24T17:35:54.310Z` with no page/HTTP errors or public writes.
+The Git integration deployed the exact merge automatically.
+
+Matched 4× CPU stress reduced the longest active drawing interval from 100 to
+16.8 ms and main-thread watercolor callback p95 from 66.4 to 0.6 ms. Separate
+normal, 6× and dense-recording checks also measured 60fps live drawing. The full
+three-minute WebKit interruption replay passed report/export and recovery checks,
+averaging 59.18fps capture and 59.15fps reveal. It retained an unexplained 367 ms
+capture maximum; dense final reconstruction under 4× stress remained 49.83fps.
+This improves the identified drawing bottleneck, not every frame on every phone.
+
+All sixteen worker scenes and lifecycle/resource tests passed both engines.
+Chromium artwork is pixel-exact; three WebKit scenes retain explicitly bounded
+raster differences, while measured samples and reveal geometry remain exact.
+See `docs/validation/mobile-drawing-performance-2026-10-24.md` for criteria,
+timing scope and release evidence. Browser replay is not physical-phone, thermal,
+camera or native-share validation. Later documentation deployments may change
+the deployment ID with identical runtime bytes. npm publication remains pending.
+
+## Previous production release: measured signal bars
 
 The recording header shows a five-bar signal meter under LIVE instead of healthy
 signal text. It uses the engine's real quality score; rejected or missing scores

@@ -6,8 +6,8 @@ Your pulse, made into a place.
 > watercolor landscapes, crisp measured pulse strokes, a pointed brush and soft
 > pigment fixed to the paper, a gradually emerging background, and shareable artwork.
 > Browser replay and deployed-asset checks passed; physical-phone validation remains separate.
-> See [current release verification](docs/validation/capture-signal-bar-2026-10-24.md)
-> and [painting performance](docs/validation/emerging-landscape-2026-10-24.md).
+> See [current release and performance verification](docs/validation/mobile-drawing-performance-2026-10-24.md)
+> and [recording header checks](docs/validation/capture-signal-bar-2026-10-24.md).
 > The [mobile gallery](https://www.pulsepainting.com/#landscapes) is now live too;
 > see [mobile verification](docs/validation/mobile-gallery-2026-10-23.md).
 > Community publishing and artwork sharing are live;
@@ -27,6 +27,13 @@ twenty usable seconds after the first discovery. Occasional short captions mark
 visible new details. Signal interruptions pause that growth; existing
 colors and shapes stay in place. The finished painting retains its complete
 detail and stronger pigment for the final reveal.
+
+Where supported, a dedicated browser worker prepares watercolor layers and soft
+background snapshots while the main thread draws the live pulse. The brush only
+updates the visible six seconds, and the final reveal reuses geometry already
+prepared during recording. Browsers without support, or with a failed worker,
+fall back to the same painting renderer. This keeps the measured line and pigment detail intact;
+browser stress results are documented separately from physical-phone validation.
 
 **Camera access, with a little guidance.** Tap **Need help with camera access?**
 on the phone's opening screen for illustrated browser and phone-settings steps.
@@ -174,7 +181,7 @@ private export and example gallery work without these credentials.
 - Sixteen seeded landscape families made from accepted waveform paths, with curved terrain, flowing brush strokes and within-stroke gradients. Artistic mapping preserves the original samples; the original manuscript and computed report remain unchanged.
 - During capture, a fine pulse contour follows the recording's actual time and value on a steady baseline. A pointed brush lays down permanent textured pigment while a faint, stationary preview of the accepted landscape develops around a clear foreground. Brief captions mark new details. This treatment applies to all sixteen families.
 - Density based on usable recorded time: sparse sessions keep open paper; longer sessions fill interleaved slots without moving earlier strokes.
-- On finish, the view pulls back along the recorded pulse paper, then reconstructs those same measured strokes into the complete landscape at full pigment strength. Cached layers keep the main thread available for capture.
+- On finish, the view pulls back along the recorded pulse paper, then reconstructs those same measured strokes into the complete landscape at full pigment strength. A local worker prepares cached watercolor layers and reveal geometry, with a main-thread fallback.
 - Optional WebGPU/WebGL2 painted entry transitions and an independent Canvas2D landscape compositor.
 - Placement coaching, a small live finger preview, real-time pulse/RMSSD/SDNN, and floating mobile controls.
 - Report charts, a 1080 × 1350 shareable artwork, native file sharing with download fallback, and optional metrics on the artwork.
