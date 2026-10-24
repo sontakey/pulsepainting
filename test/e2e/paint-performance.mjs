@@ -151,7 +151,7 @@ try {
       const initialWarmStrokes = window.__pulseLandscapeStats.warmStrokes || 0;
       const initialSegments = manuscript.segments.length, initialSamples = monitor.i;
       const width = document.getElementById('landscape-view').getBoundingClientRect().width;
-      const flow = { samples:0, advances:0, paperChanges:0, regressions:0, invalid:0, futureFrontiers:0, nibSamples:0, maxNibXError:0 };
+      const flow = { samples:0, advances:0, paperChanges:0, regressions:0, invalid:0, futureFrontiers:0, nibSamples:0, maxNibXError:0, emergenceUpdates:0, emergenceFadeSamples:0, futureBackgrounds:0 };
       let previousStreamTime,previousPaperTransform,previousWarmStrokes=initialWarmStrokes;
       let previous = 0, previousDraw = 0, previousFrames = initialFrames, previousDrawWasActive = false;
       function frame(now) {
@@ -159,6 +159,11 @@ try {
         previous = now;
         const began = performance.now(); monitor.feedUntil(preload + (now - started) / 1000); engineCPU.push(performance.now() - began);
         const surface = window.__pulseLandscapeStats;
+        if (surface.emergence) {
+          flow.emergenceUpdates = Math.max(flow.emergenceUpdates, surface.emergence.updates);
+          if (surface.emergence.animating) flow.emergenceFadeSamples++;
+          if (surface.emergence.strokeCount > (surface.warmStrokes || 0) || surface.emergence.sourceEnd > landscape.strokes.at(-1)?.sourceEnd + 1e-9) flow.futureBackgrounds++;
+        }
         if ((surface.warmStrokes || 0) > previousWarmStrokes) {
           if (Number.isFinite(surface.warmFrameMs)) warmCPU.push(surface.warmFrameMs);
           previousWarmStrokes = surface.warmStrokes;
@@ -197,7 +202,9 @@ try {
     assert.ok(replay.flow.samples > 20 && replay.flow.advances > 10 && replay.flow.paperChanges > 10 && replay.flow.nibSamples > 10, `${name}: recorded source and actual paper translation advance under a visible brush`);
     assert.equal(replay.flow.regressions + replay.flow.invalid + replay.flow.futureFrontiers, 0, `${name}: recording presentation stays finite, forward and within accepted data`);
     assert.ok(replay.flow.maxNibXError < 1, `${name}: the brush stays at its horizontal anchor while paper advances`);
-    assert.equal(replay.rasterFrames, 0, `${name}: capture does not redraw scenic landscape layers`);
+    assert.equal(replay.rasterFrames, 0, `${name}: capture does not compose the full-contrast final landscape`);
+    assert.equal(replay.flow.futureBackgrounds, 0, `${name}: ambient discoveries use only the warmed accepted source prefix`);
+    if (duration >= 10) assert.ok(replay.flow.emergenceUpdates > 0 && replay.flow.emergenceFadeSamples > 0, `${name}: measured capture includes actual background discoveries and their fades`);
     assert.ok(replay.finalSegments > replay.initialSegments && replay.samplesFed > duration * 20, `${name}: real engine keeps accepting waveform during measurement`);
     assert.ok(replay.surface.cachedPixels <= replay.surface.pixelBudget, `${name}: live landscape raster is bounded independently of session length`);
     assert.ok(replay.surface.materialPixels <= replay.surface.materialPixelBudget, `${name}: pigment canvases and immutable patterns stay bounded`);

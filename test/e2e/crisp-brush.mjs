@@ -93,7 +93,7 @@ for(const engine of engines){
     const stats=__pulseLandscapeStats,state=view.captureState,box=document.querySelector('main').getBoundingClientRect();
     const stage=document.querySelector('.landscape-stage'),style=stage&&getComputedStyle(stage);
     const snapshot={mode:stats.mode,state:{...state},bridging:!!stats.bridging,streamTime:stats.streamTime,paperOffsetX:stats.paperOffsetX,anchorX:stats.anchorX,projection:structuredClone(stats.projection),frontier:structuredClone(stats.frontier),nib:structuredClone(stats.nib),visibleIntervals:structuredClone(stats.visibleIntervals||[]),
-     scenicHidden:!stage||stage.hidden||style.display==='none'||style.visibility==='hidden'||Number(style.opacity)===0,
+     finalScenicHidden:!stage||stage.hidden||style.display==='none'||style.visibility==='hidden'||Number(style.opacity)===0,
      cachedPixels:stats.cachedPixels,materialPixels:stats.materialPixels,pixelBudget:stats.pixelBudget,materialPixelBudget:stats.materialPixelBudget,viewport:{width:box.width,height:box.height}};
     if(!stats.nib||!stats.frontier||state.painted>=scene.strokes.length)return snapshot;
     if(stats.bridging)return snapshot;
@@ -141,8 +141,8 @@ for(const engine of engines){
     let previous=null,immutableChecks=0,maxAnchorStep=0,maxPaperStep=0,bridgeFrames=0,maxBridgeError=0;
     for(let i=0;i<16000;i++){
      const snapshot=inspectRecording(scene,view),state=snapshot.state;
-     if(snapshot.mode!=='recording')throw Error('Scenery started before the explicit finish action');
-     if(!snapshot.scenicHidden)throw Error('A decorative landscape remains visible during source recording');
+     if(snapshot.mode!=='recording')throw Error('Final reconstruction started before the explicit finish action');
+     if(!snapshot.finalScenicHidden)throw Error('The full-contrast final landscape is visible before finish');
      for(const path of document.querySelectorAll('.landscape-live-core,.landscape-source-wash,.landscape-source-join,.landscape-source-blooms,.landscape-source-body,.landscape-source-edge')){
       const d=path.getAttribute('d');if(cache.has(path)&&cache.get(path)!==d)throw Error('Previously deposited source ink or pigment changed shape while paper moved');
       if(cache.has(path))immutableChecks++;else cache.set(path,d);
@@ -184,7 +184,7 @@ for(const engine of engines){
     check(frame.nib.y>=16&&frame.nib.y<=frame.viewport.height-16,`${family.id}: source excursions remain inside the painting viewport`);
     check(frame.projection.kind==='continuous-source-time-value'&&frame.projection.windowSeconds===6,`${family.id}: recording has one continuous source-time/value projection`);
     check(frame.core.timeFit.slope>0&&frame.core.timeFit.residual<.011&&frame.core.valueFit.slope<0&&frame.core.valueFit.residual<.011,`${family.id}: every cached vertex preserves measured time and amplitude without terrain distortion`);
-    check(frame.cachedPixels<=2560000&&frame.materialPixels<=4554752,`${family.id}: presentation keeps the established raster and material budgets`);
+    check(frame.cachedPixels<=frame.pixelBudget&&frame.pixelBudget<=3086336&&frame.materialPixels<=4554752,`${family.id}: presentation keeps the bounded raster and material budgets, including ambient snapshots and their fixed mask`);
     for(const interval of frame.visibleIntervals)check(interval.sourceStart<=interval.sourceEnd&&interval.start<=interval.end,`${family.id}: visible source intervals are finite ordered pen runs`);
    }
    for(let i=1;i<item.frames.length;i++){
@@ -213,14 +213,20 @@ for(const engine of engines){
   assert.ok(result.lifecycle.resumed&&result.lifecycle.recovered,'pause and visibility interruption both recover');
   assert.ok(result.lifecycle.hidden.sameFrames&&result.lifecycle.hidden.sameCursor&&result.lifecycle.hidden.pending===0&&result.lifecycle.hidden.resumeAdvance<=.021,'hidden time cannot create a backlog jump on resume, including bounded 1.2x stream catch-up');
   await page.emulateMedia({reducedMotion:'reduce'});
-  await page.waitForFunction(()=>matchMedia('(prefers-reduced-motion: reduce)').matches&&pendingPaint()===0);
+  await page.waitForFunction(()=>{
+   if(!matchMedia('(prefers-reduced-motion: reduce)').matches)return false;
+   // A discrete discovery still has a quiet, time-limited caption. Drain that
+   // presentation timer on the stepped clock before asserting the idle state.
+   for(let i=0;i<400;i++)advancePaint();
+   return (__pulseLandscapeStats.warmStrokes||0)>=scene.strokes.length&&!__pulseLandscapeStats.emergence.animating&&!__pulseLandscapeStats.emergence.captionVisible&&pendingPaint()===0;
+  });
   result.reduced=await page.evaluate(async()=>{
    const before=JSON.stringify(scene),frames=__pulseLandscapeStats.frames;
    for(let i=0;i<20;i++)advancePaint();
    const resolved=await view.finish();
    const result={sameScene:resolved===scene,sourceStable:JSON.stringify(scene)===before,framesStable:frames===__pulseLandscapeStats.frames,pending:pendingPaint(),mode:__pulseLandscapeStats.mode,camera:__pulseLandscapeStats.camera};
    view.dispose();advancePaint();
-   result.disposed=document.querySelectorAll('.landscape-ink,.landscape-stage,.landscape-tip').length===0&&pendingPaint()===0&&__pulseLandscapeStats.cachedPixels<=4;
+   result.disposed=document.querySelectorAll('.landscape-ink,.landscape-stage,.landscape-tip,.landscape-emergence,.landscape-discovery').length===0&&pendingPaint()===0&&__pulseLandscapeStats.cachedPixels<=7;
    return result;
   });
   assert.deepEqual(result.reduced,{sameScene:true,sourceStable:true,framesStable:true,pending:0,mode:'finished',camera:{x:540,y:540,scale:1},disposed:true},'reduced motion finishes the exact scene without a running animation and disposal releases its surfaces');

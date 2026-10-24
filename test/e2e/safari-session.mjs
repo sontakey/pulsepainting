@@ -81,7 +81,7 @@ try {
   await page.evaluate(({ log, originalLength }) => {
     window.__sessionMetrics = { intervals: [], uninterruptedIntervals: [], paintIntervals: [], interruptions: [], checkpointAt: 60,
       stopCalls: 0, originalLength, extensionUsed: false, droppedSamples: 0,
-      flow: { samples:0, advances:0, paperChanges:0, regressions:0, invalid:0, futureFrontiers:0, nibSamples:0, maxNibXError:0, maxScenicRasters:0 },
+      flow: { samples:0, advances:0, paperChanges:0, regressions:0, invalid:0, futureFrontiers:0, nibSamples:0, maxNibXError:0, maxScenicRasters:0, emergenceUpdates:0, emergenceFadeSamples:0, futureBackgrounds:0 },
       camera: { samples: 0, changes: 0, invalid: 0, maxCachedPixels: 0, pixelBudget: 0, maxScale: 1, maxContinuousStep: 0, examples: [] } };
     window.PPGMonitor = class extends PPG.PPGMonitor {
       constructor(host, options) {
@@ -139,6 +139,11 @@ try {
           const flow = metrics.flow;
           if (surface.mode !== 'recording') flow.invalid++;
           flow.maxScenicRasters = Math.max(flow.maxScenicRasters,surface.rasterFrames);
+          if (surface.emergence) {
+            flow.emergenceUpdates = Math.max(flow.emergenceUpdates, surface.emergence.updates);
+            if (surface.emergence.animating) flow.emergenceFadeSamples++;
+            if (surface.emergence.strokeCount > (surface.warmStrokes || 0) || surface.emergence.sourceEnd > landscape.strokes.at(-1)?.sourceEnd + 1e-9) flow.futureBackgrounds++;
+          }
           if (Number.isFinite(surface.streamTime)) {
             flow.samples++;
             if (previousStreamTime !== undefined) {
@@ -217,7 +222,7 @@ try {
               countdown: document.getElementById('session-countdown').textContent, engineState: this.currentMetrics.fingerState,
               samples: this.fedSamples, consumedSamples: this.i, droppedSamples: metrics.droppedSamples, acceptedSegments: manuscript.segments.length, backend: window.__paintGpuStats.backend,
               landscapeFrames: surface.frames, hidden: document.hidden, camera: surface.camera,
-              cachedPixels: surface.cachedPixels, mode:surface.mode,streamTime:surface.streamTime,sourceAdvances:flow.advances,scenicRasters:surface.rasterFrames }));
+              cachedPixels: surface.cachedPixels, mode:surface.mode,streamTime:surface.streamTime,sourceAdvances:flow.advances,scenicRasters:surface.rasterFrames,emergence:surface.emergence }));
             metrics.checkpointAt += 60;
           }
           this.replayFrame = requestAnimationFrame(pump);
@@ -302,7 +307,9 @@ try {
   assert.ok(flow.samples>100&&flow.advances>20&&flow.paperChanges>20&&flow.nibSamples>20,'full recording advances accepted source and actual paper translation under the continuous brush');
   assert.equal(flow.regressions+flow.invalid+flow.futureFrontiers,0,'recording flow stays finite, forward and within accepted data across interruptions');
   assert.ok(flow.maxNibXError<1,'paper moves beneath the fixed horizontal brush anchor');
-  assert.equal(flow.maxScenicRasters,0,'recording does no scenic raster work');
+  assert.equal(flow.maxScenicRasters,0,'recording never composes the full-contrast final landscape');
+  assert.ok(flow.emergenceUpdates >= 4 && flow.emergenceFadeSamples > 0,'the full recording exercises several actual background discoveries');
+  assert.equal(flow.futureBackgrounds,0,'the background uses only the warmed accepted source prefix');
   assert.equal(camera.invalid, 0, 'camera remains finite within its intended zoom bounds');
   assert.ok(camera.maxCachedPixels <= camera.pixelBudget, 'live scene raster memory remains bounded');
   assert.ok(evidence.session.reveal.phases.pullback?.frames>2&&evidence.session.reveal.phases.reconstructing?.frames>2,'automatic finish visibly pulls back and rearranges the recorded strokes');

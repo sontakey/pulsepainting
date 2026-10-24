@@ -9,7 +9,7 @@ import { chromium, webkit } from 'playwright';
 import { replayPublicFixture } from '../landscape-fixture.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
-// Recording is source ink on paper, not a partial scenic raster. The focused
+// Recording keeps source ink above a separate faint ambient surface. The focused
 // regression therefore completes reconstruction from early, late and undrained
 // recording states, and keeps the established canonical/repeated-export gates.
 // The default invocation remains the broader all-family diagnostic, including
@@ -124,7 +124,7 @@ for (const name of engines) {
           assert.equal(phase.stats.mode,'finished','canonical scenery is checked only after reconstruction completes');
           assert.equal(phase.stats.finished,true,'every completion checkpoint reaches a final artwork');
           if (phase.repeatMax !== 0) result.failures.push({ ...checkpoint, check: 'repeated-export', max: phase.repeatMax });
-          assert.ok(phase.stats.cachedPixels <= 2560000, 'live raster memory remains bounded');
+          assert.ok(phase.stats.cachedPixels <= phase.stats.pixelBudget && phase.stats.pixelBudget <= 3086336, 'canonical caches, ambient snapshots and their fixed mask remain bounded');
           // Existing pigment cache plus one 256² decoded live-wash mask.
           assert.ok(phase.stats.materialPixels <= 4489216 + 256 ** 2, 'material raster memory remains bounded');
           if (phase.max > maxChannel || phase.mean >= .001) result.failures.push({ ...checkpoint, check: 'live-export', max: phase.max, mean: phase.mean });

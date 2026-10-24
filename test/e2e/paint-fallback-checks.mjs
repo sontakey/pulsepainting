@@ -135,7 +135,7 @@ export async function checkPaintFallbacks(browser, baseURL, log, output = proces
       assert.ok(fallback.inkVisible&&fallback.coreLength>10&&fallback.view.nib,`${name}: real source ink and brush remain visible without the optional GPU`);
       assert.equal(fallback.measuring, true, `${name}: capture stays active`);
       assert.equal(fallback.gpuReady, false, `${name}: fallback actually runs without GPU`);
-      assert.equal(fallback.view.rasterFrames,0,`${name}: capture does not substitute scenic raster painting for source ink`);
+      assert.equal(fallback.view.rasterFrames,0,`${name}: capture does not compose the full-contrast final painting in place of source ink`);
       await page.evaluate(() => {landscapeView.pause(false);monitor.feedUntil(100);});
       await page.waitForFunction(before=>__pulseLandscapeStats.frontier?.t>before&&__pulseLandscapeStats.nib,fallback.view.frontier.t);
       const continued = await inspectFallback(page);
