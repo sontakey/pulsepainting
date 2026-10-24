@@ -6,7 +6,8 @@ Your pulse, made into a place.
 > watercolor landscapes, crisp measured pulse strokes, a pointed brush and soft
 > pigment fixed to the paper, a gradually emerging background, and shareable artwork.
 > Browser replay and deployed-asset checks passed; physical-phone validation remains separate.
-> See [current release and performance verification](docs/validation/mobile-drawing-performance-2026-10-24.md)
+> See [current live readings release](docs/validation/live-readings-2026-10-24.md),
+> [drawing performance verification](docs/validation/mobile-drawing-performance-2026-10-24.md)
 > and [recording header checks](docs/validation/capture-signal-bar-2026-10-24.md).
 > The [mobile gallery](https://www.pulsepainting.com/#landscapes) is now live too;
 > see [mobile verification](docs/validation/mobile-gallery-2026-10-23.md).
@@ -21,6 +22,12 @@ channel, so it follows the live measurements with a short buffer. Ordinary
 verified window boundaries connect smoothly. Missing samples, rejected windows
 and explicit breaks remain pen lifts; decorative connections never add accepted
 data or recording time. The original waveform manuscript remains available.
+
+The live strip shows Pulse, HRV (RMSSD), and estimated Breathing, with short
+definitions under **About your readings** and optional signal charts.
+Breathing needs at least 40 seconds of usable signal and appears only when the
+existing estimator has a fresh supported result; uncertain values stay hidden.
+SDNN remains in the final report.
 
 The background grows from accepted pulse data in quiet stages, roughly every
 twenty usable seconds after the first discovery. Occasional short captions mark

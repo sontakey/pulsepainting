@@ -1,6 +1,30 @@
 # Pulse Painting handoff
 
-## Current production release: responsive live watercolor
+## Current production release: simpler live readings
+
+The recording strip shows Pulse, HRV (RMSSD) and estimated Breathing. SDNN
+remains in the final report. About your readings is now a compact three-row
+guide with optional View signal charts; hidden charts stop redrawing.
+Breathing uses the existing pinned estimator with quality, agreement and
+freshness gates. It needs at least 40 seconds of accepted signal; unsupported
+estimates show a brief waiting state. It is not a direct breath measurement.
+
+PR #15 merged as `314c284e35e04c7aa209fa824a647a2c2f38b737` after full Linux
+CI `40117831657` passed feature head `7dba31d8ddf567ea99816cd5b212f751a6dbec95`.
+Production `dpl_781otiHENFGNBEUs8cABicf5DaUF` is READY at
+https://www.pulsepainting.com/. All 110 served files matched the frozen build
+at `2026-10-24T18:05:16.030Z`; anonymous Chromium/WebKit mobile and desktop
+checks passed. The Git integration deployed the exact merge automatically.
+
+Both app suites, narrow layouts, stale estimate/recovery cases and the full
+three-minute WebKit interruption replay passed. The latter measured 59.20fps
+active painting and 59.98fps reveal, with a retained 222ms capture maximum.
+The renderer, vendor, accepted data, report calculations and artwork metrics
+are unchanged. See `docs/validation/live-readings-2026-10-24.md` for evidence
+and estimator availability. Browser replay does not validate respiratory accuracy,
+physical-camera behavior or phone performance. npm publication remains pending.
+
+## Previous production release: responsive live watercolor
 
 Canonical watercolor deposits and soft background snapshots now render in a
 local worker when supported. The live SVG brush updates only its visible
