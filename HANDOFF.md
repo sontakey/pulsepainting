@@ -1,17 +1,29 @@
 # Pulse Painting handoff
 
-## Current implementation: continuous pulse brush
+## Current production release: continuous pulse brush
 
-Recording now draws one continuous accepted pulse trace on moving paper, with a
-pointed brush and permanent pigment. The landscape stays hidden until the final
-manuscript-to-landscape reconstruction. All sixteen completed landscapes and
-report exports remain unchanged. Verified source handoffs connect without adding
-accepted duration; actual gaps remain brush lifts.
+Recording draws one continuous accepted PPG trace across quiet moving paper.
+A pointed brush deposits crisp ink and permanent soft pigment; no landscape is
+visible until Finish pulls back to the manuscript and reconstructs those same
+measured strokes into the final scene. Verified source handoffs connect without
+adding accepted data or duration; missing/rejected data stays a brush lift.
+All sixteen completed landscapes, gallery images, reports and exports remain
+unchanged. Hidden paint layers warm one accepted deposit at a time.
 
-Local correctness and the full interrupted WebKit replay have passed. Release
-CI, frozen-build performance and hosted verification are being completed; see
-`docs/validation/continuous-brush-2026-10-23.md`. This section does not yet claim
-production deployment. npm publication remains pending.
+PR #10 merged as `5cba901ef7c40404ee684ec54f5a9f2199534710` after full Linux CI
+`40060891212` passed tested source `ea916e2ef85357aa649b35805f2182fb6eee6c4e`.
+Production `dpl_6izm7gaLKRf7gd54bdpr7Di46v6A` is READY at https://www.pulsepainting.com/.
+At `2026-10-24T04:17:46.955Z`, all 107 public files matched the tested build;
+anonymous Chromium/WebKit phone/desktop checks passed at `2026-10-24T04:17:59.391Z`
+without public writes or runtime/HTTP errors.
+
+The full three-minute WebKit interruption replay passed: 59.34 fps capture,
+59.96 fps reveal, exact artwork parity and export recovery. Chrome measured
+about 60 fps normally; 4× CPU stress retained 59.60–59.75 fps capture and
+52.29–52.61 fps reveal. These are browser checks, not physical-phone, thermal
+or native-share validation. See `docs/validation/continuous-brush-2026-10-23.md`.
+Later documentation commits may advance deployment IDs without changing runtime
+bytes. npm publication remains pending.
 
 ## Previous production release: framed keepsake cards
 
