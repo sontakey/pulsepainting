@@ -136,7 +136,7 @@ try {
       `capture ${viewport.width}x${viewport.height}: details remain reachable above floating controls`);
   }
   // Accepted source advances on moving paper under a fixed brush. Presentation
-  // must preserve earlier source strokes and keep scenery hidden until finish.
+  // must preserve earlier source strokes and save the final landscape for finish.
   await page.emulateMedia({ reducedMotion: 'no-preference' });
   await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
   const beforeFlow = await page.evaluate(() => {
@@ -155,7 +155,7 @@ try {
     stats: __pulseLandscapeStats,
     width: document.getElementById('landscape-view').getBoundingClientRect().width,
     acceptedEnd: landscape.strokes.at(-1).sourceEnd,
-    scenicHidden: getComputedStyle(document.querySelector('.landscape-stage')).opacity === '0',
+    finalScenicHidden: getComputedStyle(document.querySelector('.landscape-stage')).opacity === '0',
     stable: JSON.stringify(landscape.strokes.slice(0, JSON.parse(previous).length)) === previous,
   }), beforeFlow.strokes);
   assert.equal(flow.stable, true, 'new accepted strokes preserve all earlier placements and materials');
@@ -163,7 +163,7 @@ try {
   assert.equal(flow.stats.projection.kind, 'continuous-source-time-value');
   assert.ok(Math.abs(flow.stats.nib.x - flow.width * .78) < 1, 'the brush keeps its horizontal anchor as real source paper advances');
   assert.ok(flow.stats.frontier.t <= flow.acceptedEnd + 1e-9, 'the brush cannot paint beyond accepted source');
-  assert.equal(flow.scenicHidden, true, 'recording shows source ink before the landscape reveal');
+  assert.equal(flow.finalScenicHidden, true, 'recording keeps the full-contrast final painting for the finish reveal');
   assert.ok(flow.stats.cachedPixels <= flow.stats.pixelBudget, 'live landscape cache stays within its pixel budget');
   await page.emulateMedia({ reducedMotion: 'reduce' });
   await page.evaluate(() => {
@@ -180,7 +180,7 @@ try {
     elapsed: elapsedMeasuringMs, segments: manuscript.segments.length, pending: manuscript.pending.length,
     lastWindow: manuscript.lastWindow, metricsCleared: lastMetrics === null && portraitStartedAt === null,
     waveCleared: [...waveBuf, ...placementWaveBuf].every(value => value === 0),
-    rasterReleased: __cancelledCanvas.width === 1 && __cancelledCanvas.height === 1 && __cancelledLandscapeStats.cachedPixels === 4,
+    rasterReleased: __cancelledCanvas.width === 1 && __cancelledCanvas.height === 1 && __cancelledLandscapeStats.cachedPixels === 7 && !document.querySelector('.landscape-emergence,.landscape-discovery'),
     active: __cancelledLandscapeStats.active,
     overlayHidden: document.getElementById('entry-pigment').hidden,
   }));

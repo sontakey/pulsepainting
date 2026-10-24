@@ -132,7 +132,7 @@ try {
  console.log('LANDSCAPE_ALL_MATERIAL_PARITY',JSON.stringify(materialParity));
  await page.evaluate(()=>view.dispose());
  assert.equal(await page.evaluate(()=>document.querySelectorAll('.landscape-canvas').length),0,'dispose removes the live view');
- assert.ok(await page.evaluate(()=>__pulseLandscapeStats.cachedPixels)<=4,'dispose releases all layer raster storage');
+ assert.ok(await page.evaluate(()=>__pulseLandscapeStats.cachedPixels)<=7,'dispose releases canonical caches, ambient snapshots and their fixed mask');
  assert.deepEqual(errors,[]);
  if(out){mkdirSync(out,{recursive:true});writeFileSync(path.join(out,'view.json'),JSON.stringify({scope:'Synthetic test-only view regression; not a public personal artwork',finished:{...finished,source:undefined,samples:finished.samples.slice(0,10)},reduced,fragmented:{strokes:fragmentedBefore.strokes,slots:fragmentedBefore.slots,usableSeconds:fragmentedBefore.usableSeconds,duration:fragmentedFinish.duration,stats:fragmentedFinish.stats},families:all.map(({png,...rest})=>rest)},null,2));}
  console.log('PASS landscape view: stable geometry, pause/resume, responsive recording, manuscript pullback and reconstruction, direct render parity, reduced motion, bounded fragmented recording, 16 distinct family rasters and disposal');
