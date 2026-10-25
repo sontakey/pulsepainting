@@ -6,9 +6,10 @@ Your pulse, made into a place.
 > watercolor landscapes, crisp measured pulse strokes, a pointed brush and soft
 > pigment fixed to the paper, a gradually emerging background, and shareable artwork.
 > Browser replay and deployed-asset checks passed; physical-phone validation remains separate.
-> See [current live readings release](docs/validation/live-readings-2026-10-24.md),
-> [drawing performance verification](docs/validation/mobile-drawing-performance-2026-10-24.md)
-> and [recording header checks](docs/validation/capture-signal-bar-2026-10-24.md).
+> See [current immersive capture and keepsake verification](docs/validation/immersive-capture-2026-10-25.md).
+> Earlier [live readings](docs/validation/live-readings-2026-10-24.md) and
+> [drawing performance checks](docs/validation/mobile-drawing-performance-2026-10-24.md)
+> document the preceding releases.
 > The [mobile gallery](https://www.pulsepainting.com/#landscapes) is now live too;
 > see [mobile verification](docs/validation/mobile-gallery-2026-10-23.md).
 > Community publishing and artwork sharing are live;
@@ -29,11 +30,13 @@ Breathing needs at least 40 seconds of usable signal and appears only when the
 existing estimator has a fresh supported result; uncertain values stay hidden.
 SDNN remains in the final report.
 
-The background grows from accepted pulse data in quiet stages, roughly every
-twenty usable seconds after the first discovery. Occasional short captions mark
-visible new details. Signal interruptions pause that growth; existing
-colors and shapes stay in place. The finished painting retains its complete
-detail and stronger pigment for the final reveal.
+Recording fills the viewport, with live measurements overlaid above the central
+pulse trace and floating controls below. The background eases in subtly as real
+accepted beats pass the brush. Cached snapshots refresh at five-second accepted-data
+milestones after the first discovery; there is no expensive repaint on each beat.
+Occasional short captions mark visible new details. Signal interruptions pause
+that growth; existing colors and shapes stay in place. The finished painting
+retains its complete detail and stronger pigment for the final reveal.
 
 Where supported, a dedicated browser worker prepares watercolor layers and soft
 background snapshots while the main thread draws the live pulse. The brush only
@@ -59,11 +62,11 @@ it is not a screenshot or validation of the phone's native permission controls.
 
 <p align="center">
   <img src="docs/media/pulse-painting-ready.jpg" width="230" alt="Pulse Painting phone capture instructions">
-  <img src="docs/media/pulse-painting-capture.jpg" width="230" alt="Crisp measured pulse brush with a faint emerging landscape, live metrics, and floating capture controls">
-  <img src="docs/media/pulse-painting-report.jpg" width="230" alt="Shareable Pulse Painting artwork and report">
+  <img src="docs/media/pulse-painting-capture.jpg" width="230" alt="Edge-to-edge recording with a central pulse brush, overlaid Pulse, HRV and Breathing readings, and floating capture controls">
+  <img src="docs/media/pulse-painting-report.jpg" width="230" alt="Framed Quiet Lake keepsake with a larger landscape, padded cursive title, pulse and HRV metrics, and a date and website footer">
 </p>
 
-The capture screenshot shows the actual app with its crisp pulse brush, pale emerging landscape, and measured signal bars beneath LIVE. Healthy capture keeps that area word-free; short prompts appear only when attention is needed. The public recording was fed through the real signal engine in one accelerated chunk, yielding 153.85 usable seconds; the foreground animation continued at normal speed. This is a composition capture, not a three-minute wall-clock session. The report shows the framed Glacial fjord keepsake, with summary metrics calculated from the public recording. Both use browser replay; see [capture provenance](docs/media/README.md). They are not physical-phone measurements or performance benchmarks.
+The capture image shows the actual app 60.009 seconds into a WebKit replay at normal wall-clock speed: edge-to-edge paper, the pulse trace in the middle, readings above, and signal bars beneath LIVE. The finished Quiet Lake keepsake comes from the same full three-minute measurement, including interruption and recovery checks, with 65 strokes and 157.2667 usable seconds. Its metrics round to 71 bpm, 55 ms RMSSD and 52 ms SDNN. These JPEGs were resized from actual browser screenshots and exported artwork; no interface values were substituted. See [image provenance](docs/media/README.md), including the replay fixture extension. Browser replay is separate from physical-phone, physiological-accuracy and native-share validation.
 
 The primary destination is [pulsepainting.com](https://www.pulsepainting.com/), a separate Vercel project connected to this repository. The apex domain redirects to www. The simple library demo remains at [ChatPPG](https://chatppg.com/ppg-js-demo). Release and public verification status are tracked in [HANDOFF.md](HANDOFF.md).
 
@@ -128,8 +131,10 @@ These remain labeled public-fixture examples, not uploads from other visitors.
 
 ## Share a painting, or give it a public page
 
-Finished keepsakes use a warm paper frame around the complete card, padded brush
-lettering, a cursive landscape name, and a date/website footer. Pulse, RMSSD and
+Finished keepsakes use a warm paper frame around the complete card, a larger
+landscape, padded brush lettering and a cursive scene name. Only untouched source
+paper is trimmed; every painted pixel and the original proportions remain.
+The metrics sit above an airy date/website footer. Pulse, RMSSD and
 SDNN appear by default in personal exports; **Show pulse and HRV metrics** hides
 them without changing the painting. Unavailable measurements remain dashes.
 All sixteen labeled gallery share images use the same frame.
@@ -190,7 +195,7 @@ private export and example gallery work without these credentials.
 - Density based on usable recorded time: sparse sessions keep open paper; longer sessions fill interleaved slots without moving earlier strokes.
 - On finish, the view pulls back along the recorded pulse paper, then reconstructs those same measured strokes into the complete landscape at full pigment strength. A local worker prepares cached watercolor layers and reveal geometry, with a main-thread fallback.
 - Optional WebGPU/WebGL2 painted entry transitions and an independent Canvas2D landscape compositor.
-- Placement coaching, a small live finger preview, real-time pulse/RMSSD/SDNN, and floating mobile controls.
+- Placement coaching, a small live finger preview, live Pulse, HRV (RMSSD) and supported Breathing estimates, and floating mobile controls. SDNN stays in the final report.
 - Report charts, a 1080 × 1350 shareable artwork, native file sharing with download fallback, and optional metrics on the artwork.
 - A full-screen desktop introduction and an on-demand mobile collection of sixteen public-fixture examples, with filters, swipe and keyboard navigation, user-initiated image sharing and scene deep links.
 - An artwork-first social share screen and optional public community gallery, with reviewed image/metrics consent, personal preview links, removal and reporting.
@@ -209,7 +214,7 @@ The temporary pinned browser artifact in [`vendor/ppg-js/0.3.1`](vendor/ppg-js/0
 
 ## Verification
 
-[The current verification record](docs/validation/emerging-landscape-2026-10-24.md)
+[The current verification record](docs/validation/immersive-capture-2026-10-25.md)
 separates visual replay, source-data checks, full sessions and performance evidence.
 Deployment status remains in [HANDOFF.md](HANDOFF.md).
 

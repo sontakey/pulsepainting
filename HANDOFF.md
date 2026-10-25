@@ -1,6 +1,37 @@
 # Pulse Painting handoff
 
-## Current production release: simpler live readings
+## Current production release: immersive, beat-led painting
+
+Recording is now edge-to-edge with the continuous measured pulse centered and
+metrics overlaid above it. LIVE, signal bars, floating controls and a separate
+readings overlay remain accessible. Each actual accepted beat gently advances
+background pigment over about 1.2 seconds, with fixed placement and a clear
+foreground corridor. Snapshots are prepared at most once per five seconds of
+usable data, not on every beat. The nib uses cached source interpolation and
+never speeds through a backlog; delayed frames advance at most 33.333ms.
+
+Keepsakes display larger art by trimming untouched paper only, with every
+painted pixel retained. The cursive scene title has its own band, metrics move
+higher, and the date/website footer has more space. All sixteen gallery share
+cards use the same layout. Original waveforms and final scene pixels are intact.
+
+PR #16 merged as `42a0fc0a83569d2617d7747cc2363bfd7a4fc47a` after complete Linux
+CI `40235656573` passed final feature head `098a752a422d5a56917f6b312a6ef355b7a2158a`.
+Production `dpl_Fpj8xpvDo7n8xHWW3LfKNtwUaNXB` is READY at
+https://www.pulsepainting.com/. All 110 files matched the tested build at
+`2026-10-25T21:47:11.131Z`. Anonymous Chromium/WebKit mobile and desktop checks
+and the production WebKit four-viewport capture layout passed. The Git integration
+deployed the exact merge automatically.
+
+Full three-minute WebKit replay passed interruption recovery and report/export,
+with 59.91fps active painting and 60.02fps reveal. Its retained 181ms capture
+maximum includes screenshot overhead. Separate 4× and 6× desktop CPU stress
+runs measured 60fps live drawing. These are browser results, not physical-phone,
+thermal, camera or physiology validation. See
+`docs/validation/immersive-capture-2026-10-25.md`. Later documentation deployments
+may have different IDs with identical runtime bytes. npm publication stays pending.
+
+## Previous production release: simpler live readings
 
 The recording strip shows Pulse, HRV (RMSSD) and estimated Breathing. SDNN
 remains in the final report. About your readings is now a compact three-row

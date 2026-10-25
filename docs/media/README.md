@@ -1,15 +1,67 @@
 # Pulse Painting screenshots
 
-These are direct browser captures of the actual static app. The capture image
-was refreshed on October 24, 2026 for continuous source-time ink with a slowly
-emerging landscape behind it, then refreshed again for the signal-bar header. The report and sharing
-images show the October 23 framed keepsake card. The desktop image retains the
-October 22 foreground release. Ready and QR retain their
-unchanged first-release images.
-The mobile gallery PNG documents the separately tested October 23 build
-described below. Its release was subsequently verified on the public site;
-the screenshot itself was captured locally.
+These images document the actual app and its exported artwork. The capture and
+keepsake images were refreshed on October 25, 2026 from a full WebKit session
+replay. Their current provenance is below; earlier captures remain documented
+for history. The sharing image retains the October 23 framed keepsake flow,
+and the desktop image retains the October 22 foreground release. Ready and QR
+retain their unchanged first-release images. The mobile gallery PNG documents
+the separately tested October 23 build; it was captured locally before the
+release was verified on the public site.
 See [HANDOFF.md](../../HANDOFF.md) for deployment status.
+
+## Current immersive capture and balanced keepsake
+
+`pulse-painting-capture.jpg` comes from the actual app screenshot at **60.009
+seconds of wall time** in the full WebKit session replay. The browser is WebKit
+26.6 with an emulated iPhone 13 viewport. Source was
+`4f88137b2e1e28809c4fc9cadf8dd456a2f91ecf`; the capture runtime is unchanged in final
+`098a752a422d5a56917f6b312a6ef355b7a2158a`, merged through PR #16 as
+`42a0fc0a83569d2617d7747cc2363bfd7a4fc47a`.
+
+The capture shows the real **2:20** countdown, **72 bpm**, **40 ms HRV** and an
+unavailable Breathing estimate. At that checkpoint, 41.105 seconds of active
+measurement had accrued, six segments were accepted, and 29.75 accepted seconds
+had reached the background cache. The brush follows the same accepted samples;
+the camera thumbnail is empty because camera I/O is mocked.
+
+`pulse-painting-report.jpg` shows the actual final **Quiet Lake** keepsake from
+that session, rendered by the final portrait compositor. Seed 39293 contains
+**65 strokes and 157.2667 usable seconds**. The completed measurement has 193
+accepted beats; report values of 71 bpm, 54.6 ms RMSSD and 51.9 ms SDNN round to
+**71 bpm, 55 ms and 52 ms** in the artwork. Metrics remain on by default. The
+larger painting, cursive name, complete golden frame and date/website footer
+are part of the exported artwork, not added to the screenshot.
+
+Both delivery files were resized to **780 pixels wide** and encoded as JPEG
+from the actual session capture PNG and final portrait PNG. No interface text,
+countdown, metric values, paint strokes or other content was altered. The prepared
+JPEGs were copied byte-for-byte into this folder. The capture is 780 × 1328;
+the keepsake is 780 × 975, preserving the original 1080 × 1350 export ratio.
+
+The public `test/fixtures/iphone-200s.json` was replayed through the real signal
+engine and app callbacks at **1× wall-clock speed**. Camera-frame interruption,
+a main-thread stall and simulated visibility interruption were exercised. The
+session reached 180.404 active measuring seconds in 209.86 wall seconds, then
+completed the reveal. To cover acquisition and interruption overhead beyond the
+fixture's original 199.452 seconds, the replay repeated its final 60 seconds once
+with monotonically shifted timestamps; that extension was used. This is an
+explicit test input extension, not an additional real recording. Expired samples
+were dropped during interruptions instead of replayed as a catch-up backlog.
+
+Public fixture SHA-256:
+`5f09524bc151460d1a1a1fa58c30681dd84eaf30d989f4637edf6183e4a03b66`.
+Final landscape renderer SHA-256:
+`277a3163b8d797944e264e2775f9232645f3f1c9cbcaead4865ce72d78802849`.
+Final portrait compositor SHA-256:
+`ea232aab358b7cdf9b0ecdb89f9a3aeb8656c7db9e8723ca432eafa67f4f877e`.
+
+Session evidence is in ignored `.dream-loop/immersive-capture/session/result.json`;
+the prepared images are `capture-readme.jpg` and `report-readme.jpg` in the parent
+folder. See [current verification](../validation/immersive-capture-2026-10-25.md).
+These images illustrate browser replay and artwork presentation. They do not
+establish physical iPhone camera, thermal, physiological-accuracy, native-sharing
+or sustained phone frame-rate performance.
 
 ## Camera guidance
 
@@ -25,9 +77,9 @@ This illustrates Pulse Painting's help, not the operating system's controls or
 a physical iPhone permission prompt. The SVG inside the dialog is explicitly a
 schematic. See [camera verification](../validation/camera-guidance-2026-10-24.md).
 
-## Capture header refresh
+## Earlier capture header refresh
 
-`pulse-painting-capture.jpg` was refreshed from source
+The previous `pulse-painting-capture.jpg` was refreshed from source
 `9f1058c1e5cade5c76d2d3f654857931d19792dd` at
 `2026-10-24T16:07:44.520Z` to show the signal bars, balanced
 header and removed recording footer. This is the direct Chrome native JPEG
@@ -43,7 +95,7 @@ substituted. There were no page errors or viewport overflow. Evidence is in
 ignored `.dream-loop/capture-signal-bar/readme/`.
 
 Native JPEG SHA-256: `f9bd2cea222ab037c68db9526e4d0d92c292339fd9f847d346091449d3b4cbba`.
-The renderer and public-fixture hashes below are unchanged.
+The renderer and public-fixture hashes in the preceding-capture section below applied to that refresh.
 
 ## Earlier emerging landscape capture
 
@@ -154,9 +206,9 @@ thumbnail decoded. No image pixels or interface text were edited.
   covers Chromium/WebKit behavior, layout, history, retry and capture handoff.
   This screenshot is not physical-phone, native-share or performance evidence.
 
-## Framed keepsake report and sharing
+## Earlier framed keepsake report and retained sharing
 
-`pulse-painting-report.jpg` and `pulse-painting-sharing.png` were captured directly
+The previous `pulse-painting-report.jpg` and retained `pulse-painting-sharing.png` were captured directly
 from the rebuilt app at `2026-10-23T23:33:00.090Z` and
 `2026-10-23T23:33:00.215Z`. Chrome 155.0.8059.85 through Playwright 1.63.0 used
 iPhone 13 emulation, a 390 × 844 CSS-pixel viewport, DPR 1, reduced motion and
@@ -232,8 +284,8 @@ social-post delivery or sustained frame-rate evidence.
 | `pulse-painting-desktop-candidate.jpg` | 188941 | `71f997d63b0146af03e7cebbaea9b092c927ffd8c044959c591d36365a01fd4f` |
 | `pulse-painting-qr.jpg` | 81054 | `56374f21d8c42f2edc94165adb7b06a762b95fae80e95c147e157f7038c52898` |
 | `pulse-painting-ready.jpg` | 51933 | `1da91b18ec49b70eebb09af1fcea4dff9f87078637b8ffcc70adf00e375a1ddf` |
-| `pulse-painting-capture.jpg` | 58923 | `6f2fb575a9ada8b51dee5a9697614ea29581b8ae1aeb3ee532ff3f02ce026d68` |
-| `pulse-painting-report.jpg` | 72429 | `00bf687a8592d16f0848eebf5bc756dee6e90191fba23b052715274f2c6eff93` |
+| `pulse-painting-capture.jpg` | 105141 | `afe7bc706b42c96b58db31b1bd2e6108cb2e35d6a323c8f618771cd8b5a77c36` |
+| `pulse-painting-report.jpg` | 102898 | `90e30ef4166ccaa0a4e2e55e28c720055b64a6d579f3353a8d9f45c4a807f9bc` |
 | `pulse-painting-mobile-gallery.png` | 469347 | `2f7f07374fb73399156555da8a86281d6b982db7714efe9a7bd2b4d4caa1889b` |
 | `pulse-painting-sharing.png` | 112629 | `2108b3314600dcda8a89d8e1aa0fe9b19e550fece694c7abfca10ec26ff664d3` |
 | `pulse-painting-sketchbook.png` | 533165 | `3a39ce8438a318de609cb2ef215e22b07ff9758e1abd86741d1f5f72afbdfb04` |
