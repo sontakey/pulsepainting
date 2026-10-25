@@ -109,7 +109,8 @@ try{for(const[name,engine]of[['chromium',chromium],['webkit',webkit]]){
  assert.ok(!publication.plain.labels.some(text=>/2026|148|2 min|Pulse$|RMSSD|SDNN|62 ms|51 ms/.test(text)));assert.deepEqual(publication.opted.metrics,{hr:71,rmssd:62,sdnn:51});
  for(const variant of[publication.plain,publication.opted]){
    assert.ok(variant.labels.includes('Pulse Painting')&&variant.labels.includes('Quiet lake')&&variant.labels.includes('PulsePainting.com'),'every public frame retains its title, cursive scene name and website independently of metrics');
-   assert.deepEqual(variant.draws,[{width:1080,height:1350,bounds:[100,190,880,880]}],'public export places the full cached artwork inside the same paper border without a source crop');
+   const source=publication.initial.artworkSourceBounds, placement=publication.initial.artworkPlacement;
+   assert.deepEqual(variant.draws,[{width:1080,height:1350,bounds:[source.x,source.y,source.width,source.height,placement.x,placement.y,placement.width,placement.height]}],'public export uses the same cached artwork and conservative paper crop as the local keepsake');
  }
  await page.locator('#open').click();await page.waitForFunction(()=>PulseShare.getState().ready);assert.equal(await page.locator('.pulse-share-sheet').isVisible(),true);
  const stale=await page.evaluate(async()=>{const pending=PulsePortrait.preparePublication({},host);PulsePortrait.clear(host);try{await pending;return false}catch(error){return error.message.includes("report changed")}});assert.equal(stale,true,"replaced report cannot publish a stale canvas");assert.equal(await page.locator('.pulse-share-sheet').count(),0);

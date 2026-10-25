@@ -3,8 +3,8 @@
 /* Authored vector icons never depend on a platform emoji font. */
 .ui-arrow { display:inline-block; flex:none; vertical-align:-.12em; pointer-events:none; }
 
-/* The artwork camera moves inside its frame; controls and live readings stay
-   in the page layout. The original manuscript remains an export/fallback. */
+/* The artwork camera fills the recording view behind readable controls.
+   The original manuscript remains an export/fallback. */
 #screen-measuring #manuscript[hidden], #landscape-view[hidden] { display: none; }
 #landscape-view { position: absolute; inset: 0; width: 100%; height: 100%; }
 #screen-measuring.is-revealing .capture-camera { opacity: .45; }
@@ -1192,4 +1192,130 @@ h1,.capture-title{font-size:clamp(54px,9vw,92px);line-height:.92;letter-spacing:
 @media print {
   #app { padding-bottom:0!important; }
   .mobile-action-dock { display:none!important; }
+}
+
+/* Recording is one unbroken sheet. The HUD and disclosure overlay the art;
+   opening details never changes its viewport or moves the painted trace. */
+#app[data-active-screen="measuring"] { padding-bottom:0; }
+#screen-measuring.capture-screen,
+#screen-measuring.capture-screen:has(.live-details[open]) {
+  position:relative; isolation:isolate; overflow:hidden;
+  width:100%; max-width:none; height:100dvh; min-height:0;
+  padding:0; margin:0; gap:0;
+}
+#screen-measuring .measuring-content {
+  position:absolute; inset:0; display:block;
+  width:100%; height:100%; min-height:0; gap:0;
+}
+#screen-measuring .manuscript-frame,
+#screen-measuring:has(.live-details[open]) .manuscript-frame {
+  position:absolute; inset:0; z-index:0; overflow:hidden;
+  width:100%; height:100%; min-height:0; margin:0; border:0; border-radius:0;
+}
+#screen-measuring #landscape-view { border-radius:0; aspect-ratio:auto; }
+#screen-measuring .landscape-discovery {
+  bottom:calc(max(88px,var(--mobile-dock-reserve,0px)) + 58px);
+  left:max(22px,env(safe-area-inset-left)); right:max(22px,env(safe-area-inset-right));
+  max-width:520px; margin:0 auto; color:#55717a;
+}
+#screen-measuring:has(.live-details[open]) .landscape-discovery,
+#screen-measuring:has(#pause-note:not([hidden])) .landscape-discovery { visibility:hidden; }
+#screen-measuring .measuring-content::after {
+  content:""; position:absolute; inset:auto 0 0; z-index:1;
+  height:180px; pointer-events:none;
+  background:linear-gradient(0deg,#fdfbf7f2,#fdfbf7a6 48%,#fdfbf700);
+}
+#screen-measuring .capture-hud {
+  position:absolute; inset:0 0 auto; z-index:2;
+  padding:calc(env(safe-area-inset-top) + 12px) max(18px,env(safe-area-inset-right)) 34px max(18px,env(safe-area-inset-left));
+  background:linear-gradient(180deg,#fdfbf7f5,#fdfbf7d9 72%,#fdfbf700);
+  pointer-events:none;
+}
+#screen-measuring .capture-topline { gap:5px 16px; }
+#screen-measuring .capture-heading .capture-title {
+  font-size:clamp(30px,8.6vw,38px); line-height:1.12;
+  padding:4px .06em 5px 0;
+}
+#screen-measuring .capture-camera { width:54px; height:54px; }
+#screen-measuring .quality-pill { width:54px; }
+#screen-measuring .live-metrics {
+  width:100%; margin-top:12px; padding:0; border:0;
+}
+#screen-measuring .live-metric { padding-inline:14px; border-color:#cbd6db99; }
+#screen-measuring .live-metric:first-child { padding-left:0; }
+#screen-measuring .live-metric:last-child { padding-right:0; }
+#screen-measuring .metric-number { font-size:32px; line-height:1.1; }
+#screen-measuring .metric-status { margin-top:3px; min-height:20px; line-height:20px; }
+#screen-measuring #manuscript-empty {
+  top:50%; transform:translateY(-50%);
+  padding-inline:max(22px,env(safe-area-inset-left));
+  font-size:16px; line-height:1.6;
+}
+#screen-measuring .live-details {
+  position:absolute; z-index:3;
+  left:max(16px,env(safe-area-inset-left)); right:max(16px,env(safe-area-inset-right));
+  bottom:max(88px,var(--mobile-dock-reserve,0px));
+  max-width:560px; margin:0 auto; padding:0;
+}
+#screen-measuring .live-details > summary {
+  min-height:44px; padding:9px 16px;
+  border:1px solid #d6dfdfb3; border-radius:24px;
+  color:#375962; background:#fdfbf7de; font-size:14px;
+}
+#screen-measuring .live-details[open] > summary { background:#f5f4ec; }
+#screen-measuring .live-details-body {
+  position:absolute; bottom:calc(100% + 10px); left:0; right:0;
+  max-height:calc(100dvh - max(88px,var(--mobile-dock-reserve,0px)) - 70px - env(safe-area-inset-top));
+  overflow-y:auto; overscroll-behavior:contain; -webkit-overflow-scrolling:touch;
+  padding:14px; border:1px solid #d6dfdf; border-radius:20px;
+  background:#fdfbf7; box-shadow:0 8px 32px #193e4b14;
+}
+#screen-measuring .live-details-body .reading-guide { padding:4px 8px; background:none; }
+#screen-measuring .live-details-body .reading-guide > div { grid-template-columns:70px minmax(0,1fr); gap:8px; }
+#screen-measuring .live-details-body .reading-actions { border-top:1px solid #dce1ea; padding-top:10px; }
+#screen-measuring .live-details-body canvas { max-width:100%; }
+#screen-measuring .painting-actions.mobile-action-dock {
+  position:absolute; z-index:4;
+  left:max(12px,env(safe-area-inset-left)); right:max(12px,env(safe-area-inset-right));
+  bottom:calc(env(safe-area-inset-bottom) + 10px + var(--mobile-viewport-inset,0px));
+  width:auto; max-width:656px; margin:0 auto; padding:8px;
+  grid-template-columns:minmax(0,1fr) minmax(0,1.12fr); gap:6px;
+  border:1px solid #dce2eb; border-radius:36px; background:#fdfbf7f7;
+  box-shadow:0 5px 24px #253d701a,0 1px 4px #253d700a;
+}
+#screen-measuring .painting-actions.mobile-action-dock button {
+  min-height:48px; padding:10px 12px; border-radius:26px;
+  font-size:16px; line-height:1.3; touch-action:manipulation;
+}
+#screen-measuring .painting-actions.mobile-action-dock .btn-secondary { border:1px solid #d5dfef; background:#fffaf7; }
+#screen-measuring #pause-note {
+  position:absolute; z-index:2;
+  left:max(18px,env(safe-area-inset-left)); right:max(18px,env(safe-area-inset-right));
+  bottom:calc(max(88px,var(--mobile-dock-reserve,0px)) + 54px);
+  max-width:560px; margin:0 auto; padding:8px 12px; border-radius:12px;
+  background:#fdfbf7e8; font-size:14px; line-height:1.4;
+}
+@media(max-width:380px) {
+  #screen-measuring .capture-hud { padding-inline:max(16px,env(safe-area-inset-left)); }
+  #screen-measuring .capture-topline { column-gap:12px; }
+  #screen-measuring .live-metric { padding-inline:9px; }
+  #screen-measuring .metric-number { font-size:30px; }
+  #screen-measuring .painting-actions.mobile-action-dock button { font-size:15px; padding-inline:8px; }
+}
+@media(max-height:500px) and (min-width:600px) {
+  #screen-measuring .capture-hud {
+    display:grid; grid-template-columns:minmax(0,1fr) minmax(280px,1.2fr) 54px;
+    grid-template-rows:auto auto; gap:4px 22px; padding-bottom:22px;
+  }
+  #screen-measuring .capture-topline { display:contents; }
+  #screen-measuring .capture-heading .capture-title { grid-area:1 / 1; font-size:30px; }
+  #screen-measuring .painting-status { grid-area:2 / 1; }
+  #screen-measuring .capture-camera { grid-area:1 / 3; }
+  #screen-measuring .quality-pill { grid-area:2 / 3; }
+  #screen-measuring .live-metrics { grid-area:1 / 2 / 3 / 3; align-self:center; margin-top:0; }
+  #screen-measuring .metric-number { font-size:28px; }
+  #screen-measuring .landscape-discovery { bottom:88px; }
+  #screen-measuring .live-details { left:max(18px,env(safe-area-inset-left)); right:auto; width:230px; bottom:12px; }
+  #screen-measuring .painting-actions.mobile-action-dock { left:auto; right:max(18px,env(safe-area-inset-right)); width:calc(100% - 280px); max-width:540px; }
+  #screen-measuring .live-details-body { width:min(420px,calc(100vw - 36px)); max-height:calc(100dvh - 76px - env(safe-area-inset-top)); }
 }

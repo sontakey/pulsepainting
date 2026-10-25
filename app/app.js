@@ -162,7 +162,13 @@ function acceptPaintWindow(metrics) {
   const values = points.map(p => p.v), lo = Math.min(...values), hi = Math.max(...values);
   if (hi - lo < 1e-8) return;
   manuscript.segments.forEach(segment => { segment.reveal = 1; });
-  const segment = { reveal: matchMedia('(prefers-reduced-motion: reduce)').matches ? 1 : 0, channel: window.selectedChannel, score: Math.max(0, Math.min(1, metrics.sqi.score)), sourceAmplitude: { min: lo, max: hi }, points: points.map(p => ({...p, v:(p.v-lo)/(hi-lo)})) };
+  // These are the engine's accepted peak timestamps, including the one-second
+  // analyses between paint windows. Never infer decorative beats from BPM.
+  const acceptedBeats = monitor?.getTachogram?.({ goodOnly: true, hrvOnly: true })
+    ?? monitor?.engine?.getTachogram?.({ goodOnly: true, hrvOnly: true }) ?? [];
+  const beatTimes = [...new Set(acceptedBeats.filter(beat => beat.valid && Number.isFinite(beat.t)
+    && beat.t >= points[0].t && beat.t <= points.at(-1).t).map(beat => beat.t))].sort((a, b) => a - b);
+  const segment = { reveal: matchMedia('(prefers-reduced-motion: reduce)').matches ? 1 : 0, channel: window.selectedChannel, score: Math.max(0, Math.min(1, metrics.sqi.score)), sourceAmplitude: { min: lo, max: hi }, beatTimes, points: points.map(p => ({...p, v:(p.v-lo)/(hi-lo)})) };
   manuscript.segments.push(segment);
   if (landscape) {
     try {
