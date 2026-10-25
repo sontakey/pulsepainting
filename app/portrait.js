@@ -87,7 +87,7 @@
     const y = baseline ?? box.y + (box.height + measured.actualBoundingBoxAscent - measured.actualBoundingBoxDescent) / 2;
     ctx.fillText(text, x, y);
   }
-  function paintCard(canvas, { art, layout = artworkLayout(art), name, footerLeft = '', metrics = {}, includeMetrics = false }) {
+  function paintCard(canvas, { art, scene, layout = artworkLayout(art, scene), name, footerLeft = '', metrics = {}, includeMetrics = false }) {
     const ctx = canvas.getContext('2d');
     // One warm paper stock and a fine ochre frame surround the entire keepsake,
     // including its title and footer, rather than only the landscape square.
