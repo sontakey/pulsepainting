@@ -12,6 +12,12 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..')
 const source = readFileSync(path.join(root, 'app/landscape.js'), 'utf8');
 const recording = replayPublicFixture(1, 0, 180);
 const fragmented = replayPublicFixture(.5, .18);
+const acceptedPeakTimes = new Set(recording.acceptedBeats.map(beat => beat.t));
+assert.ok(recording.segments.some(segment => segment.beatTimes.length), 'the public replay retains real accepted beat timestamps');
+assert.ok(recording.segments.every(segment => segment.beatTimes.every(t => acceptedPeakTimes.has(t))), 'art metadata cannot synthesize timestamps from heart rate');
+assert.ok(recording.scene.strokes.every(stroke => stroke.beatTimes.every(t => acceptedPeakTimes.has(t) && t >= stroke.sourceStart && t <= stroke.sourceEnd)), 'beat metadata belongs to the retained source fragment');
+const retainedPeakTimes = recording.scene.strokes.flatMap(stroke => stroke.beatTimes);
+assert.equal(new Set(retainedPeakTimes).size, retainedPeakTimes.length, 'shared fragment boundaries cannot count one beat twice');
 const output = path.resolve(root, process.env.PPG_EMERGENCE_ARTIFACTS || '.dream-loop/emerging-landscape/verification');
 const engines = (process.env.PPG_EMERGENCE_ENGINES || 'chromium,webkit').split(',');
 assert.ok(engines.every(engine => ['chromium', 'webkit'].includes(engine)));
@@ -77,7 +83,8 @@ for (const engine of engines) {
           composite[i + 3] = 255;
         }
         const { clearTop, clearBottom } = __pulseLandscapeStats.emergence;
-        let changed = 0;
+        let changed = 0, changedAnywhere = 0;
+        for (let i = 0; i < composite.length; i += 4) if (Math.abs(composite[i] - previousAmbientPixels[i]) + Math.abs(composite[i + 1] - previousAmbientPixels[i + 1]) + Math.abs(composite[i + 2] - previousAmbientPixels[i + 2]) > 2) changedAnywhere++;
         for (let y = 0; y < 480; y++) {
           const screenY = paper.top - wrapper.top + (y + .5) / 480 * paper.height;
           if (screenY < wrapper.height * .1 || screenY > wrapper.height * .92 || (screenY >= wrapper.height * clearTop && screenY <= wrapper.height * clearBottom)) continue;
@@ -88,6 +95,7 @@ for (const engine of engines) {
             if (Math.abs(composite[i] - previousAmbientPixels[i]) + Math.abs(composite[i + 1] - previousAmbientPixels[i + 1]) + Math.abs(composite[i + 2] - previousAmbientPixels[i + 2]) > 2) changed++;
           }
         }
+        window.lastAmbientDifference = { changed, changedAnywhere };
         window.previousAmbientPixels = composite;
         return changed;
       };
@@ -123,12 +131,56 @@ for (const engine of engines) {
     assert.ok(result.short.usableSeconds < 3 && result.short.usableSeconds > 0);
     assert.equal(result.short.stats.updates, 0, 'a very short accepted recording stays an honest airy study');
 
+    result.beats = await page.evaluate(segment => {
+      resetScene(); PulseLandscape.append(scene, segment); view.sync();
+      const source = JSON.stringify(scene), firstBeatAt = segment.beatTimes[0] - segment.points[0].t;
+      advancePaint(Math.max(1, Math.floor((firstBeatAt - .12) * 60)));
+      const beforeFirstBeat = inspectEmergence(), changes = []; let previousTarget = 0, previousFade = 0;
+      for (let i = 0; i < 600; i++) {
+        advancePaint(); const state = __pulseLandscapeStats.emergence;
+        if (!state.updates) continue;
+        const sourceTime = segment.points[0].t + __pulseLandscapeStats.streamTime;
+        if (state.lastBeatTime != null && (!segment.beatTimes.includes(state.lastBeatTime) || state.lastBeatTime > sourceTime + 1e-6)) throw Error('Background progress invented or anticipated a beat');
+        if (state.target < previousTarget || state.fade < previousFade) throw Error('Deposited background pigment faded backward');
+        if (state.target !== previousTarget) changes.push({ target: state.target, beat: state.lastBeatTime });
+        previousTarget = state.target; previousFade = state.fade;
+      }
+      const finished = inspectEmergence(), pending = pendingPaint();
+      return { beforeFirstBeat, changes, finished, pending, sourceUnchanged: JSON.stringify(scene) === source };
+    }, recording.segments[0]);
+    assert.equal(result.beats.beforeFirstBeat.stats.updates, 0, 'accepted terrain waits for its first actual played beat');
+    assert.equal(result.beats.changes.length, recording.segments[0].beatTimes.length, 'each real beat advances the pigment target once');
+    assert.deepEqual(result.beats.changes.map(change => change.beat), Array.from(recording.segments[0].beatTimes));
+    assert.equal(result.beats.finished.stats.target, 1);
+    assert.equal(result.beats.finished.stats.fade, 1);
+    assert.equal(result.beats.finished.stats.snapshotRequests, 1, 'per-beat progress does not rasterize per beat');
+    assert.equal(result.beats.pending, 0, 'settled pigment stops requesting frames');
+    assert.ok(result.beats.sourceUnchanged, 'background progress does not modify accepted data');
+
+    result.noBeats = await page.evaluate(segment => {
+      resetScene(); PulseLandscape.append(scene, { ...segment, beatTimes: [] }); view.sync(); advancePaint(1200);
+      return { ...inspectEmergence(), pending: pendingPaint() };
+    }, recording.segments[0]);
+    assert.equal(result.noBeats.stats.updates, 0, 'an explicit empty accepted-beat list creates no invented beat progress');
+    assert.equal(result.noBeats.stats.snapshotRequests, 0, 'empty beat metadata performs no unnecessary fallback snapshot');
+    assert.equal(result.noBeats.pending, 0, 'an empty beat list cannot keep the animation clock running');
+
+    result.legacy = await page.evaluate(segment => {
+      resetScene(); const legacy = { ...segment }; delete legacy.beatTimes;
+      PulseLandscape.append(scene, legacy); view.sync(); advancePaint(1200);
+      return inspectEmergence();
+    }, recording.segments[0]);
+    assert.equal(result.legacy.stats.updates, 1, 'legacy waveform-only paintings retain a calm time fade');
+    assert.equal(result.legacy.stats.beatDriven, false);
+    assert.equal(result.legacy.stats.lastBeatTime, null, 'legacy fades do not fabricate beat timestamps');
+    assert.equal(result.legacy.stats.fade, 1);
+
     result.families = await page.evaluate(({ segments, fragmented }) => {
       const results = [];
       const check = (condition, message) => { if (!condition) throw Error(message); };
       for (const family of PulseLandscape.FAMILIES) {
         resetScene(family.id);
-        const updates = [], captions = new Set(); let previousUpdate = 0, placement = null;
+        const updates = [], captions = new Set(), visibleGroups = []; let previousUpdate = 0, placement = null, groupStartSeconds = 0, groupVisiblePixels = 0;
         const input = family.id === 'quiet-lake' ? segments : segments.slice(0, 5);
         for (const segment of input) {
           PulseLandscape.append(scene, segment); view.sync();
@@ -154,11 +206,21 @@ for (const engine of engines) {
               snapshot.visibleNewPixels = visibleDiscoveryDelta();
               check(ambient.updates === previousUpdate + 1, `${family.id}: update counters skipped a visible discovery`);
               check(ambient.sourceSeconds >= 3, `${family.id}: discovery appears before usable source threshold`);
-              if (updates.length) check(ambient.stage > updates.at(-1).stats.stage && ambient.sourceSeconds >= 3 + 20 * (ambient.stage - 1), `${family.id}: discoveries repeat before the next usable-source milestone`);
+              if (updates.length) check(ambient.stage > updates.at(-1).stats.stage && ambient.sourceSeconds >= 3 + 5 * (ambient.stage - 1), `${family.id}: snapshots repeat before the next five-second source milestone`);
               check(snapshot.pixels.some(canvas => canvas.occupied > 0 && canvas.hash !== emptyAmbientHash), `${family.id}: discovery adds no actual painted pixels to empty paper`);
               check(snapshot.pixels.some(canvas => canvas.opaque === 480 * 480 && canvas.hash !== emptyAmbientHash), `${family.id}: snapshot is not backed with opaque paper for a stable crossfade`);
-              check(snapshot.visibleNewPixels > 0, `${family.id}: a discovery adds no pigment outside the foreground quiet mask`);
-              check(snapshot.opacity <= .75, `${family.id}: background competes with foreground contrast`);
+              snapshot.changedPixels = lastAmbientDifference.changedAnywhere;
+              check(snapshot.changedPixels > 0, `${family.id}: snapshot ${ambient.stage} has a stale pigment buffer`);
+              groupVisiblePixels += snapshot.visibleNewPixels;
+              // Five-second additions may land wholly in the intentionally
+              // clear foreground corridor. The prior twenty-second discovery
+              // contract still requires actual visible background growth.
+              if (ambient.sourceSeconds - groupStartSeconds >= 20) {
+                check(groupVisiblePixels > 0, `${family.id}: twenty seconds of accepted source adds no pigment outside the foreground quiet mask`);
+                visibleGroups.push({ fromSeconds: groupStartSeconds, toSeconds: ambient.sourceSeconds, changedPixels: groupVisiblePixels });
+                groupStartSeconds = ambient.sourceSeconds; groupVisiblePixels = 0;
+              }
+              check(snapshot.opacity <= .6, `${family.id}: background competes with foreground contrast`);
               check(snapshot.finalOpacity === 0, `${family.id}: full-strength final landscape appeared during capture`);
               check(snapshot.mask && snapshot.mask !== 'none', `${family.id}: the live waveform has no quiet masked corridor`);
               check(ambient.clearTop < .45 && ambient.clearBottom > .60, `${family.id}: the clear corridor does not contain the live waveform amplitude and brush margin`);
@@ -174,10 +236,11 @@ for (const engine of engines) {
         const held = inspectEmergence();
         check(JSON.stringify(held.pixels) === JSON.stringify(settled.pixels), `${family.id}: already deposited ambient pigment shifts without new source`);
         check(held.stats.updates === settled.stats.updates, `${family.id}: idle time creates another discovery`);
+        check(held.stats.snapshotRequests <= Math.max(0, Math.floor((scene.usableSeconds - 3) / 5) + 1), `${family.id}: per-beat progress exceeds the five-second snapshot budget`);
         check(held.stats.captionVisible === false, `${family.id}: discovery text persists after its quiet interval`);
         check(captions.size <= 4, `${family.id}: too many repeated progress captions`);
         check(held.cachedPixels <= held.pixelBudget && held.pixelBudget <= 3086336, `${family.id}: ambient canvases exceed their fixed budget`);
-        results.push({ family: family.id, updates, captions: [...captions], final: held.stats, usableSeconds: scene.usableSeconds });
+        results.push({ family: family.id, updates, visibleGroups, captions: [...captions], final: held.stats, usableSeconds: scene.usableSeconds });
       }
       // Delivery gaps contribute no usable duration, even when the recording
       // has hundreds of separate fragments.

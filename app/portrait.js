@@ -6,7 +6,8 @@
   'use strict';
   const WIDTH = 1080, HEIGHT = 1350;
   const PAPER = '#fbf8f0', INK = '#193e49', BLUE = '#45646c';
-  const ARTWORK = Object.freeze({ x: 100, y: 190, width: 880, height: 880 });
+  const ARTWORK = Object.freeze({ x: 56, y: 190, width: 968, height: 752 });
+  const METRICS = Object.freeze({ x: 72, y: 1096, width: 936, height: 88 });
   const instances = new Map();
   let revision = 0;
   const valueLabel = value => Number.isFinite(value) ? `${Math.round(value)}` : '—';
@@ -22,6 +23,49 @@
   }
   function sceneName(scene) {
     return window.PulseLandscape.FAMILIES.find(f => f.id === scene.family)?.name || scene.family?.name || 'Your landscape';
+  }
+  function artworkLayout(art, scene) {
+    const source = { x: 0, y: 0, width: art.width, height: art.height };
+    let content = { ...source };
+    // The square scene includes its own paper margins. Trim only paper that is
+    // pixel-identical to the same seeded, unpainted stock; even the faintest
+    // changed pigment pixel remains inside the crop. This is done once after
+    // recording, never in the live brush loop or on a metrics toggle.
+    if (scene && scene.family !== 'aurora-night') {
+      const paper = document.createElement('canvas'); paper.width = art.width; paper.height = art.height;
+      try {
+        window.PulseLandscape.render(scene, paper, { through: 0 });
+        const actual = art.getContext('2d').getImageData(0, 0, art.width, art.height).data;
+        const blank = paper.getContext('2d').getImageData(0, 0, art.width, art.height).data;
+        let left = art.width, top = art.height, right = -1, bottom = -1;
+        for (let y = 0; y < art.height; y++) for (let x = 0; x < art.width; x++) {
+          const i = (y * art.width + x) * 4;
+          if (actual[i] === blank[i] && actual[i + 1] === blank[i + 1] && actual[i + 2] === blank[i + 2] && actual[i + 3] === blank[i + 3]) continue;
+          left = Math.min(left, x); right = Math.max(right, x); top = Math.min(top, y); bottom = Math.max(bottom, y);
+        }
+        if (right >= left && bottom >= top) {
+          content = { x: left, y: top, width: right - left + 1, height: bottom - top + 1 };
+          const pad = Math.ceil(Math.min(art.width, art.height) * 24 / 1080);
+          // Retain generous source context for sparse or unusually narrow
+          // recordings. Never magnify one isolated mark into a full landscape.
+          source.x = Math.max(0, Math.min(left - pad, Math.floor(art.width * .12)));
+          source.y = Math.max(0, Math.min(top - pad, Math.floor(art.height * .20)));
+          const endX = Math.min(art.width, Math.max(right + pad + 1, Math.ceil(art.width * .88)));
+          const endY = Math.min(art.height, Math.max(bottom + pad + 1, Math.ceil(art.height * .80)));
+          source.width = endX - source.x; source.height = endY - source.y;
+        }
+      } catch { /* Cropping is optional; keep the complete original if inspection is unavailable. */ }
+      finally { paper.width = paper.height = 1; }
+    }
+    // One scale preserves the actual scene's aspect and every measured path.
+    const scale = Math.min(ARTWORK.width / source.width, ARTWORK.height / source.height);
+    const placement = { x: ARTWORK.x + (ARTWORK.width - source.width * scale) / 2,
+      y: ARTWORK.y + (ARTWORK.height - source.height * scale) / 2,
+      width: source.width * scale, height: source.height * scale };
+    const bounds = { x: Math.floor(placement.x), y: Math.floor(placement.y),
+      width: Math.ceil(placement.x + placement.width) - Math.floor(placement.x),
+      height: Math.ceil(placement.y + placement.height) - Math.floor(placement.y) };
+    return { source, content, placement, bounds };
   }
   // Fit actual ink bounds, including script overhangs and descenders. Shrinking
   // the font preserves its proportions; Canvas fillText(maxWidth) would squash it.
@@ -43,7 +87,7 @@
     const y = baseline ?? box.y + (box.height + measured.actualBoundingBoxAscent - measured.actualBoundingBoxDescent) / 2;
     ctx.fillText(text, x, y);
   }
-  function paintCard(canvas, { art, name, footerLeft = '', metrics = {}, includeMetrics = false }) {
+  function paintCard(canvas, { art, scene, layout = artworkLayout(art, scene), name, footerLeft = '', metrics = {}, includeMetrics = false }) {
     const ctx = canvas.getContext('2d');
     // One warm paper stock and a fine ochre frame surround the entire keepsake,
     // including its title and footer, rather than only the landscape square.
@@ -51,20 +95,20 @@
     ctx.fillStyle = PAPER; ctx.fillRect(16, 16, WIDTH - 32, HEIGHT - 32);
     ctx.strokeStyle = '#d2bf91'; ctx.lineWidth = 1.5;
     ctx.strokeRect(28.75, 28.75, WIDTH - 57.5, HEIGHT - 57.5);
-    // Uniform scaling preserves the whole source. Decorations and metrics never
-    // crop, reposition, blur or recolor the measured landscape.
-    ctx.drawImage(art, ARTWORK.x, ARTWORK.y, ARTWORK.width, ARTWORK.height);
+    const source = layout.source, destination = layout.placement;
+    ctx.drawImage(art, source.x, source.y, source.width, source.height,
+      destination.x, destination.y, destination.width, destination.height);
     ctx.fillStyle = INK;
     cardText(ctx, 'Pulse Painting', { x: 72, y: 64, width: 936, height: 102 }, 88, 'Water Brush');
-    cardText(ctx, name, { x: 88, y: 1082, width: 904, height: 66 }, 68, 'Water Brush');
+    cardText(ctx, name, { x: 88, y: 980, width: 904, height: 76 }, 68, 'Water Brush');
     if (includeMetrics) {
       [['Pulse', metrics.hr, 'bpm'], ['RMSSD', metrics.rmssd, 'ms'], ['SDNN', metrics.sdnn, 'ms']].forEach(([label, value, unit], index) => {
         const x = 84 + index * 312;
         ctx.fillStyle = BLUE;
-        cardText(ctx, label, { x, y: 1160, width: 288, height: 30 }, 30, 'DM Sans');
+        cardText(ctx, label, { x, y: 1102, width: 288, height: 30 }, 30, 'DM Sans');
         const available = Number.isFinite(value) && value >= 0 && value <= 9999;
         ctx.fillStyle = INK;
-        cardText(ctx, available ? `${valueLabel(value)} ${unit}` : '—', { x, y: 1194, width: 288, height: 44 }, 46, 'DM Sans', 500, 'center', 1228);
+        cardText(ctx, available ? `${valueLabel(value)} ${unit}` : '—', { x, y: 1138, width: 288, height: 44 }, 46, 'DM Sans', 500, 'center', 1172);
       });
     }
     ctx.strokeStyle = '#d8ccb3'; ctx.lineWidth = 1;
@@ -105,7 +149,7 @@
     const render = () => {
       const version = ++state.renderVersion;
       state.blob = null; state.file = null; syncActions();
-      paintCard(canvas, { art: state.art, name, footerLeft: date, metrics: options.metrics || {}, includeMetrics: state.includeMetrics });
+      paintCard(canvas, { art: state.art, layout: state.artworkLayout, name, footerLeft: date, metrics: options.metrics || {}, includeMetrics: state.includeMetrics });
       canvas.setAttribute('aria-label', `Pulse Painting. ${name}, composed from ${duration} of accepted pulse${date ? ` on ${date}` : ''}. Metrics ${state.includeMetrics ? 'included' : 'excluded'} from artwork.`);
       state.ready = new Promise(resolve => {
         try { canvas.toBlob(blob => {
@@ -168,6 +212,7 @@
           // Publish only a completed painting. Encoding retries reuse these
           // exact pixels; a failed landscape render can still be tried again.
           state.art = art;
+          state.artworkLayout = artworkLayout(art, scene);
         }
         checkbox.disabled = false;
         await render();
@@ -198,7 +243,12 @@
     return {
       width: state.canvas.width, height: state.canvas.height, ready: !!state.blob, revision: state.revision,
       includeMetrics: state.includeMetrics, family: state.scene.family,
-      artworkBounds: { ...ARTWORK },
+      artworkBounds: { ...(state.artworkLayout?.bounds || ARTWORK) },
+      artworkViewport: { ...ARTWORK },
+      artworkSourceBounds: state.artworkLayout ? { ...state.artworkLayout.source } : null,
+      artworkContentBounds: state.artworkLayout ? { ...state.artworkLayout.content } : null,
+      artworkPlacement: state.artworkLayout ? { ...state.artworkLayout.placement } : null,
+      metricBounds: { ...METRICS },
       seed: state.scene.seed, version: state.scene.version, strokeCount: state.scene.strokes.length,
       usableSeconds: state.scene.usableSeconds, durationSec: state.options.durationSec,
       bytes: state.blob?.size || 0,
@@ -217,7 +267,7 @@
       const metric = value => Number.isFinite(value) && value >= 0 && value <= 9999 ? Math.round(value * 10) / 10 : null;
       metrics = { hr: metric(source.hr), rmssd: metric(source.rmssd), sdnn: metric(source.sdnn) };
     }
-    paintCard(canvas, { art: state.art, name: sceneName(state.scene), metrics: metrics || {}, includeMetrics: includeMetrics === true });
+    paintCard(canvas, { art: state.art, layout: state.artworkLayout, name: sceneName(state.scene), metrics: metrics || {}, includeMetrics: includeMetrics === true });
     const encode = quality => new Promise((resolve, reject) => {
       const timeout = setTimeout(() => reject(new Error('Image preparation took too long. Please try again.')), 30000);
       try { canvas.toBlob(blob => {

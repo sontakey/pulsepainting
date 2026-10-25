@@ -506,6 +506,9 @@
         while(last+1<points.length && offset+points[last].t-points[first].t<SLOT_SECONDS-1e-8)last++;
         const chunk=points.slice(first,last+1), id=scene.strokes.length;
         const stroke={id,points:chunk,sourceStart:chunk[0].t,sourceEnd:chunk.at(-1).t,score:clamp(Number.isFinite(segment.score)?segment.score:.65,0,1),channel:segment.channel||'selected',...placeFragment(slot,chunk,offset,sourceDomain)};
+        // Beat metadata follows the same retained fragment as its real samples.
+        // An explicit empty list differs from legacy artwork with no beat data.
+        if(Array.isArray(segment.beatTimes))stroke.beatTimes=[...new Set(segment.beatTimes.filter(t=>Number.isFinite(t)&&t>=stroke.sourceStart&&t<=stroke.sourceEnd&&(!predecessor||t>predecessor.sourceEnd)))].sort((a,b)=>a-b);
         const separation=predecessor?stroke.sourceStart-predecessor.sourceEnd:Infinity;
         if(predecessor===scene.strokes.at(-1)&&predecessor?.channel===stroke.channel&&separation>=0&&separation<=GAP)continuityPredecessors.set(stroke,predecessor);
         scene.strokes.push(stroke);added.push(stroke);
@@ -1194,8 +1197,8 @@
     let cursor=0,total=0,cachePainted=0,cacheReady=false,revealElapsed=0,resolveFinish=null,finishPromise=null,warmTask=0;
     let rasterWorker=null,workerBusy=false,workerTimer=0,workerSnapshot=0,workerMaterials=0,workerStarted=false,pendingAmbient=null;
     let captureFirst=0,captureLast=0,captureViewBox='',captureTransform='';
-    let warmedSeconds=0,ambientFront=0,ambientElapsed=0,ambientStage=0,ambientAnimating=false,captionElapsed=6000,captionIndex=-1;
-    const ambientOpacity=.72,ambientDuration=3200,captionStages=[1,3,5,7],captions=['Your first colors are appearing.','A landscape is taking shape.','Your pulse is adding the details.','A place that is yours alone.'];
+    let warmedSeconds=0,ambientFront=0,ambientElapsed=0,ambientStage=0,ambientPreparedStage=0,ambientThrough=0,ambientAnimating=false,ambientTask=0,ambientCandidate=null,activeAmbient=null,ambientFade=0,ambientTarget=0,captionElapsed=6000,captionIndex=-1;
+    const ambientOpacity=.58,ambientDuration=3200,ambientSettleMs=1200,ambientStepSeconds=5,captionStages=[1,9,17,25],captions=['Your first colors are appearing.','A landscape is taking shape.','Your pulse is adding the details.','A place that is yours alone.'];
     let box={width:1,height:1},camera={x:540,y:540,scale:1};
     const motion=win.matchMedia?.('(prefers-reduced-motion: reduce)');
     let reduced=options.reducedMotion===true||options.reducedMotion==='reduce'||!!motion?.matches;
@@ -1204,12 +1207,13 @@
     const grainContext=ambientGrain.getContext('2d');grainContext.drawImage(atlas.tile,0,0);grainContext.globalCompositeOperation='destination-over';grainContext.fillStyle='rgba(255,255,255,.18)';grainContext.fillRect(0,0,INK_SIDE,INK_SIDE);
     const pattern=svgNode('pattern');pattern.id=`${uid}-grain`;pattern.setAttribute('patternUnits','userSpaceOnUse');pattern.setAttribute('width','85');pattern.setAttribute('height','85');
     const texture=svgNode('image');texture.setAttribute('href',atlas.svgMaskUrl);texture.setAttribute('width','85');texture.setAttribute('height','85');pattern.append(texture);defs.append(pattern);
-    const stats=global.__pulseLandscapeStats={frames:0,rasterFrames:0,forcedRasterFrames:0,rasterSkipped:0,rasterIntervalMs:0,rasterPainted:-1,rasterProgress:0,active:false,revealing:false,mode:'recording',frameMs:0,pixelBudget:3086336,cachedPixels:side*side*4+ambientSide*ambientSide*2+INK_SIDE*INK_SIDE,get materialPixelBudget(){return 2*INK_SIDE*INK_SIDE+2*INK_PIXEL_LIMIT+(rasterWorker?2*INK_SIDE*INK_SIDE+2*INK_PIXEL_LIMIT:0);},get materialPixels(){return 2*INK_SIDE*INK_SIDE+2*(pigmentAtlases.get(doc)?.pixels||0)+workerMaterials;},liveTexturePixels:INK_SIDE*INK_SIDE,liveMaskPixelEstimate:0,camera:{...camera},finished:false,strokes:0,painted:0,activeStroke:null,progress:0,frontier:null,nib:null,visibleSeconds:6,wetTrail:null,projection:null,settling:false,streamTime:0,streamStart:-6,paperOffsetX:0,anchorX:0,visibleIntervals:[],morphProgress:0,revealSamples:[],emergence:{updates:0,stage:0,sourceSeconds:0,strokeCount:0,sourceEnd:null,animating:false,fade:0,opacity:0,caption:'',captionVisible:false,clearTop:0,clearBottom:1,pixelBudget:ambientSide*ambientSide*2+INK_SIDE*INK_SIDE}};
+    const stats=global.__pulseLandscapeStats={frames:0,rasterFrames:0,forcedRasterFrames:0,rasterSkipped:0,rasterIntervalMs:0,rasterPainted:-1,rasterProgress:0,active:false,revealing:false,mode:'recording',frameMs:0,pixelBudget:3086336,cachedPixels:side*side*4+ambientSide*ambientSide*2+INK_SIDE*INK_SIDE,get materialPixelBudget(){return 2*INK_SIDE*INK_SIDE+2*INK_PIXEL_LIMIT+(rasterWorker?2*INK_SIDE*INK_SIDE+2*INK_PIXEL_LIMIT:0);},get materialPixels(){return 2*INK_SIDE*INK_SIDE+2*(pigmentAtlases.get(doc)?.pixels||0)+workerMaterials;},liveTexturePixels:INK_SIDE*INK_SIDE,liveMaskPixelEstimate:0,camera:{...camera},finished:false,strokes:0,painted:0,activeStroke:null,progress:0,frontier:null,nib:null,visibleSeconds:6,wetTrail:null,projection:null,settling:false,streamTime:0,streamStart:-6,paperOffsetX:0,anchorX:0,visibleIntervals:[],morphProgress:0,revealSamples:[],emergence:{updates:0,stage:0,sourceSeconds:0,strokeCount:0,sourceEnd:null,animating:false,fade:0,target:0,beatDriven:false,beatsRevealed:0,beatCount:0,lastBeatTime:null,snapshotRequests:0,opacity:0,caption:'',captionVisible:false,clearTop:0,clearBottom:1,pixelBudget:ambientSide*ambientSide*2+INK_SIDE*INK_SIDE}};
     stats.rasterBackend='main-thread';stats.workerFrameMs=0;stats.workerRequests=0;
+    stats.queuedSeconds=0;stats.playbackRate=0;stats.awaitingSource=false;
     // Numeric payload accounting is separate from canvas backing pixels. At
     // most one four-number knot is retained per original accepted source point.
     stats.revealKnotCount=0;stats.revealKnotLimit=0;stats.revealKnotDataBytes=0;
-    function stopWorker(){rasterWorker?.terminate();rasterWorker=null;workerBusy=false;holdWorkerWatchdog();pendingAmbient?.close();pendingAmbient=null;workerMaterials=0;stats.workerMaterialPixels=0;}
+    function stopWorker(){rasterWorker?.terminate();rasterWorker=null;workerBusy=false;holdWorkerWatchdog();pendingAmbient?.bitmap?.close();pendingAmbient=null;workerMaterials=0;stats.workerMaterialPixels=0;}
     function holdWorkerWatchdog(){win.clearTimeout(workerTimer);workerTimer=0;}
     function watchWorker(){
       if(workerTimer||!workerBusy||paused||doc.hidden)return;
@@ -1242,7 +1246,7 @@
           if(record&&Array.isArray(knots)&&knots.length===record.stroke.points.length&&knots.every((p,i)=>p&&Number.isFinite(p.x)&&Number.isFinite(p.y)&&p.t===record.stroke.points[i].t&&p.v===record.stroke.points[i].v)){
             stats.revealKnotCount+=knots.length-(record.revealKnots?.length||0);stats.revealKnotDataBytes=stats.revealKnotCount*4*8;record.revealKnots=knots;
           }
-          if(result.bitmap&&result.snapshot==='ambient'){pendingAmbient?.close();pendingAmbient=null;if(finishing)result.bitmap.close();else pendingAmbient=result.bitmap;}
+          if(result.bitmap&&result.snapshot==='ambient'){pendingAmbient?.bitmap?.close();pendingAmbient=null;if(finishing)result.bitmap.close();else pendingAmbient={bitmap:result.bitmap,...ambientMetadata(result.count)};}
           else if(result.bitmap){
             try{ctx.resetTransform();ctx.clearRect(0,0,side,side);ctx.drawImage(result.bitmap,0,0);workerSnapshot=result.count;}
             catch{fallbackRaster();return;}
@@ -1262,7 +1266,10 @@
       const r=records[cachePainted];let message;
       if(r){
         const nextSeconds=warmedSeconds+r.stroke.sourceEnd-r.stroke.sourceStart;
-        const snapshot=finishing?(cachePainted+1===records.length?'final':false):nextSeconds>=3&&Math.floor((nextSeconds-3)/20)+1>ambientStage?'ambient':false;
+        const nextStage=ambientStageFor(nextSeconds);
+        const candidate=nextStage>ambientPreparedStage?ambientMetadata(cachePainted+1):null;
+        const snapshot=finishing?(cachePainted+1===records.length?'final':false):candidate&&(!candidate.beatDriven||candidate.beats.length)?'ambient':false;
+        if(snapshot==='ambient'){ambientPreparedStage=nextStage;stats.emergence.snapshotRequests++;}
         message={type:'paint',stroke:r.stroke,snapshot};
         if(!cachePainted)message.scene={...scene,strokes:[],slots:[],sourceIntervals:[]};
       }else if(finishing&&workerSnapshot!==records.length)message={type:'snapshot'};
@@ -1277,7 +1284,7 @@
     }
     const path=nodes=>nodes.map((p,i)=>`${i?'L':'M'}${p.x.toFixed(3)} ${p.y.toFixed(3)}`).join('');
     const liveColor=t=>{const a=[[36,82,194],[103,73,157],[31,121,134],[36,82,194]],q=(t/11+.15*Math.sin(t/19))%3,i=Math.floor(q),u=smooth(q-i);return a[i].map((v,j)=>mix(v,a[i+1][j],u));};
-    const settings=()=>({anchor:box.width*.78,baseline:box.height*.52,sx:(box.width-Math.min(30,box.width*.085)*2)/600,sy:clamp(box.height*.16,52,72)/100});
+    const settings=()=>({anchor:box.width*.78,baseline:box.height*.50,sx:(box.width-Math.min(30,box.width*.085)*2)/600,sy:clamp(box.height*.16,52,72)/100});
     const sourcePoint=(r,p)=>({x:(r.start+p.t-r.stroke.sourceStart)*100,y:(.5-normalized(p.v,r.stroke.transform.domain.min,r.stroke.transform.domain.max))*100});
     function placeEmergence(){
       const s=settings(),width=box.width*1.12,height=box.height*1.6,top=clamp((s.baseline-s.sy*50-26)/box.height,0,1),bottom=clamp((s.baseline+s.sy*50+32)/box.height,0,1),feather=28/box.height;
@@ -1288,27 +1295,82 @@
       const mask=`linear-gradient(to bottom,transparent,black 10%,black ${Math.max(.1,top-feather)*100}%,transparent ${top*100}%,transparent ${bottom*100}%,black ${Math.min(.92,bottom+feather)*100}%,black 92%,transparent)`;
       emergence.style.maskImage=mask;emergence.style.webkitMaskImage=mask;stats.emergence.clearTop=top;stats.emergence.clearBottom=bottom;
     }
+    const ambientStageFor=seconds=>seconds<3?0:Math.floor((seconds-3)/ambientStepSeconds)+1;
+    function ambientMetadata(count){
+      if(ambientCandidate?.count===count&&ambientCandidate.from===ambientThrough)return ambientCandidate;
+      const prefix=records.slice(0,count),fresh=prefix.slice(ambientThrough),seen=new Set(),beats=[];
+      let sourceSeconds=0;for(const r of prefix)sourceSeconds+=r.stroke.sourceEnd-r.stroke.sourceStart;
+      const beatDriven=fresh.every(r=>Array.isArray(r.stroke.beatTimes));
+      if(beatDriven)for(const r of fresh)for(const t of r.stroke.beatTimes){
+        const key=Math.round(t*1e7);if(seen.has(key))continue;seen.add(key);
+        beats.push({t,at:r.start+t-r.stroke.sourceStart});
+      }
+      beats.sort((a,b)=>a.at-b.at);
+      return ambientCandidate={count,from:ambientThrough,sourceSeconds,sourceEnd:prefix.at(-1)?.stroke.sourceEnd??null,stage:ambientStageFor(sourceSeconds),beatDriven,beats,beatIndex:0};
+    }
     function hideDiscovery(){captionElapsed=6000;discovery.style.opacity='0';stats.emergence.captionVisible=false;}
     function completeEmergence(){
       ambientFront=1-ambientFront;ambient[ambientFront].style.opacity='1';ambient[1-ambientFront].style.opacity='0';
-      ambientAnimating=false;stats.emergence.animating=false;stats.emergence.fade=1;
+      ambientThrough=activeAmbient?.count??ambientThrough;activeAmbient=null;ambientFade=ambientTarget=1;
+      ambientAnimating=false;stats.emergence.animating=false;stats.emergence.fade=stats.emergence.target=1;
+    }
+    function ambientNeedsFrame(){return ambientAnimating&&(!activeAmbient?.beatDriven||ambientFade<ambientTarget-.0001);}
+    function prepareAmbient(){
+      if(rasterWorker||ambientTask||disposed||paused||doc.hidden||finishing||finished||ambientAnimating||pendingAmbient||ambientStageFor(warmedSeconds)<=ambientStage)return;
+      const candidate=ambientMetadata(cachePainted);
+      if(candidate.beatDriven&&(!candidate.beats.length||candidate.beats[0].at>cursor))return;
+      const prepare=()=>{
+        ambientTask=0;if(disposed||paused||doc.hidden||finishing||finished||ambientAnimating)return;
+        const meta=ambientMetadata(cachePainted);
+        if(meta.stage<=ambientStage||meta.beatDriven&&(!meta.beats.length||meta.beats[0].at>cursor))return;
+        // Only the two bounded snapshot canvases are retained. Heavy pigment
+        // copying stays in an idle callback, never in a beat animation frame.
+        paintAmbient(ambientCtx[1-ambientFront],caches,ambientGrain,ambientSide);
+        pendingAmbient={...meta,prepared:true};ambientPreparedStage=meta.stage;stats.emergence.snapshotRequests++;discover();
+      };
+      ambientTask=win.requestIdleCallback?win.requestIdleCallback(prepare,{timeout:1200}):win.setTimeout(prepare,60);
     }
     function discover(){
-      if(disposed||paused||doc.hidden||finishing||finished||ambientAnimating||warmedSeconds<3||rasterWorker&&!pendingAmbient)return;
-      const nextStage=Math.floor((warmedSeconds-3)/20)+1;if(nextStage<=ambientStage)return;
+      if(disposed||paused||doc.hidden||finishing||finished||ambientAnimating||warmedSeconds<3)return;
+      if(!pendingAmbient){prepareAmbient();return;}
+      // Recompute only the small timestamp list after the previous snapshot
+      // settles: a worker may have coalesced a newer accepted-data prefix.
+      const meta=ambientMetadata(pendingAmbient.count);
+      if(meta.stage<=ambientStage){pendingAmbient.bitmap?.close();pendingAmbient=null;return;}
+      if(meta.beatDriven&&(!meta.beats.length||meta.beats[0].at>cursor))return;
       const next=1-ambientFront,output=ambientCtx[next];
-      if(rasterWorker){output.clearRect(0,0,ambientSide,ambientSide);output.drawImage(pendingAmbient,0,0);pendingAmbient.close();pendingAmbient=null;}
-      else paintAmbient(output,caches,ambientGrain,ambientSide);
+      if(pendingAmbient.bitmap){output.clearRect(0,0,ambientSide,ambientSide);output.drawImage(pendingAmbient.bitmap,0,0);pendingAmbient.bitmap.close();}
+      pendingAmbient=null;activeAmbient=meta;
       ambient[next].style.zIndex='1';ambient[ambientFront].style.zIndex='0';ambient[next].style.opacity='0';
-      ambientStage=nextStage;ambientElapsed=0;ambientAnimating=true;emergence.style.opacity=`${ambientOpacity}`;
-      Object.assign(stats.emergence,{updates:stats.emergence.updates+1,stage:ambientStage,sourceSeconds:warmedSeconds,strokeCount:cachePainted,sourceEnd:records[cachePainted-1].stroke.sourceEnd,animating:true,fade:0,opacity:ambientOpacity});
-      // Coalesce buffered milestones into one discovery, never a burst of messages.
+      ambientStage=meta.stage;ambientElapsed=ambientFade=ambientTarget=0;ambientAnimating=true;emergence.style.opacity=`${ambientOpacity}`;
+      Object.assign(stats.emergence,{updates:stats.emergence.updates+1,stage:ambientStage,sourceSeconds:meta.sourceSeconds,strokeCount:meta.count,sourceEnd:meta.sourceEnd,animating:true,fade:0,target:0,beatDriven:meta.beatDriven,beatsRevealed:0,beatCount:meta.beats.length,lastBeatTime:null,opacity:ambientOpacity});
+      // Captions remain sparse source-duration milestones, never a heartbeat flash.
       const nextCaption=captionStages.findLastIndex(stage=>stage<=ambientStage);
       if(nextCaption>captionIndex){captionIndex=nextCaption;captionElapsed=0;discovery.textContent=captions[nextCaption];stats.emergence.caption=captions[nextCaption];stats.emergence.captionVisible=true;}
-      if(reduced)completeEmergence();schedule();
+      if(reduced){
+        if(meta.beatDriven){stats.emergence.beatsRevealed=meta.beats.length;stats.emergence.lastBeatTime=meta.beats.at(-1)?.t??null;}
+        completeEmergence();
+      }
+      schedule();
     }
     function emergenceFrame(delta){
-      if(ambientAnimating){ambientElapsed+=delta;const fade=smooth(clamp(ambientElapsed/ambientDuration,0,1));ambient[1-ambientFront].style.opacity=`${fade}`;stats.emergence.fade=fade;if(ambientElapsed>=ambientDuration||reduced)completeEmergence();}
+      discover();
+      if(ambientAnimating){
+        if(activeAmbient.beatDriven){
+          const beats=activeAmbient.beats;
+          while(activeAmbient.beatIndex<beats.length&&beats[activeAmbient.beatIndex].at<=cursor){
+            stats.emergence.lastBeatTime=beats[activeAmbient.beatIndex].t;activeAmbient.beatIndex++;
+          }
+          ambientTarget=activeAmbient.beatIndex/beats.length;
+          // Successive real beats add pigment monotonically. The 1.2-second
+          // settling tail spans beats without pulsing opacity or moving ink.
+          ambientFade+=(ambientTarget-ambientFade)*(1-Math.exp(-4*delta/ambientSettleMs));
+          if(ambientTarget-ambientFade<.003)ambientFade=ambientTarget;
+          stats.emergence.beatsRevealed=activeAmbient.beatIndex;
+        }else{ambientElapsed+=delta;ambientTarget=1;ambientFade=smooth(clamp(ambientElapsed/ambientDuration,0,1));}
+        ambient[1-ambientFront].style.opacity=`${ambientFade}`;stats.emergence.fade=ambientFade;stats.emergence.target=ambientTarget;
+        if(ambientFade===1||reduced)completeEmergence();
+      }
       if(captionElapsed<6000){captionElapsed=Math.min(6000,captionElapsed+delta);const opacity=reduced?Number(captionElapsed<6000):Math.min(smooth(captionElapsed/700),smooth((6000-captionElapsed)/1200));discovery.style.opacity=`${opacity}`;stats.emergence.captionVisible=captionElapsed<6000;}
       discover();
     }
@@ -1361,7 +1423,7 @@
       }
       stats.strokes=records.length;
     }
-    function stopWarming(){if(warmTask){if(win.cancelIdleCallback)win.cancelIdleCallback(warmTask);else win.clearTimeout(warmTask);warmTask=0;}}
+    function stopWarming(){if(ambientTask){if(win.cancelIdleCallback)win.cancelIdleCallback(ambientTask);else win.clearTimeout(ambientTask);ambientTask=0;}if(warmTask){if(win.cancelIdleCallback)win.cancelIdleCallback(warmTask);else win.clearTimeout(warmTask);warmTask=0;}}
     function warmNext(){
       if(!disposed&&records.length&&!workerStarted)startWorker();
       if(rasterWorker){warmWorker();return;}
@@ -1377,6 +1439,15 @@
       stats.painted=painted;stats.progress=progress;stats.activeStroke=r&&cursor>=r.start?painted:null;return r;
     }
     function hideBrush(){if(tip.style.display!=='none')tip.style.display='none';stats.nib=null;}
+    function liveFrontier(record,fraction){
+      // Live drawing needs only measured time/value interpolation. Preparing
+      // terrain pigment here duplicates the worker and can stall a new stroke.
+      const nodes=record.nodes,t=mix(record.stroke.sourceStart,record.stroke.sourceEnd,clamp(fraction,0,1));
+      let lo=0,hi=nodes.length-1;
+      while(hi-lo>1){const mid=(lo+hi)>>1;if(nodes[mid].t<=t)lo=mid;else hi=mid;}
+      const a=nodes[lo],b=nodes[hi],u=b.t>a.t?clamp((t-a.t)/(b.t-a.t),0,1):0;
+      return {t,v:mix(a.v,b.v,u)};
+    }
     function captureFrame(){
       const s=settings(),offset=s.anchor-cursor*100*s.sx;
       const viewBox=`0 0 ${box.width} ${box.height}`,transform=`translate(${offset} ${s.baseline}) scale(${s.sx} ${s.sy})`;
@@ -1400,15 +1471,17 @@
         if(cursor>=r.start)visible.push({index:r.index,sourceStart:r.stroke.sourceStart,sourceEnd:Math.min(r.stroke.sourceEnd,r.stroke.sourceStart+cursor-r.start),start:r.start,end:r.end});
       }
       const r=currentRecord();stats.streamTime=cursor;stats.streamStart=cursor-6;stats.paperOffsetX=offset;stats.anchorX=s.anchor;stats.visibleIntervals=visible;
+      stats.queuedSeconds=Math.max(0,total-cursor);stats.awaitingSource=cursor>=total&&!paused&&!doc.hidden&&!finished;
+      stats.playbackRate=paused||doc.hidden||reduced||stats.awaitingSource?0:1;
       stats.projection={kind:'continuous-source-time-value',windowSeconds:6,start:cursor-6,baseline:s.baseline,amplitude:s.sy*100,settle:0};
       stats.liveMaskPixelEstimate=visible.length*Math.ceil(box.width*(win.devicePixelRatio||1))*Math.ceil(90*(win.devicePixelRatio||1));
       const bridging=r?.join&&cursor>=r.displayStart&&cursor<r.start;stats.bridging=!!bridging;
       if(!r||cursor<r.start&&!bridging||paused||reduced||doc.hidden){hideBrush();return;}
       const u=bridging?(cursor-r.displayStart)/(r.start-r.displayStart):0;
-      const frontier=bridging?{t:mix(r.join.from.t,r.join.to.t,u),v:mix(r.join.from.v,r.join.to.v,u)}:strokeFrontier(r.stroke,progress);
+      const frontier=bridging?{t:mix(r.join.from.t,r.join.to.t,u),v:mix(r.join.from.v,r.join.to.v,u)}:liveFrontier(r,progress);
       const q=bridging?{x:mix(r.join.a.x,r.join.b.x,u),y:mix(r.join.a.y,r.join.b.y,u)}:sourcePoint(r,frontier);
       const x=offset+q.x*s.sx,y=s.baseline+q.y*s.sy;
-      const earlier=bridging?r.join.from:strokeFrontier(r.stroke,Math.max(0,progress-.005));
+      const earlier=bridging?r.join.from:liveFrontier(r,Math.max(0,progress-.005));
       const dy=-(frontier.v-earlier.v)*s.sy*100,angle=clamp(Math.atan2(dy,Math.max(.001,(frontier.t-earlier.t)*100*s.sx))*180/Math.PI*.08,-8,8);
       if(tip.style.display!=='')tip.style.display='';tip.setAttribute('transform',`translate(${x} ${y}) rotate(${angle})`);loadedTip.setAttribute('fill',color(liveColor(cursor)));
       stats.frontier=frontier;stats.nib={x,y,angle,width:50,coreWidth:1.25};stats.wetTrail={start:Math.max(0,cursor-6),end:cursor,points:visible.length,persistent:true};
@@ -1468,7 +1541,7 @@
       trace.style.display='none';reconstruction.style.display='none';stage.style.opacity='1';ink.setAttribute('hidden','');
       const done=resolveFinish;resolveFinish=null;done?.(scene);
     }
-    function schedule(){if(!disposed&&!paused&&!doc.hidden&&!finished&&!frame&&(revealing||cursor<total||ambientAnimating||captionElapsed<6000))frame=win.requestAnimationFrame(tick);}
+    function schedule(){if(!disposed&&!paused&&!doc.hidden&&!finished&&!frame&&(revealing||cursor<total||ambientNeedsFrame()||captionElapsed<6000))frame=win.requestAnimationFrame(tick);}
     function tick(now){
       frame=0;if(disposed||paused||doc.hidden||finished){last=0;return;}
       const begin=performance.now(),delta=last?clamp(now-last,0,64):1000/60;last=now;stats.frames++;stats.active=true;
@@ -1476,10 +1549,10 @@
         if(!cacheReady)prepareRaster();
         revealElapsed+=delta;revealFrame();if(revealElapsed>=5800&&cacheReady)settle();
       }else{
-        // Small gentle catch-up prevents buffered source from accumulating a
-        // long delay; there is never a per-fragment reset or fast scenic jump.
-        cursor=Math.min(total,cursor+delta/1000*(total-cursor>10?1.20:1));
-        emergenceFrame(delta);captureFrame();stats.rasterSkipped++;if(cursor>=total&&!ambientAnimating&&captionElapsed>=6000){stats.active=false;last=0;}
+        // Preserve a steady brush speed even after delayed frames or source
+        // windows. Never rush through buffered pulse data to catch up.
+        cursor=Math.min(total,cursor+Math.min(delta,1000/30)/1000);
+        emergenceFrame(delta);captureFrame();stats.rasterSkipped++;if(cursor>=total&&!ambientNeedsFrame()&&captionElapsed>=6000){stats.active=false;last=0;}
       }
       stats.frameMs=performance.now()-begin;schedule();
     }
@@ -1512,7 +1585,7 @@
     function finish(){
       if(disposed||finished)return Promise.resolve(scene);if(finishPromise)return finishPromise;
       stopWarming();
-      pendingAmbient?.close();pendingAmbient=null;
+      pendingAmbient?.bitmap?.close();pendingAmbient=null;
       resize();
       finishPromise=new Promise(resolve=>resolveFinish=resolve);paused=false;refreshRecords();
       hideDiscovery();ambientAnimating=false;stats.emergence.animating=false;

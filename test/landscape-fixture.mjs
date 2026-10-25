@@ -26,5 +26,10 @@ export function replayPublicFixture(period=1,gap=0,until=100){
     if(result.state==='MEASURING'&&Number.isFinite(result.waveform))replayContext.manuscript.pending.push({t,v:result.waveform});
   }
   const scene=replayContext.landscape,segments=replayContext.manuscript.segments;
-  return {scene,segments,goodWindows,acceptedSegments:segments.length,breaks:segments.reduce((n,s)=>n+s.points.filter(p=>p.breakBefore).length,0)};
+  const acceptedBeats=engine.getTachogram({goodOnly:true,hrvOnly:true}).filter(beat=>beat.valid).map(beat=>({t:beat.t,ibiMs:beat.ibiMs}));
+  const result={scene,segments,goodWindows,acceptedSegments:segments.length,breaks:segments.reduce((n,s)=>n+s.points.filter(p=>p.breakBefore).length,0)};
+  // Exact source evidence is available to focused tests without bloating the
+  // model suite's spread summaries or serialized artifact manifests.
+  Object.defineProperty(result,'acceptedBeats',{value:acceptedBeats,enumerable:false});
+  return result;
 }

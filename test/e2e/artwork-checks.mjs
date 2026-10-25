@@ -196,12 +196,12 @@ export async function checkArtwork(page, output = process.env.PPG_ARTWORK_ARTIFA
   const footerURL = preparation.textLayout.find(item => item.text === 'PulsePainting.com');
   const footerDate = preparation.textLayout.find(item => /\b\d{4}\b/.test(item.text));
   assert.ok(title && title.top >= 36 && title.bottom < 190, 'brush brand title has real paper padding above and below');
-  assert.ok(sceneTitle && /Water Brush/.test(sceneTitle.font) && sceneTitle.top > 1070 && sceneTitle.bottom < 1160, 'cursive landscape name remains visible above the metric band');
+  assert.ok(sceneTitle && /Water Brush/.test(sceneTitle.font) && sceneTitle.top >= 980 && sceneTitle.bottom <= 1056, 'cursive landscape name remains visible above the metric band');
   assert.ok(footerDate && Math.abs(footerDate.left - 72) < .1 && footerDate.top >= 1275 && footerDate.bottom <= 1309, 'recording date sits at the bottom left');
   assert.ok(footerURL && Math.abs(footerURL.right - 1008) < .1 && footerURL.top >= 1275 && footerURL.bottom <= 1309, 'website sits at the bottom right');
   assert.ok(footerDate.right < footerURL.left, 'date and website have distinct nonoverlapping footer areas');
   assert.ok(preparation.textLayout.every(item => item.left >= 36 && item.right <= 1044 && item.top >= 36 && item.bottom <= 1314), 'all exported labels remain inside the paper frame');
-  assert.deepEqual(preparation.textLayout.filter(item => item.top >= 1194 && item.bottom <= 1238).map(item => item.text), ['—', '—', '—'], 'unavailable values stay visibly unavailable instead of showing NaN, Infinity or fabricated zeroes');
+  assert.deepEqual(preparation.textLayout.filter(item => item.top >= 1138 && item.bottom <= 1182).map(item => item.text), ['—', '—', '—'], 'unavailable values stay visibly unavailable instead of showing NaN, Infinity or fabricated zeroes');
   const recovery = await page.evaluate(async () => {
     const outcomes=[];
     for (const mode of ['encoder', 'renderer']) {
@@ -212,6 +212,7 @@ export async function checkArtwork(page, output = process.env.PPG_ARTWORK_ARTIFA
       let renderCalls=0,successfulRenders=0,renderedArt=null;
       try {
         window.PulseLandscape={...originalLandscape,render(...args){
+          if (args[2]?.through === 0) return originalLandscape.render(...args);
           renderCalls++;
           if(mode==='renderer'&&renderCalls===1)throw new Error('Test-only renderer failure');
           const result=originalLandscape.render(...args);successfulRenders++;renderedArt=args[1];return result;
@@ -292,7 +293,19 @@ export async function checkArtwork(page, output = process.env.PPG_ARTWORK_ARTIFA
     // Comparing a copied crop against an origin-aligned resample adds a second
     // backend-dependent rounding step that is unrelated to scene preservation.
     const expectedArt = document.createElement('canvas'); expectedArt.width=1080;expectedArt.height=1350;
-    expectedArt.getContext('2d').drawImage(exact,x,y,width,height);
+    const expectedContext = expectedArt.getContext('2d');
+    expectedContext.fillStyle = '#fbf8f0'; expectedContext.fillRect(0,0,1080,1350);
+    const source = state.artworkSourceBounds, destination = state.artworkPlacement;
+    expectedContext.drawImage(exact,source.x,source.y,source.width,source.height,destination.x,destination.y,destination.width,destination.height);
+    const blank=document.createElement('canvas');blank.width=blank.height=1080;
+    PulseLandscape.render(landscape,blank,{through:0});
+    const exactPixels=exact.getContext('2d').getImageData(0,0,1080,1080).data,blankPixels=blank.getContext('2d').getImageData(0,0,1080,1080).data;
+    let croppedPigmentPixels=0;
+    for(let py=0;py<1080;py++)for(let px=0;px<1080;px++){
+      if(px>=source.x&&px<source.x+source.width&&py>=source.y&&py<source.y+source.height)continue;
+      const i=(py*1080+px)*4;
+      if([0,1,2,3].some(c=>exactPixels[i+c]!==blankPixels[i+c]))croppedPigmentPixels++;
+    }
     // Observe a 1:1 copy, never read back the live export canvas. Repeated
     // getImageData calls can trigger a Chromium GPU-to-CPU backend switch
     // before its next draw and change resampling solely because of the test.
@@ -311,7 +324,7 @@ export async function checkArtwork(page, output = process.env.PPG_ARTWORK_ARTIFA
       state, expectedDuration: elapsedMeasuringMs / 1000,
       scene: { family: landscape.family, seed: landscape.seed, version: landscape.version, strokeCount: landscape.strokes.length, usableSeconds: landscape.usableSeconds },
       sourceUnchanged: sceneBefore === JSON.stringify(landscape),
-      art: portraitArt.toDataURL(), maxArtDelta, meanArtDelta:artDelta/a.length, deltaBounds, border,
+      art: portraitArt.toDataURL(), maxArtDelta, meanArtDelta:artDelta/a.length, deltaBounds, border, croppedPigmentPixels,
       image: document.querySelector('.portrait-preview canvas').toDataURL(),
       accessibleDescription: document.querySelector('.portrait-preview canvas').getAttribute('aria-label'),
     };
@@ -319,7 +332,13 @@ export async function checkArtwork(page, output = process.env.PPG_ARTWORK_ARTIFA
   assert.equal(captured.state.width, 1080, 'share artwork width');
   assert.equal(captured.state.height, 1350, 'share artwork height');
   assert.equal(captured.state.durationSec, captured.expectedDuration, 'portrait uses actual active capture duration, including early finishes');
-  assert.deepEqual(captured.state.artworkBounds, { x:100, y:190, width:880, height:880 }, 'complete scene has equal generous side borders and padded title space');
+  assert.deepEqual(captured.state.artworkViewport, { x:56, y:190, width:968, height:752 }, 'artwork has a wider composition area above its padded name');
+  const source=captured.state.artworkSourceBounds, destination=captured.state.artworkPlacement, viewport=captured.state.artworkViewport;
+  assert.ok(source.x>=0&&source.y>=0&&source.x+source.width<=1080&&source.y+source.height<=1080, 'artwork source bounds remain within the original square');
+  assert.ok(Math.abs(destination.width/source.width-destination.height/source.height)<1e-9, 'source aspect ratio is preserved without stretching');
+  assert.ok(destination.x>=viewport.x-1e-8&&destination.y>=viewport.y-1e-8&&destination.x+destination.width<=viewport.x+viewport.width+1e-8&&destination.y+destination.height<=viewport.y+viewport.height+1e-8, 'measured artwork fits inside its composition area');
+  assert.equal(captured.croppedPigmentPixels,0,'only identical unpainted paper is removed; every changed pigment pixel remains');
+  if(captured.state.family==='aurora-night')assert.deepEqual(source,{x:0,y:0,width:1080,height:1080},'the aurora composition preserves its complete night sky');
   assert.ok(captured.border.every(([r,g,b,a]) => r >= 245 && g >= 240 && b >= 230 && r > b && a === 255), 'warm opaque paper surrounds the entire card');
   assert.equal(captured.state.includeMetrics, true, 'numeric metrics are included in the local shared artwork by default');
   assert.equal(await checkbox.isChecked(), true, 'local metrics inclusion starts checked');
@@ -329,7 +348,7 @@ export async function checkArtwork(page, output = process.env.PPG_ARTWORK_ARTIFA
   assert.ok(captured.state.strokeCount > 0 && captured.state.usableSeconds > 0, 'personal landscape contains accepted data');
   assert.equal(captured.sourceUnchanged, true, 'export never mutates the private source descriptor');
   console.log('PORTRAIT_SCENE_PARITY',JSON.stringify({max:captured.maxArtDelta,mean:captured.meanArtDelta,bounds:captured.deltaBounds}));
-  assert.ok(captured.maxArtDelta<=1&&captured.meanArtDelta<.01, 'portrait contains the full capture landscape within one-level Canvas2D copy rounding, without re-layout or selected rows');
+  assert.ok(captured.maxArtDelta<=1&&captured.meanArtDelta<.01, 'portrait contains every original pigment pixel within one-level Canvas2D copy rounding, without scene re-layout or selected rows');
 
   for (const width of [320, 390]) {
     await page.setViewportSize({ width, height: 844 });
@@ -369,7 +388,7 @@ export async function checkArtwork(page, output = process.env.PPG_ARTWORK_ARTIFA
   await page.waitForFunction(() => PulsePortrait.getState().ready && !PulsePortrait.getState().includeMetrics);
   assert.notEqual(hash(await canvas.evaluate(node => node.toDataURL())), hash(captured.image), 'turning metrics off changes the shared portrait');
   const toggled = await canvas.evaluate(node => {
-    const {x,y,width,height} = PulsePortrait.getState().artworkBounds;
+    const state=PulsePortrait.getState(), {x,y,width,height}=state.artworkBounds;
     const crop = document.createElement('canvas'); crop.width = width; crop.height = height;
     crop.getContext('2d').drawImage(node,x,y,width,height,0,0,width,height);
     const observed=document.createElement('canvas');observed.width=1080;observed.height=1350;
@@ -379,7 +398,7 @@ export async function checkArtwork(page, output = process.env.PPG_ARTWORK_ARTIFA
     for(let offset=0;offset<pixels.length;offset+=4) {
       if(![0,1,2,3].some(channel=>pixels[offset+channel]!==original[offset+channel]))continue;
       const y=Math.floor(offset/4/1080);
-      if(y>=1150&&y<1240)metricBandChanges++;else {outsideBandChanges++;for(let channel=0;channel<4;channel++)maxOutsideDelta=Math.max(maxOutsideDelta,Math.abs(pixels[offset+channel]-original[offset+channel]));}
+      if(y>=state.metricBounds.y&&y<state.metricBounds.y+state.metricBounds.height)metricBandChanges++;else {outsideBandChanges++;for(let channel=0;channel<4;channel++)maxOutsideDelta=Math.max(maxOutsideDelta,Math.abs(pixels[offset+channel]-original[offset+channel]));}
     }
     delete window.__artworkDefaultPixels;
     return {art:crop.toDataURL(),outsideBandChanges,metricBandChanges,maxOutsideDelta,image:node.toDataURL()};

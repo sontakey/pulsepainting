@@ -43,7 +43,7 @@ try{
    const full=document.createElement('canvas');full.width=full.height=1080;PulseLandscape.render(scene,full);
    const thumb=document.createElement('canvas');thumb.width=thumb.height=640;thumb.getContext('2d').drawImage(full,0,0,640,640);
    const share=document.createElement('canvas');share.width=1080;share.height=1350;
-   PulsePortrait.paintCard(share,{art:full,name:family.name,footerLeft:'Example · public recording'});
+   PulsePortrait.paintCard(share,{art:full,scene,name:family.name,footerLeft:'Example · public recording'});
    scenes.push({id:family.id,name:family.name,seed:scene.seed,usableSeconds:scene.usableSeconds,strokeCount:scene.strokes.length,image:full.toDataURL('image/webp',.91),thumbnail:thumb.toDataURL('image/webp',.86),shareImage:share.toDataURL('image/jpeg',.92)});
   }
   const hero=scenes.find(scene=>scene.id==='quiet-lake');
