@@ -113,6 +113,33 @@ for(const engine of engines){
     const slope=source.reduce((sum,value,i)=>sum+(value-a)*(rendered[i]-b),0)/variance;
     return {slope,offset:b-a*slope,residual:Math.max(...source.map((value,i)=>Math.abs(rendered[i]-(b+(value-a)*slope))))};
    };
+   window.inspectMountedSources=(scene,seen,explicitLifts=new Set())=>{
+    // Source definitions now live only as long as a visible row references them.
+    // Validate every owner when it arrives, retaining evidence by source index
+    // rather than relying on future/historical records being in the DOM.
+    const groups=[...document.querySelectorAll('.landscape-record')],uses=[...document.querySelectorAll('.landscape-line-fragment')];
+    const mounted=new Map();
+    for(const group of groups){
+     const index=Number(group.dataset.recordIndex),stroke=scene.strokes[index],cores=group.querySelectorAll('.landscape-live-core'),core=cores[0];
+     if(mounted.has(index)||!stroke||cores.length!==1||Number(core.dataset.strokeIndex)!==index)throw Error('A mounted record lost or duplicated its accepted source owner');
+     mounted.set(index,group);
+     if(!uses.some(use=>Number(use.dataset.recordIndex)===index&&use.getAttribute('href')===`#${group.id}`))throw Error('An unreferenced historical or future source remains mounted');
+     if((core.getAttribute('d').match(/M/g)||[]).length!==1)throw Error('A source record contains an unowned connecting subpath');
+     if(explicitLifts.has(stroke.sourceStart)&&group.querySelector('.landscape-source-join'))throw Error('A real adapter pen lift acquired a presentation connector');
+     const signature=JSON.stringify([...group.querySelectorAll('path')].map(path=>[path.getAttribute('class'),path.getAttribute('d')])),previous=seen.get(index);
+     if(previous&&previous.signature!==signature)throw Error('A previously checked source core or pigment changed across its mounted lifetime');
+     if(!previous||previous.group!==group){
+      const vertices=inkVertices(core),source=PulseLandscape.sampleStroke(stroke);
+      if(vertices.length!==source.length)throw Error('A mounted source path dropped measured/interpolated vertices');
+      const timeFit=fitInk(source.map(point=>point.t),vertices.map(point=>point.x)),valueFit=fitInk(source.map(point=>point.v),vertices.map(point=>point.y));
+      if(!Number.isFinite(timeFit.slope)||!Number.isFinite(valueFit.slope)||timeFit.slope<=0||valueFit.slope>=0||timeFit.residual>=.011||valueFit.residual>=.011)throw Error('Mounting source changed measured time or pulse geometry');
+      seen.set(index,{group,signature,vertices:vertices.length,timeFit,valueFit});
+     }
+    }
+    for(const use of uses){const owner=mounted.get(Number(use.dataset.recordIndex));if(!owner||use.getAttribute('href')!==`#${owner.id}`)throw Error('A visible row has a missing or mismatched source definition');}
+    if(__pulseLandscapeStats.liveRecords!==groups.length||__pulseLandscapeStats.liveSourcePoints!==[...mounted.keys()].reduce((sum,index)=>sum+scene.strokes[index].points.length,0))throw Error('Mounted source diagnostics disagree with the actual owned DOM');
+    return groups.length;
+   };
    window.inspectRecording=(scene,view)=>{
     const stats=__pulseLandscapeStats,state=view.captureState,box=document.querySelector('main').getBoundingClientRect();
     const stage=document.querySelector('.landscape-stage'),style=stage&&getComputedStyle(stage);
@@ -165,12 +192,13 @@ for(const engine of engines){
     window.view?.dispose();window.scene=PulseLandscape.create({family:family.id,seed:39293});
     segments.slice(0,7).forEach(segment=>PulseLandscape.append(scene,segment));
     const before=JSON.stringify(scene);window.view=PulseLandscape.createView(document.querySelector('main'),scene);
-    const target=scene.strokes.length-1,frames=[],cache=new Map(),textureCache=new Map(),transitions=[];
+    const target=scene.strokes.length-1,frames=[],cache=new Map(),textureCache=new Map(),transitions=[],seenSources=new Map();
     let previous=null,immutableChecks=0,maxContactStep=0,maxPaperStep=0,bridgeFrames=0,maxBridgeError=0,returnFrames=0,lineTurns=0,maxVisibleLines=0,threeRowChecks=0;
     for(let i=0;i<16000;i++){
      const snapshot=inspectRecording(scene,view),state=snapshot.state;
      if(snapshot.mode!=='recording')throw Error('Final reconstruction started before the explicit finish action');
      if(!snapshot.finalScenicHidden)throw Error('The full-contrast final landscape is visible before finish');
+     inspectMountedSources(scene,seenSources);
      for(const path of document.querySelectorAll('.landscape-live-core,.landscape-source-wash,.landscape-source-join,.landscape-source-blooms,.landscape-source-body,.landscape-source-edge')){
       const d=path.getAttribute('d');if(cache.has(path)&&cache.get(path)!==d)throw Error('Previously deposited source ink or pigment changed shape while paper moved');
       if(cache.has(path))immutableChecks++;else cache.set(path,d);
@@ -213,9 +241,10 @@ for(const engine of engines){
      if(!advancePaint())throw Error('The continuous source cursor stopped before the active checkpoint');
     }
     if(frames.length<8)throw Error('No sustained active measured source was observed');
-    return{family:family.id,sourceStable:before===JSON.stringify(scene),frames,transitions,immutableChecks,maxContactStep,maxPaperStep,bridgeFrames,maxBridgeError,returnFrames,lineTurns,maxVisibleLines,threeRowChecks,state:view.captureState};
+    return{family:family.id,sourceStable:before===JSON.stringify(scene),frames,transitions,immutableChecks,maxContactStep,maxPaperStep,bridgeFrames,maxBridgeError,returnFrames,lineTurns,maxVisibleLines,threeRowChecks,sourceRecords:scene.strokes.length,checkedSourceIndices:[...seenSources.keys()].sort((a,b)=>a-b),state:view.captureState};
    },{family,segments:recording.segments});
    assert.equal(item.sourceStable,true);
+   assert.deepEqual(item.checkedSourceIndices,Array.from({length:item.sourceRecords},(_,i)=>i),`${family.id}: every accepted source record is checked when its cached paths become visible`);
    const issues=new Set(),check=(condition,message)=>{if(!condition)issues.add(message)};
    check(item.transitions.length>=5&&item.immutableChecks>100,`${family.id}: one recording crosses accepted windows while reusing deposited core and wash geometry`);
    check(item.bridgeFrames>0&&item.maxBridgeError<.04,`${family.id}: clean accepted-window handoffs retain a continuously attached brush without changing source coverage`);
@@ -305,10 +334,27 @@ for(const engine of engines){
     if(label==='channel-change')next.channel=`different-${next.channel}`;
     const previous=scene.strokes.at(-1),added=PulseLandscape.append(scene,next),snapshot=JSON.stringify(scene);
     const view=PulseLandscape.createView(document.querySelector('main'),scene);
-    const join=document.querySelector(`.landscape-source-join[data-from-stroke-index="${previous.id}"][data-stroke-index="${added[0].id}"]`);
-    if(!!join!==(label==='clean'))throw Error(`${label}: live presentation ignored ingestion continuity proof`);
+    const targetIndex=scene.strokes.indexOf(added[0]),previousIndex=scene.strokes.indexOf(previous),seenSources=new Map();
+    let mountedFrames=0,bridgeFrames=0,connected=false,completed=false;
+    for(let i=0;i<3000;i++){
+     inspectMountedSources(scene,seenSources);
+     const stats=__pulseLandscapeStats,group=document.querySelector(`.landscape-record[data-record-index="${targetIndex}"]`);
+     const join=document.querySelector(`.landscape-source-join[data-from-stroke-index="${previousIndex}"][data-stroke-index="${targetIndex}"]`);
+     if(group){
+      mountedFrames++;
+      if(!!join!==(label==='clean')||group.querySelectorAll('.landscape-source-join').length!==(label==='clean'?1:0))throw Error(`${label}: mounted presentation ignored ingestion continuity proof`);
+      connected ||= !!join;
+     }else if(join)throw Error(`${label}: a connector outlived or preceded its owned source definition`);
+     if(stats.painted===targetIndex&&stats.bridging){
+      if(label!=='clean'||!stats.nib?.drawing)throw Error(`${label}: a real ingestion barrier acquired a drawing bridge`);
+      inspectJoin(scene,stats);bridgeFrames++;
+     }
+     if(stats.streamTime>0&&stats.queuedSeconds===0){completed=true;break;}
+     if(!advancePaint())throw Error(`${label}: presentation stopped before traversing the ingestion boundary`);
+    }
+    if(!completed||!mountedFrames||seenSources.size!==scene.strokes.length||((bridgeFrames>0)!==(label==='clean')))throw Error(`${label}: continuity evidence did not cover every source and the actual boundary`);
     if(JSON.stringify(scene)!==snapshot)throw Error(`${label}: presentation connector altered saved source coverage`);
-    result.push({label,connected:!!join,sourceStable:true});view.dispose();
+    result.push({label,connected,mountedFrames,bridgeFrames,checkedPaths:seenSources.size,strokes:scene.strokes.length,completed,sourceStable:true});view.dispose();
    }
    return result;
   },recording.segments);
@@ -317,22 +363,12 @@ for(const engine of engines){
    const scene=PulseLandscape.create({family:'quiet-lake',seed:39293});segments.slice(0,6).forEach(segment=>PulseLandscape.append(scene,segment));
    const original=JSON.stringify(scene),view=PulseLandscape.createView(document.querySelector('main'),scene);
    const sourceGaps=scene.strokes.slice(1).filter((stroke,index)=>stroke.sourceStart-scene.strokes[index].sourceEnd>.12).length;
-   const result={sourceGaps,strokes:scene.strokes.length,gapFrames:0,checkedIntervals:0,checkedPaths:0};
+   const result={sourceGaps,strokes:scene.strokes.length,gapFrames:0,checkedIntervals:0,checkedPaths:0},seenSources=new Map();
    const explicitLifts=new Set(segments.flatMap(segment=>segment.points.filter(point=>point.breakBefore).map(point=>point.t)));
-   for(const group of document.querySelectorAll('.landscape-record')){
-    const index=Number(group.dataset.recordIndex),stroke=scene.strokes[index],core=group.querySelector('.landscape-live-core');
-    if(Number(core.dataset.strokeIndex)!==index||!stroke)throw Error('A cached record lost its accepted source owner');
-    if((core.getAttribute('d').match(/M/g)||[]).length!==1)throw Error('A source record contains an unowned connecting subpath');
-    if(explicitLifts.has(stroke.sourceStart)&&group.querySelector('.landscape-source-join'))throw Error('A real adapter pen lift acquired a presentation connector');
-    const vertices=inkVertices(core),source=PulseLandscape.sampleStroke(stroke);
-    if(vertices.length!==source.length)throw Error('A fragmented source path dropped measured/interpolated vertices');
-    const timeFit=fitInk(source.map(point=>point.t),vertices.map(point=>point.x)),valueFit=fitInk(source.map(point=>point.v),vertices.map(point=>point.y));
-    if(timeFit.residual>=.011||valueFit.residual>=.011)throw Error('Source delivery gaps altered the measured pulse geometry');
-    result.checkedPaths++;
-   }
    for(let i=0;i<12000;i++){
     const stats=__pulseLandscapeStats;
     if(stats.mode!=='recording')throw Error('A delivery gap triggered premature scenic reconstruction');
+    inspectMountedSources(scene,seenSources,explicitLifts);
     if(stats.bridging&&stats.nib?.drawing)inspectJoin(scene,stats);
     else if(!stats.lineTurn?.active&&stats.activeStroke===null&&stats.streamTime>0&&view.captureState.painted<scene.strokes.length){
      result.gapFrames++;if(stats.nib!==null)throw Error('Brush continued drawing through a period with no accepted source');
@@ -346,9 +382,11 @@ for(const engine of engines){
     }
     if(!advancePaint())break;
    }
+   result.checkedPaths=seenSources.size;result.checkedSourceIndices=[...seenSources.keys()].sort((a,b)=>a-b);result.completed=__pulseLandscapeStats.queuedSeconds===0;
    result.sourceStable=JSON.stringify(scene)===original;result.mode=__pulseLandscapeStats.mode;view.dispose();return result;
   },fragmented.segments);
-  assert.ok(result.gaps.sourceGaps>5&&result.gaps.gapFrames>10&&result.gaps.checkedIntervals>100&&result.gaps.checkedPaths===result.gaps.strokes&&result.gaps.sourceStable&&result.gaps.mode==='recording','dropped real delivery produces separate measured paths and visible pen lifts, never fabricated connecting pulses');
+  assert.deepEqual(result.gaps.checkedSourceIndices,Array.from({length:result.gaps.strokes},(_,i)=>i),'every fragmented source path is inspected during its actual visible lifetime');
+  assert.ok(result.gaps.sourceGaps>5&&result.gaps.gapFrames>10&&result.gaps.checkedIntervals>100&&result.gaps.checkedPaths===result.gaps.strokes&&result.gaps.completed&&result.gaps.sourceStable&&result.gaps.mode==='recording','dropped real delivery produces separate measured paths and visible pen lifts, never fabricated connecting pulses');
   // Finish must begin at the actual sub-sample frontier, including a brush
   // return halfway through scrolling. A rounded original knot is not enough:
   // live interpolation can differ visibly between recorded samples.

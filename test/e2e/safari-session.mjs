@@ -17,6 +17,7 @@ const out = path.resolve(root, process.env.PPG_SAFARI_ARTIFACTS || '.dream-loop/
 const timeoutSeconds = Number(process.env.PPG_SAFARI_TIMEOUT_SECONDS) || 260;
 const family = process.env.PPG_SAFARI_FAMILY || 'quiet-lake';
 const seed = Number(process.env.PPG_SAFARI_SEED) || 39293;
+const recordVideo = process.env.PPG_SAFARI_RECORD_VIDEO === '1';
 assert.ok(timeoutSeconds >= 180 && timeoutSeconds <= 600, 'session timeout must be180–600seconds');
 mkdirSync(out, { recursive: true });
 const original = JSON.parse(readFileSync(path.join(root, 'test/fixtures/iphone-200s.json'), 'utf8'));
@@ -34,6 +35,7 @@ const server = createServer((req, res) => {
 await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
 const evidence = { url: process.env.PPG_SAFARI_URL || `http://127.0.0.1:${server.address().port}/dist/index.html`, fixture: 'test/fixtures/iphone-200s.json',
   scope: 'Playwright WebKit with iPhone13 emulation; camera I/O mocked; no physical Safari or real camera claim.', family, seed,
+  videoCapture: recordVideo ? 'Playwright browser video enabled; this is not the iOS screen recorder or phone thermal validation.' : false,
   replay: { rate: '1x wall clock from session start', originalSamples: original.samples.length,
     originalSeconds: (originalEnd - original.samples[0].t) / 1000,
     extension: 'Recorded final60s repeated once with monotonically shifted timestamps, only if automatic measurement needs more than the original recording.',
@@ -43,7 +45,8 @@ let browser, page, checkpointCapture;
 try {
   browser = await webkit.launch();
   evidence.browser = browser.version();
-  const context = await browser.newContext({ ...devices['iPhone 13'], reducedMotion: 'no-preference' });
+  const context = await browser.newContext({ ...devices['iPhone 13'], reducedMotion: 'no-preference',
+    ...(recordVideo ? { recordVideo: { dir: `${out}/video`, size: { width: 390, height: 844 } } } : {}) });
   page = await context.newPage();
   await instrumentReportGraphText(page);
   const firstParty = url => { try { return new URL(url).origin === new URL(evidence.url).origin; } catch { return false; } };
