@@ -68,3 +68,25 @@ Evidence lives in ignored `.dream-loop/live-signal-quality/` and
 `.dream-loop/immersive-capture/verification/`. No private recordings are used.
 Browser replay does not validate physical-phone performance, camera/flash,
 physiological accuracy or native sharing. npm publication remains pending.
+
+## GitHub and production verification
+
+[Complete Linux CI](https://github.com/sontakey/pulsepainting/actions/runs/40528624618)
+passed final feature head `aac2c16b8ef37d6e644bfc174c29180f9ecb4dba`, including
+all landscape, app, camera guidance, fallback, gallery, sharing and legacy-link
+checks. [PR #17](https://github.com/sontakey/pulsepainting/pull/17) merged as
+`a142e6acfb9b6097437fcbd90a9b61c05ede0cbf`; its tree exactly matches the tested
+feature head.
+
+The repository's Git integration deployed that merge to
+https://www.pulsepainting.com/ as `dpl_CapZC2u8s16Y5MHPGLfsQvTXHYts` (READY).
+At `2026-10-27T15:29:05.080Z`, all 110 served files matched the frozen SHA-256
+manifest. The apex returns a 308 redirect to the verified www destination.
+
+Anonymous production Chromium/WebKit smoke checks pass at mobile and desktop
+sizes, covering camera help, example viewing, sharing controls and read-only
+community browsing. The production capture-layout replay also passes all four
+phone viewports in both engines. Its inspected 390px WebKit recording shows the
+single Signal tile and no duplicate meter beneath LIVE. These checks make no
+public writes and do not open a real camera. Later documentation-only deployments
+may have different IDs while serving identical runtime files.

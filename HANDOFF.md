@@ -1,6 +1,6 @@
 # Pulse Painting handoff
 
-## Candidate: one live Signal meter
+## Current production release: one live Signal meter
 
 The recording strip shows Pulse, HRV (RMSSD), and Signal, replacing the sparse
 breathing tile. Signal uses the existing engine's measured 0–100 quality score
@@ -16,10 +16,19 @@ macOS card pixels and all gallery images are unchanged.
 Chromium/WebKit app checks, four phone layouts, accessibility/reduced-motion
 cases and full WebKit interruption replay pass. Replay completed 180.434 active
 seconds and averaged 59.06fps live painting, with a retained 267ms maximum;
-this is not physical-phone performance validation. GitHub/production release
-verification is pending. See `docs/validation/live-signal-quality-2026-10-27.md`.
+this is not physical-phone performance validation.
 
-## Current production release: immersive, beat-led painting
+PR #17 merged as `a142e6acfb9b6097437fcbd90a9b61c05ede0cbf` after complete Linux
+CI `40528624618` passed final feature head `aac2c16b8ef37d6e644bfc174c29180f9ecb4dba`.
+Production `dpl_CapZC2u8s16Y5MHPGLfsQvTXHYts` is READY at
+https://www.pulsepainting.com/. All 110 files matched the tested build at
+`2026-10-27T15:29:05.080Z`. Anonymous Chromium/WebKit mobile and desktop checks
+and all four production phone layouts in both engines passed. The Git integration
+deployed the exact merge automatically. Later documentation deployments may have
+different IDs with identical runtime bytes. npm publication remains pending.
+See `docs/validation/live-signal-quality-2026-10-27.md`.
+
+## Previous production release: immersive, beat-led painting
 
 Recording is now edge-to-edge with the continuous measured pulse centered and
 metrics overlaid above it. LIVE, signal bars, floating controls and a separate
