@@ -123,8 +123,44 @@ export async function checkReportDockViewport(page) {
   return result;
 }
 
+async function checkAllSceneTitleBounds(page) {
+  const results = await page.evaluate(async () => {
+    await document.fonts.load('68px "Water Brush"');
+    const art = document.createElement('canvas'); art.width = art.height = 10;
+    const canvas = document.createElement('canvas'); canvas.width = 1080; canvas.height = 1350;
+    const layout = { source: { x: 0, y: 0, width: 10, height: 10 }, placement: { x: 56, y: 190, width: 968, height: 752 } };
+    const original = CanvasRenderingContext2D.prototype.fillText;
+    const results = [];
+    try {
+      CanvasRenderingContext2D.prototype.fillText = function (text, x, y) {
+        if (this.canvas === canvas) {
+          const measured = this.measureText(text);
+          const title = { text, font: this.font,
+            left: x - measured.actualBoundingBoxLeft, right: x + measured.actualBoundingBoxRight,
+            top: y - measured.actualBoundingBoxAscent, bottom: y + measured.actualBoundingBoxDescent };
+          if (PulseLandscape.FAMILIES.some(family => family.name === text)) results.push(title);
+        }
+        return original.apply(this, arguments);
+      };
+      // Typography must fit every authored title, irrespective of the random
+      // landscape selected by the camera replay or platform font quantization.
+      for (const family of PulseLandscape.FAMILIES) PulsePortrait.paintCard(canvas, { art, layout, name: family.name });
+      return { results, expected: PulseLandscape.FAMILIES.map(family => family.name) };
+    } finally {
+      CanvasRenderingContext2D.prototype.fillText = original;
+      canvas.width = canvas.height = art.width = art.height = 1;
+    }
+  });
+  assert.deepEqual(results.results.map(title => title.text), results.expected, 'every authored landscape title is checked');
+  for (const title of results.results) {
+    assert.ok(/Water Brush/.test(title.font) && title.left >= 88 && title.right <= 992 && title.top >= 980 && title.bottom <= 1056,
+      `${title.text}: cursive ink fits its exact title box (${JSON.stringify(title)})`);
+  }
+}
+
 export async function checkArtwork(page, output = process.env.PPG_ARTWORK_ARTIFACTS) {
   await page.waitForFunction(() => window.PulsePortrait?.getState()?.ready);
+  await checkAllSceneTitleBounds(page);
   await checkReportActions(page);
   assert.equal(await page.locator('#btn-share-artwork').isEnabled(), true, 'floating Share artwork becomes available when its PNG is ready');
   const preparation = await page.evaluate(async () => {

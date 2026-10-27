@@ -1,8 +1,8 @@
 # Pulse Painting screenshots
 
-These images document the actual app and its exported artwork. The capture and
-keepsake images were refreshed on October 25, 2026 from a full WebKit session
-replay. Their current provenance is below; earlier captures remain documented
+These images document the actual app and its exported artwork. The capture
+image was refreshed on October 27, 2026 and the keepsake on October 25, 2026
+from full WebKit session replays. Their current provenance is below; earlier captures remain documented
 for history. The sharing image retains the October 23 framed keepsake flow,
 and the desktop image retains the October 22 foreground release. Ready and QR
 retain their unchanged first-release images. The mobile gallery PNG documents
@@ -12,21 +12,18 @@ See [HANDOFF.md](../../HANDOFF.md) for deployment status.
 
 ## Current immersive capture and balanced keepsake
 
-`pulse-painting-capture.jpg` comes from the actual app screenshot at **60.009
-seconds of wall time** in the full WebKit session replay. The browser is WebKit
-26.6 with an emulated iPhone 13 viewport. Source was
-`4f88137b2e1e28809c4fc9cadf8dd456a2f91ecf`; the capture runtime is unchanged in final
-`098a752a422d5a56917f6b312a6ef355b7a2158a`, merged through PR #16 as
-`42a0fc0a83569d2617d7747cc2363bfd7a4fc47a`.
-
-The capture shows the real **2:20** countdown, **72 bpm**, **40 ms HRV** and an
-unavailable Breathing estimate. At that checkpoint, 41.105 seconds of active
+`pulse-painting-capture.jpg` comes from the actual app at **60.012 seconds of
+wall time** in the October 27 full WebKit replay, with an emulated iPhone 13
+viewport. It shows the new single Signal meter: **2:20** remaining, **72 bpm**,
+**40 ms HRV** and **98/100 Signal**. At that checkpoint, 41.105 seconds of active
 measurement had accrued, six segments were accepted, and 29.75 accepted seconds
-had reached the background cache. The brush follows the same accepted samples;
-the camera thumbnail is empty because camera I/O is mocked.
+had reached the background cache. The camera thumbnail is empty because camera
+I/O is mocked. This screenshot is from the unchanged landscape/portrait renderer
+with the new live-signal display; see [Signal verification](../validation/live-signal-quality-2026-10-27.md).
+Its source PNG is in ignored `.dream-loop/live-signal-quality/safari/capture-390.png`.
 
 `pulse-painting-report.jpg` shows the actual final **Quiet Lake** keepsake from
-that session, rendered by the final portrait compositor. Seed 39293 contains
+the October 25 session, rendered by the final portrait compositor. Seed 39293 contains
 **65 strokes and 157.2667 usable seconds**. The completed measurement has 193
 accepted beats; report values of 71 bpm, 54.6 ms RMSSD and 51.9 ms SDNN round to
 **71 bpm, 55 ms and 52 ms** in the artwork. Metrics remain on by default. The
@@ -39,7 +36,7 @@ countdown, metric values, paint strokes or other content was altered. The prepar
 JPEGs were copied byte-for-byte into this folder. The capture is 780 × 1328;
 the keepsake is 780 × 975, preserving the original 1080 × 1350 export ratio.
 
-The public `test/fixtures/iphone-200s.json` was replayed through the real signal
+In the October 25 session, the public `test/fixtures/iphone-200s.json` was replayed through the real signal
 engine and app callbacks at **1× wall-clock speed**. Camera-frame interruption,
 a main-thread stall and simulated visibility interruption were exercised. The
 session reached 180.404 active measuring seconds in 209.86 wall seconds, then

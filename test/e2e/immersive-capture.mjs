@@ -55,7 +55,7 @@ async function inspect(page) {
     const stats = window.__pulseLandscapeStats;
     return {
       width: innerWidth, height: innerHeight, scrollWidth: document.documentElement.scrollWidth, scrollHeight: document.documentElement.scrollHeight, scrollX, scrollY,
-      safeArea, art: rect('#landscape-view'), frame: rect('.manuscript-frame'), hud: rect('.capture-hud'), title: rect('.capture-title'), metrics: rect('.live-metrics'), camera: rect('.capture-camera'), meter: rect('#signal-meter'), summary: rect('.live-details > summary'), dock: rect('.painting-actions'), buttons,
+      safeArea, art: rect('#landscape-view'), frame: rect('.manuscript-frame'), hud: rect('.capture-hud'), title: rect('.capture-title'), metrics: rect('.live-metrics'), camera: rect('.capture-camera'), signalHint: rect('#quality-pill'), summary: rect('.live-details > summary'), dock: rect('.painting-actions'), buttons,
       labels: [...document.querySelectorAll('#screen-measuring .metric-label')].map(node => node.textContent),
       metricValues: [...document.querySelectorAll('#screen-measuring .metric-number')].map(node => node.textContent),
       detailsOpen: document.querySelector('.live-details').open,
@@ -82,8 +82,8 @@ function checkLayout(layout, label) {
   const waveTop = layout.art.top + layout.projection.baseline - layout.projection.amplitude / 2;
   assert.ok(layout.metrics.bottom <= waveTop - 8, `${label}: overlaid metrics leave space above the central pulse`);
   assert.ok(layout.title.bottom <= waveTop - 8 && layout.camera.bottom <= waveTop - 8, `${label}: header stays above the pulse corridor`);
-  assert.ok(layout.meter.top >= layout.camera.bottom - 1, `${label}: signal bars remain beneath the camera preview`);
-  assert.deepEqual(layout.labels, ['Pulse', 'HRV', 'Breathing'], `${label}: compact live readouts remain available`);
+  assert.ok(layout.signalHint.top >= layout.camera.bottom - 1, `${label}: brief signal coaching remains beneath the camera preview`);
+  assert.deepEqual(layout.labels, ['Pulse', 'HRV', 'Signal'], `${label}: compact live readouts remain available`);
   assert.ok(layout.dock.bottom <= layout.height - layout.safeArea.bottom - 8, `${label}: actions clear the bottom safe area`);
   assert.ok(layout.dock.left >= layout.safeArea.left && layout.dock.right <= layout.width - layout.safeArea.right, `${label}: action dock clears side safe areas`);
   assert.ok(layout.summary.width >= 44 && layout.summary.height >= 44, `${label}: disclosure is a usable touch target`);
@@ -133,12 +133,22 @@ try {
       let closed;
       for (const state of ['ready', 'estimating', 'bad']) {
         await page.evaluate(state => {
-          resetLiveBreathing();
-          updateMeasuringScreen({ t: 100, heartRate: 94, rmssd: 45, qualityScore: 92, quality: { good: state !== 'bad' }, respiration: state === 'estimating' ? null : { rateBpm: 14.4, confidence: .8, basis: 'agreement' } });
+          resetLiveSignal();
+          updateMeasuringScreen({ t: 100, heartRate: 94, rmssd: 45, qualityScore: state === 'estimating' ? undefined : 92, quality: { good: state !== 'bad' } });
         }, state);
         await settle(page);
         const layout = await inspect(page);
-        if (state === 'ready') await page.screenshot({ path: path.join(out, `${id}-recording.png`) });
+        if (state === 'ready') {
+          // Capture the settled measured value rather than a random point in
+          // its CSS easing; reduced motion reaches the same target immediately.
+          await page.waitForFunction(() => {
+            const track = document.getElementById('signal-quality-track');
+            const target = Number(track.getAttribute('aria-valuenow')) / 100;
+            const transform = getComputedStyle(document.getElementById('signal-quality-fill')).transform;
+            return Math.abs(new DOMMatrix(transform).m11 - target) <= .005;
+          }, null, { timeout: 3000 });
+          await page.screenshot({ path: path.join(out, `${id}-recording.png`) });
+        }
         checkLayout(layout, `${id}/${state}`);
         if (state === 'ready') {
           assert.equal(layout.signalText.trim(), '', `${id}: a good signal needs no extra words`);

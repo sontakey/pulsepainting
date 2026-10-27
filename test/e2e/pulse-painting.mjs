@@ -63,11 +63,11 @@ try {
           update(metrics);
           if (metrics.fingerState === 'MEASURING') this.metricUpdates.push({
             t: metrics.t, good: metrics.quality.good, segments: manuscript.segments.length,
-            score: metrics.qualityScore, meter: Number(document.getElementById('signal-meter').getAttribute('aria-valuenow')),
+            score: metrics.qualityScore, meter: Number(document.getElementById('signal-quality-track').getAttribute('aria-valuenow')),
             signalText: document.getElementById('quality-text').textContent,
-            values: ['hr-value', 'rmssd-value', 'resp-value'].map(id => document.getElementById(id).textContent),
+            values: ['hr-value', 'rmssd-value', 'signal-value'].map(id => document.getElementById(id).textContent),
             expected: [metrics.heartRate, metrics.rmssd].map(value => metrics.quality.good && Number.isFinite(value) ? String(Math.round(value)) : '--').concat(
-              metrics.quality.good && !metrics.gap && metrics.respiration?.basis === 'agreement' && metrics.respiration.confidence >= .5 && metrics.respiration.confidence <= 1 && Number.isFinite(metrics.respiration.rateBpm) && metrics.respiration.rateBpm > 0 ? String(Math.round(metrics.respiration.rateBpm)) : '--'),
+              !metrics.gap && Number.isFinite(metrics.qualityScore) ? String(metrics.quality.good ? Math.round(Math.max(0, Math.min(100, metrics.qualityScore))) : 0) : '--'),
           });
         };
       }
@@ -112,7 +112,7 @@ try {
   assert.ok(await page.evaluate(() => manuscript.segments.length > 0), 'accepted real signal paints');
   const cadence = await page.evaluate(() => ({ updates: monitor.metricUpdates, hop: monitor.engine.opts.hopSec, window: monitor.engine.opts.windowSec }));
   assert.ok(cadence.updates.every(update => update.meter === (update.good ? Math.round(Math.max(0, Math.min(100, update.score))) : 0)), 'signal meter follows the real gate-aware quality score');
-  assert.ok(cadence.updates.filter(update => update.good).every(update => update.signalText === ''), 'healthy capture shows bars without signal copy');
+  assert.ok(cadence.updates.filter(update => update.good).every(update => update.signalText === ''), 'healthy capture shows signal quality without extra coaching');
   assert.equal(cadence.hop, 1, 'capture requests genuine computed updates once a second');
   assert.equal(cadence.window, 5, 'signal analysis retains five-second windows');
   assert.ok(cadence.updates.every(update => update.values.join() === update.expected.join()), 'readouts display the actual quality-gated metrics, without interpolation');
@@ -133,14 +133,14 @@ try {
       return {
         metrics: rect('.live-metrics'),
         status: rect('.painting-status'),
-        signal: rect('#signal-meter'),
+        signal: rect('#quality-pill'),
         title: rect('.capture-title'),
         camera: rect('.capture-camera'),
         details: rect('.live-details > summary'),
         dock: rect('.painting-actions'),
       };
     });
-    assert.ok(Math.abs(captureLayout.status.top - captureLayout.signal.top) <= 1, 'timer and signal bars share a row');
+    assert.ok(Math.abs(captureLayout.status.top - captureLayout.signal.top) <= 1, 'timer and brief signal coaching share a row');
     assert.ok(Math.abs((captureLayout.title.top + captureLayout.title.bottom) / 2 - (captureLayout.camera.top + captureLayout.camera.bottom) / 2) <= 1, 'title and camera are vertically balanced');
     assert.ok(captureLayout.metrics.top >= 0 && captureLayout.metrics.bottom <= captureLayout.dock.top - 4,
       `capture ${viewport.width}x${viewport.height}: live metrics stay above floating controls without scrolling`);
@@ -150,9 +150,9 @@ try {
   const signalCases = await page.evaluate(() => {
     const read = metrics => {
       updateCaptureSignal(metrics);
-      return { value: document.getElementById('signal-meter').getAttribute('aria-valuenow'),
-        description: document.getElementById('signal-meter').getAttribute('aria-valuetext'),
-        bars: document.querySelectorAll('#signal-meter .filled').length,
+      return { value: document.getElementById('signal-quality-track').getAttribute('aria-valuenow'),
+        description: document.getElementById('signal-quality-track').getAttribute('aria-valuetext'),
+        fill: document.getElementById('signal-quality-fill').style.transform,
         text: document.getElementById('quality-text').textContent };
     };
     const cases = [
@@ -161,14 +161,15 @@ try {
       read({ quality: {good:false, code:'irregular', reason:'Long internal quality explanation'} }),
       read({ quality: {good:true}, qualityScore:NaN }),
     ];
+    resetLiveSignal();
     updateMeasuringScreen(monitor.getMetrics());
     return cases;
   });
   assert.deepEqual(signalCases, [
-    {value:'41',description:'41 out of 100',bars:3,text:''},
-    {value:'0',description:'0 out of 100',bars:0,text:'Hold still'},
-    {value:'0',description:'Signal quality unavailable',bars:0,text:'Finding signal'},
-    {value:'0',description:'Signal quality unavailable',bars:0,text:''},
+    {value:'41',description:'41 out of 100',fill:'scaleX(0.41)',text:''},
+    {value:'0',description:'0 out of 100',fill:'scaleX(0)',text:'Hold still'},
+    {value:'0',description:'Signal quality unavailable',fill:'scaleX(0)',text:'Finding signal'},
+    {value:'0',description:'Signal quality unavailable',fill:'scaleX(0)',text:'Finding signal'},
   ], 'signal display gates rejected data, keeps issue prompts brief, and never invents a missing score');
   await checkLiveReadings(page);
   // Accepted source advances on moving paper under a fixed brush. Presentation
@@ -232,7 +233,7 @@ try {
         cancelledMonitorActive: monitor === __cancelledMonitor,
         manuscript, landscape, lastMetrics, elapsedMeasuringMs, lastMeasuringFrame,
         measuringStartedAt, portraitStartedAt, sessionTimerId, waveBuf, placementWaveBuf,
-        readings: ['hr-value', 'rmssd-value', 'resp-value', 'resp-status', 'quality-text', 'painting-state', 'session-countdown'].map(id => document.getElementById(id).textContent),
+        readings: ['hr-value', 'rmssd-value', 'signal-value', 'quality-text', 'painting-state', 'session-countdown'].map(id => document.getElementById(id).textContent),
         torchHidden: document.getElementById('torch-note').hidden,
       });
       const before = snapshot(), oldAlert = window.alert, alerts = [];

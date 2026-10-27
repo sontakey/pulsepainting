@@ -81,6 +81,17 @@
       ctx.font = `${weight} ${size}px "${family}", ${family === 'Water Brush' ? 'cursive' : 'sans-serif'}`;
       measured = ctx.measureText(text);
     }
+    // Some font rasterizers quantize the fitted size, so one proportional
+    // shrink can still leave ink outside its box. Re-fit only that overflow;
+    // already-fitting labels keep their original size and exact placement.
+    for (let retry = 0; retry < 8; retry++) {
+      const width = measured.actualBoundingBoxLeft + measured.actualBoundingBoxRight;
+      const height = measured.actualBoundingBoxAscent + measured.actualBoundingBoxDescent;
+      if (width <= box.width && height <= box.height) break;
+      size = Math.max(1, size * Math.min(box.width / Math.max(1, width), box.height / Math.max(1, height)) - .25);
+      ctx.font = `${weight} ${size}px "${family}", ${family === 'Water Brush' ? 'cursive' : 'sans-serif'}`;
+      measured = ctx.measureText(text);
+    }
     const x = align === 'left' ? box.x + measured.actualBoundingBoxLeft
       : align === 'right' ? box.x + box.width - measured.actualBoundingBoxRight
       : box.x + (box.width + measured.actualBoundingBoxLeft - measured.actualBoundingBoxRight) / 2;
