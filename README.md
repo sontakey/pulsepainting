@@ -6,7 +6,8 @@ Your pulse, made into a place.
 > watercolor landscapes, crisp measured pulse strokes, a pointed brush and soft
 > pigment fixed to the paper, a gradually emerging background, and shareable artwork.
 > Browser replay and deployed-asset checks passed; physical-phone validation remains separate.
-> See [scrolling-line verification](docs/validation/scrolling-pulse-lines-2026-10-27.md),
+> See [three-line capture verification](docs/validation/three-line-pulse-paper-2026-10-27.md),
+> [scrolling-line verification](docs/validation/scrolling-pulse-lines-2026-10-27.md),
 > [Signal meter verification](docs/validation/live-signal-quality-2026-10-27.md), and
 > [immersive capture and keepsake verification](docs/validation/immersive-capture-2026-10-25.md).
 > Earlier [live readings](docs/validation/live-readings-2026-10-24.md) and
@@ -18,7 +19,7 @@ Your pulse, made into a place.
 > see [sharing release checks](docs/validation/community-sharing-2026-10-23.md).
 > Existing sketchbook links remain supported; see [recipient-page checks](docs/validation/shareable-sketchbooks-2026-10-23.md).
 
-Pulse Painting is a three-minute phone-camera capture experience by [ChatPPG](https://chatppg.com), powered by [ppg-js](https://github.com/sontakey/ppg-js). During recording, a pointed brush writes your accepted pulse from left to right in six-second lines. At the edge, it lifts and returns as the paper scrolls gently upward. Finished ink and its soft pigment stay fixed to the paper. The current and previous line remain visible while a faint landscape forms behind them. Finishing pulls back to the recorded strokes, then arranges those same measurements into the full-strength landscape, ready to share alongside an expandable HRV report.
+Pulse Painting is a three-minute phone-camera capture experience by [ChatPPG](https://chatppg.com), powered by [ppg-js](https://github.com/sontakey/ppg-js). During recording, a pointed brush writes your accepted pulse from left to right in six-second lines. At the edge, it lifts and returns as the paper scrolls gently upward. Finished ink and its soft pigment stay fixed to the paper. The current line and two previous lines remain visible, centered together between the live readings and floating controls. A faint landscape forms behind them through a broad, translucent veil. Finishing pulls back to the recorded strokes, then arranges those same measurements into the full-strength landscape, ready to share alongside an expandable HRV report.
 
 Painting uses quality-approved five-second windows from the selected camera
 channel, so it follows the live measurements with a short buffer. Six-second
@@ -35,8 +36,11 @@ There is one quality meter, with brief placement guidance by LIVE only when need
 **About your readings** provides short definitions and optional signal charts.
 SDNN and supported breathing estimates remain in the detailed final report.
 
-Recording fills the viewport, with live measurements overlaid above the central
-pulse trace and floating controls below. The background eases in subtly as real
+Recording fills the viewport, with live measurements overlaid above three pulse
+lines and floating controls below. Row spacing and waveform amplitude adapt to
+the available paper, including shorter screens and landscape orientation. The
+background remains softly visible between and behind the rows, without a hard
+white band. The background eases in subtly as real
 accepted beats pass the brush. Cached snapshots refresh at five-second accepted-data
 milestones after the first discovery; there is no expensive repaint on each beat.
 Occasional short captions mark visible new details. Signal interruptions pause
@@ -45,8 +49,11 @@ retains its complete detail and stronger pigment for the final reveal.
 
 Where supported, a dedicated browser worker prepares watercolor layers and soft
 background snapshots while the main thread draws the live pulse. Cached source
-paths are reused across paper rows: only the current and previous row stay
-mounted, with at most three during a turn. Older rows leave the live view while
+paths are reused across paper rows: the current line and two previous lines stay
+mounted, with at most four during a turn. The oldest line gently fades as it
+leaves. UI bounds are read on resize, outside the drawing loop. The outer paper
+mask is applied only during a row return; settled writing avoids that extra
+offscreen layer while preserving its visible ink and pigment. Older rows leave the live view while
 all accepted samples remain available for the final painting. The reveal reuses
 geometry prepared during recording. Browsers without worker support, or with a
 failed worker, fall back to the same painting renderer. This keeps the measured
@@ -70,14 +77,16 @@ it is not a screenshot or validation of the phone's native permission controls.
 
 <p align="center">
   <img src="docs/media/pulse-painting-ready.jpg" width="230" alt="Pulse Painting phone capture instructions">
-  <img src="docs/media/pulse-painting-capture.jpg" width="230" alt="Measured pulse written in scrolling watercolor lines, with a pointed brush, overlaid Pulse, HRV and Signal readings, and floating capture controls">
+  <img src="docs/media/pulse-painting-capture.jpg" width="230" alt="Three crisp pulse lines on softly emerging watercolor scenery, with a pointed brush, overlaid Pulse, HRV and Signal readings, and floating capture controls">
   <img src="docs/media/pulse-painting-report.jpg" width="230" alt="Framed Quiet Lake keepsake with a larger landscape, padded cursive title, pulse and HRV metrics, and a date and website footer">
 </p>
 
-The capture image shows the actual app **60.001 seconds** into the October 27
-WebKit replay at normal wall-clock speed: scrolling pulse lines, a pointed brush,
-and Pulse, HRV and Signal above the painting. The displayed values are **72 bpm,
-40 ms HRV and 98/100 Signal**; 41.084 seconds of active measurement had accrued.
+The capture image shows the actual app **60.011 seconds** into
+the October 27 WebKit replay at normal wall-clock speed: three scrolling pulse
+lines, a pointed brush, a softly visible landscape, and Pulse, HRV and Signal
+above the painting. The displayed values are **72 bpm,
+40 ms HRV and 98/100 Signal**;
+41.105 seconds of active measurement had accrued.
 The framed Quiet Lake keepsake is retained from a separate October 25 session,
 with 65 strokes and 157.2667 usable seconds. Its metrics round to 71 bpm, 55 ms
 RMSSD and 52 ms SDNN. These JPEGs were resized from actual browser screenshots
@@ -119,9 +128,9 @@ browser, and sharing happens only when you choose it.
 The [desktop design note](docs/design/desktop-gallery.md) records the inspected
 Mobbin references, gallery behavior and validation scope. The
 [gallery manifest](app/assets/gallery/manifest.json) records renderer, fixture,
-signal-engine, accepted-window adapter and image hashes. All sixteen examples
-are regenerated from the current renderer. Default mobile capture
-does not download gallery imagery.
+signal-engine, accepted-window adapter and image hashes. This live-view update
+preserves the canonical artwork renderer and all 49 gallery images. Default
+mobile capture does not download gallery imagery.
 
 ## Mobile gallery
 
@@ -209,7 +218,7 @@ private export and example gallery work without these credentials.
 ## What is implemented
 
 - Sixteen seeded landscape families made from accepted waveform paths, with curved terrain, flowing brush strokes and within-stroke gradients. Artistic mapping preserves the original samples; the original manuscript and computed report remain unchanged.
-- During capture, a fine pulse contour follows the recording's actual time and value on a steady baseline. A pointed brush lays down permanent textured pigment while a faint, stationary preview of the accepted landscape develops around a clear foreground. Brief captions mark new details. This treatment applies to all sixteen families.
+- During capture, a fine pulse contour follows the recording's actual time and value across six-second lines. Three lines remain visible together, with adaptive spacing between the overlaid readings and controls. A pointed brush lays down permanent textured pigment while a faint, stationary landscape develops behind a broad translucent veil. Brief captions mark new details. This treatment applies to all sixteen families.
 - Density based on usable recorded time: sparse sessions keep open paper; longer sessions fill interleaved slots without moving earlier strokes.
 - On finish, the view pulls back along the recorded pulse paper, then reconstructs those same measured strokes into the complete landscape at full pigment strength. A local worker prepares cached watercolor layers and reveal geometry, with a main-thread fallback.
 - Optional WebGPU/WebGL2 painted entry transitions and an independent Canvas2D landscape compositor.
@@ -232,7 +241,7 @@ The temporary pinned browser artifact in [`vendor/ppg-js/0.3.1`](vendor/ppg-js/0
 
 ## Verification
 
-[The current verification record](docs/validation/scrolling-pulse-lines-2026-10-27.md)
+[The current verification record](docs/validation/three-line-pulse-paper-2026-10-27.md)
 separates visual replay, source-data checks, full sessions and performance evidence.
 Deployment status remains in [HANDOFF.md](HANDOFF.md).
 

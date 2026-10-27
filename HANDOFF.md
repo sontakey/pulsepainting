@@ -1,6 +1,59 @@
 # Pulse Painting handoff
 
-## Current production release: scrolling pulse lines
+## Current production release: three pulse lines and a softer landscape
+
+The active six-second pulse line and its two preceding lines remain visible.
+Their group is centered in the available paper, with spacing and amplitude
+bounded by the actual metrics and floating controls. Bounds are cached on
+resize; the drawing loop performs no layout reads. A brush return gently moves
+the sheet up while the oldest row fades, with at most four rows mounted.
+The outer live-paper mask is applied only during a row return, avoiding its
+offscreen layer during settled writing. Finish retains its separate opening
+mask. Returns hold the presentation cursor, add no data or recording credit and draw
+no connecting line. Source gaps remain real pen lifts.
+
+The background has a broad continuous veil instead of a transparent horizontal
+band. Its mask retains half-alpha at the group center, with softly graduated
+shoulders; the overall landscape remains faint during recording. Its fixed
+placement and accepted-beat progression are unchanged. Deposited pigment stays
+with the paper, and Finish preserves all three visible rows and outgoing-row
+opacity even during a return. The original waveform, all sixteen final scene
+mappings and keepsake layout remain unchanged. Actual regeneration of all 49
+gallery image files at initial candidate `7a514147` (renderer `d1c6b48f`)
+verified byte-for-byte parity. The final mask optimization changes only
+`createView()`; canonical rendering sections are byte-identical to that
+candidate. The final candidate has not been separately regenerated.
+
+Chromium/WebKit app, all sixteen scenes, four phone layouts, source/pigment,
+worker/fallback, interruption recovery and reduced-motion checks pass.
+The full WebKit interruption replay completed 180.404 active
+seconds, 25 line returns and report/export, averaging
+57.46fps active painting and 59.01fps reveal.
+The retained capture maximum was 217ms, including
+screenshot overhead. Isolated 4×/6× desktop CPU checks measured 60fps live drawing.
+Browser replay and desktop CPU stress are separate from physical-phone camera,
+thermal, sustained performance, physiological-accuracy and native-share checks.
+
+Feature source: `7ff4e00eaa1f7b8f994e49fc1a32fb51fe1a43c5`.
+Renderer SHA-256:
+`af3d157e115f6282f1d7d71cff511eb337151431586294ce889c5bad863603ba`.
+PR #19 merged as `eba3d7973e2fcea597364a557b3880f7a3f3153d` after full Linux CI
+`40558977752` passed the final feature head
+`7ff4e00eaa1f7b8f994e49fc1a32fb51fe1a43c5`.
+Production `dpl_3NZzYmK97F5smUZpamfQkDKW8bUL` is READY at https://www.pulsepainting.com/
+on the exact merge commit. All 110 files matched the tested
+build at `2026-10-27T18:37:42.114Z`. Anonymous Chromium/WebKit mobile and desktop checks, and all four production
+phone viewports in both engines, passed.
+The Git integration deployed the merge automatically; later documentation-only
+deployments may have different IDs with the same runtime bytes.
+
+The README capture is from this release's full WebKit replay; the October 25
+Quiet Lake keepsake image and its separate-session provenance are retained.
+See `docs/validation/three-line-pulse-paper-2026-10-27.md`; ignored evidence is in
+`.dream-loop/three-line-pulse-paper/`. npm publication remains pending. The
+simple PPG-JS reference demo is separate and unchanged.
+
+## Previous production release: scrolling pulse lines
 
 The live brush now writes left to right across six-second rows. At the edge,
 it lifts for a short return while the paper scrolls upward, keeping the active

@@ -10,9 +10,65 @@ the separately tested October 23 build; it was captured locally before the
 release was verified on the public site.
 See [HANDOFF.md](../../HANDOFF.md) for deployment status.
 
-## Current scrolling capture — October 27
+## Current three-line capture — October 27
 
-`pulse-painting-capture.jpg` comes from the actual app at **60.001 seconds of
+`pulse-painting-capture.jpg` comes from the actual app at
+**60.011 seconds of wall time** in the October 27 full WebKit
+replay, with an emulated iPhone 13 viewport. It shows the active six-second PPG
+line and its two preceding lines. The group fits between the actual live metrics
+and floating controls, with a pointed brush and a broad translucent background
+veil. The mask retains half its opacity at the group center; this is background
+mask alpha, not the final landscape opacity. Settled ink and pigment remain
+fixed to the paper. At most four rows are mounted during a brush return. The
+outer live-paper mask is used only while a row returns; settled writing avoids
+an unnecessary offscreen layer. Finish uses its separate opening mask.
+
+The screenshot displays **2:20** remaining,
+**72 bpm**, **40 ms HRV** and
+**98/100 Signal**. At that checkpoint,
+41.105 seconds of active measurement had accrued,
+6 segments were accepted, and
+29.75 accepted seconds had reached the background cache.
+Camera I/O is mocked, so the camera thumbnail is empty. The source PNG is
+1170 × 1992 pixels at
+`.dream-loop/three-line-pulse-paper/session-final/capture-390.png`.
+
+The public `test/fixtures/iphone-200s.json` is replayed through the real signal
+engine and app callbacks at **1× wall-clock speed**, including camera-frame,
+main-thread and simulated-visibility interruptions. The session reached
+180.404 active measuring seconds in 209.854
+wall seconds, then completed 25 line returns and the
+reveal. Its original 199.452-second fixture requires a repeat of the final
+60 seconds with monotonically shifted timestamps to cover acquisition and
+interruption overhead. This is an explicit test-input extension, not another
+real recording. Expired samples are dropped during interruptions instead of
+replayed as a catch-up backlog.
+
+Final feature source: `7ff4e00eaa1f7b8f994e49fc1a32fb51fe1a43c5` (identical runtime to the full-session source `88ae316`).
+Landscape renderer SHA-256:
+`af3d157e115f6282f1d7d71cff511eb337151431586294ce889c5bad863603ba`.
+Source capture PNG SHA-256:
+`0ff060dba8ca569aff89319994bb9f1c2a8e10b5d21e9c71b05bf7b47b855f0b`.
+Public fixture SHA-256:
+`5f09524bc151460d1a1a1fa58c30681dd84eaf30d989f4637edf6183e4a03b66`.
+
+The capture JPEG is resized to **780 × 1328**
+from that PNG. No interface text, countdown, measurements, paint strokes or
+other content is altered. Session evidence is in ignored
+`.dream-loop/three-line-pulse-paper/session-final/result.json`; see
+[three-line verification](../validation/three-line-pulse-paper-2026-10-27.md).
+
+All 49 gallery image files were regenerated and verified byte-for-byte against
+existing assets at initial three-line candidate
+`7a514147feb6fde24939df14484819beed5341eb`, renderer
+`d1c6b48f3919a8e5a3c703b50161adac862249fb3421ce0fc6ac54bb1f33edc9`.
+The final source above changes only live-view masking inside `createView()`;
+the canonical rendering sections before and after it are byte-identical.
+No separate gallery regeneration of the final candidate is claimed.
+
+## Previous two-line capture — October 27
+
+The previous `pulse-painting-capture.jpg` came from the actual app at **60.001 seconds of
 wall time** in the October 27 full WebKit replay, with an emulated iPhone 13
 viewport. It shows a pointed brush writing the accepted PPG in six-second lines,
 with the previous line retained above. During line returns the paper moves up
@@ -305,7 +361,7 @@ social-post delivery or sustained frame-rate evidence.
 | `pulse-painting-desktop-candidate.jpg` | 188941 | `71f997d63b0146af03e7cebbaea9b092c927ffd8c044959c591d36365a01fd4f` |
 | `pulse-painting-qr.jpg` | 81054 | `56374f21d8c42f2edc94165adb7b06a762b95fae80e95c147e157f7038c52898` |
 | `pulse-painting-ready.jpg` | 51933 | `1da91b18ec49b70eebb09af1fcea4dff9f87078637b8ffcc70adf00e375a1ddf` |
-| `pulse-painting-capture.jpg` | 107977 | `1778fc6b664a313380b64b37bf87acfb355e9168c51546e34d5b4811eb87bffa` |
+| `pulse-painting-capture.jpg` | 124301 | `2842346534c59983e94b422718e550d9e0bac79cbd2c2f9c2a9a3fe4e284bca1` |
 | `pulse-painting-report.jpg` | 102898 | `90e30ef4166ccaa0a4e2e55e28c720055b64a6d579f3353a8d9f45c4a807f9bc` |
 | `pulse-painting-mobile-gallery.png` | 469347 | `2f7f07374fb73399156555da8a86281d6b982db7714efe9a7bd2b4d4caa1889b` |
 | `pulse-painting-sharing.png` | 112629 | `2108b3314600dcda8a89d8e1aa0fe9b19e550fece694c7abfca10ec26ff664d3` |
