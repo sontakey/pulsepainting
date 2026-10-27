@@ -74,7 +74,7 @@ try {
           segments.forEach(segment => PulseLandscape.append(scene, segment));
           window.acceptedBefore = JSON.stringify(scene);
           window.pathCache = new Map(); window.materialCache = new Map();
-          window.observedChecks = { frontiers: 0, knots: 0, paths: 0, materials: 0, transitions: 0, previousStroke: null, lineTurns: 0, returning: 0, intervals: 0, maxRows: 0, previousProjection: null };
+          window.observedChecks = { frontiers: 0, knots: 0, paths: 0, materials: 0, transitions: 0, previousStroke: null, lineTurns: 0, returning: 0, intervals: 0, maxRows: 0, threeRowChecks: 0, previousProjection: null };
           window.view = PulseLandscape.createView(document.querySelector('main'), scene);
         };
         window.streamDuration = () => scene.strokes.reduce((sum, stroke, index) => sum + stroke.sourceEnd - stroke.sourceStart + (index ? Math.min(.45, Math.max(0, stroke.sourceStart - scene.strokes[index - 1].sourceEnd)) : 0), 0);
@@ -106,7 +106,15 @@ try {
           observedChecks.previousProjection = { line: projection.lineIndex, y: stats.paperOffsetY, turn: !!turn?.active, cursor: stats.streamTime };
           const rows = [...document.querySelectorAll('.landscape-line')];
           observedChecks.maxRows = Math.max(observedChecks.maxRows, rows.length);
-          expect(rows.length <= 3, 'live row DOM grows with the recording');
+          expect(projection.retainedLines === 3, 'live manuscript does not retain three rows');
+          expect(rows.length <= (turn?.active ? 4 : 3), 'live row DOM grows with the recording');
+          if (!turn?.active && projection.lineIndex >= 2 && projection.lineProgress > .02) {
+            const expected = [projection.lineIndex - 2, projection.lineIndex - 1, projection.lineIndex];
+            expect(JSON.stringify(rows.map(row => Number(row.dataset.lineIndex))) === JSON.stringify(expected), 'three consecutive settled rows are not mounted');
+            expect(rows.every(row => row.querySelector('.landscape-line-fragment') && Number(getComputedStyle(row).opacity) === 1), 'a settled retained row has no visible measured ink');
+            expect(expected.every(line => stats.visibleIntervals.some(interval => interval.line === line)), 'a settled row has no accepted source coverage');
+            observedChecks.threeRowChecks++;
+          }
           const bySource = new Map();
           for (const interval of stats.visibleIntervals) {
             const stroke = scene.strokes[interval.index];
@@ -206,7 +214,7 @@ try {
         assert.equal(final.pending, 0, `${family}: disposal cancels animation`);
         assert.equal(final.elements, 0, `${family}: disposal removes painting surfaces`);
         assert.ok(item.checks.frontiers > 100 && item.checks.transitions >= 2 && item.checks.knots > 100, `${family}: checks cross real source windows and preserve measured knots`);
-        assert.ok(item.checks.lineTurns >= 2 && item.checks.returning > 10 && item.checks.intervals > 100 && item.checks.maxRows > 1 && item.checks.maxRows <= 3, `${family}: source crosses multiple bounded paper rows through non-drawing returns`);
+        assert.ok(item.checks.lineTurns >= 2 && item.checks.returning > 10 && item.checks.intervals > 100 && item.checks.maxRows >= 3 && item.checks.maxRows <= 4 && item.checks.threeRowChecks > 100, `${family}: source crosses multiple bounded paper rows through non-drawing returns`);
         result.families.push(item);
       }
       assert.equal(result.families.length, 16, 'all landscape families share the source-only live path');

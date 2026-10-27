@@ -81,7 +81,7 @@ try {
   await page.evaluate(({ log, originalLength }) => {
     window.__sessionMetrics = { intervals: [], uninterruptedIntervals: [], paintIntervals: [], interruptions: [], checkpointAt: 60,
       stopCalls: 0, originalLength, extensionUsed: false, droppedSamples: 0,
-      flow: { samples:0, advances:0, paperChanges:0, regressions:0, invalid:0, futureFrontiers:0, nibSamples:0, maxNibContactError:0, lineTurns:0, returnSamples:0, returnSourceAdvance:0, paperRegressions:0, maxVisibleLines:0, maxScenicRasters:0, emergenceUpdates:0, emergenceFadeSamples:0, futureBackgrounds:0 },
+      flow: { samples:0, advances:0, paperChanges:0, regressions:0, invalid:0, futureFrontiers:0, nibSamples:0, maxNibContactError:0, lineTurns:0, returnSamples:0, returnSourceAdvance:0, paperRegressions:0, maxVisibleLines:0, threeRowSamples:0, invalidRowWindows:0, maxScenicRasters:0, emergenceUpdates:0, emergenceFadeSamples:0, futureBackgrounds:0 },
       camera: { samples: 0, changes: 0, invalid: 0, maxCachedPixels: 0, pixelBudget: 0, maxScale: 1, maxContinuousStep: 0, examples: [] } };
     window.PPGMonitor = class extends PPG.PPGMonitor {
       constructor(host, options) {
@@ -160,6 +160,11 @@ try {
           }
           previousTurn = !!surface.lineTurn?.active;
           flow.maxVisibleLines = Math.max(flow.maxVisibleLines, surface.visibleLines || 0);
+          if (surface.visibleLines > (surface.lineTurn?.active ? 4 : 3)) flow.invalidRowWindows++;
+          if (Number.isInteger(line) && line >= 2 && !surface.lineTurn?.active && surface.projection.lineProgress > .02) {
+            if (surface.visibleLines === 3 && surface.projection.retainedLines === 3) flow.threeRowSamples++;
+            else flow.invalidRowWindows++;
+          }
           if (Number.isFinite(surface.streamTime)) {
             flow.samples++;
             if (previousStreamTime !== undefined) {
@@ -326,7 +331,7 @@ try {
   assert.ok(flow.maxNibContactError<1,'the writing brush contacts the measured waveform on each row');
   assert.ok(flow.lineTurns>=10&&flow.returnSamples>20,'the full recording exercises repeated brush lifts and new lines');
   assert.ok(flow.returnSourceAdvance<1e-7&&flow.paperRegressions===0,'line returns consume no source time and the paper never scrolls backward');
-  assert.ok(flow.maxVisibleLines>1&&flow.maxVisibleLines<=3,'only a bounded set of manuscript rows stays in the live SVG');
+  assert.ok(flow.maxVisibleLines===4&&flow.threeRowSamples>100&&flow.invalidRowWindows===0,'three settled manuscript rows remain mounted with only one extra row during returns');
   assert.equal(flow.maxScenicRasters,0,'recording never composes the full-contrast final landscape');
   assert.ok(flow.emergenceUpdates >= 4 && flow.emergenceFadeSamples > 0,'the full recording exercises several actual background discoveries');
   assert.equal(flow.futureBackgrounds,0,'the background uses only the warmed accepted source prefix');
