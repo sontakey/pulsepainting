@@ -107,13 +107,27 @@ The first Linux run, `40567655414`, passed the new diagnostics, all renderer,
 worker/lifecycle and app checks, then correctly stopped on stale gallery
 provenance. Actual regeneration verified all 49 image files unchanged and the
 new generated manifest records the current renderer hash. Unchanged gallery
-checks subsequently passed Chromium and WebKit locally. The complete Linux rerun
-and production identity are tracked in PR #20 and recorded after completion.
+checks subsequently passed Chromium and WebKit locally. The complete Linux
+rerun `40570144526` passed on final feature head
+`ba3dcaaac481da0c82dfe6cee7854e834cb5d03b`.
 
-Preview `dpl_5PQA2DLEsFWj5WbBsUUoBrvDAfar` was READY on feature head `1ce5d452`.
+Final preview `dpl_3xqbHnbFcdjjHTv6xtdRNu9v2tMF` was READY on that exact head.
 Its 110 non-document assets matched the frozen build exactly; the original HTML
-was byte-identical with only Vercel's preview feedback script appended. The
-subsequent gallery provenance update requires a new manifest/build verification.
+was byte-identical with only Vercel's 163-byte preview feedback script appended.
+
+PR #20 merged as `60194f67fd24fd5ce70a81fa90210c2a204261af`. Its source tree
+matches the tested feature head exactly. The Git integration deployed production
+`dpl_EDBuVxRxXWUXQ4QA4W9UHGK2kJz7`, READY on that merge commit, to
+https://www.pulsepainting.com/. All 111 public runtime files, including HTML,
+matched the frozen build at `2026-10-27T19:48:05.029Z`. The apex returns a 308
+redirect to www. Anonymous hosted Chromium/WebKit mobile and desktop checks
+passed: camera guidance, examples, artwork sharing UI and the read-only community
+gallery. All 40 immersive layout cases passed across 320×568, 390×844,
+430×932 and 844×390 in Chromium and WebKit: edge-to-edge paper, three rows,
+overlay clearance, expanded details and floating controls. No real camera or
+public publication API was used in these checks.
+Later documentation-only deployments may have different IDs with identical
+runtime bytes.
 
 Ignored local evidence lives under `.dream-loop/steady-long-capture/`,
 `.dream-loop/long-capture/` and `.dream-loop/capture-performance/`.
