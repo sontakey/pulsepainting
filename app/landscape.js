@@ -1300,7 +1300,7 @@
     }
     const sourcePoint=(r,p)=>({x:(r.start+p.t-r.stroke.sourceStart)*100,y:(.5-normalized(p.v,r.stroke.transform.domain.min,r.stroke.transform.domain.max))*100});
     function placeEmergence(){
-      const s=settings(),width=box.width*1.12,height=box.height*1.6,top=clamp((s.baseline-s.lineSpacing-s.sy*50-26)/box.height,0,1),bottom=clamp((s.baseline+s.sy*50+32)/box.height,0,1),feather=28/box.height;
+      const s=settings(),width=box.width*1.12,height=box.height*1.6,top=clamp((s.baseline-s.sy*50-26)/box.height,0,1),bottom=clamp((s.baseline+s.sy*50+32)/box.height,0,1),feather=28/box.height;
       // Spread the accepted landscape vertically around the quiet writing
       // corridor, retaining its banks and full contour density at phone width.
       // This fixed atmospheric projection never follows or pans with the nib.
