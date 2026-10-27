@@ -1211,7 +1211,7 @@
     const paperFade=gradient(`${uid}-paper-fade`,[['0%','black'],['100%','white']],{gradientUnits:'userSpaceOnUse',x1:0,x2:0,y1:0,y2:1});
     const paperMask=svgNode('mask'),paperMaskRect=svgNode('rect');paperMask.id=`${uid}-paper-window`;paperMask.setAttribute('maskUnits','userSpaceOnUse');paperMask.setAttribute('maskContentUnits','userSpaceOnUse');paperMaskRect.setAttribute('fill',`url(#${paperFade.id})`);paperMask.append(paperMaskRect);defs.append(paperMask);paperViewport.setAttribute('mask',`url(#${paperMask.id})`);
     const stats=global.__pulseLandscapeStats={frames:0,rasterFrames:0,forcedRasterFrames:0,rasterSkipped:0,rasterIntervalMs:0,rasterPainted:-1,rasterProgress:0,active:false,revealing:false,mode:'recording',frameMs:0,pixelBudget:3086336,cachedPixels:side*side*4+ambientSide*ambientSide*2+INK_SIDE*INK_SIDE,get materialPixelBudget(){return 2*INK_SIDE*INK_SIDE+2*INK_PIXEL_LIMIT+(rasterWorker?2*INK_SIDE*INK_SIDE+2*INK_PIXEL_LIMIT:0);},get materialPixels(){return 2*INK_SIDE*INK_SIDE+2*(pigmentAtlases.get(doc)?.pixels||0)+workerMaterials;},liveTexturePixels:INK_SIDE*INK_SIDE,liveMaskPixelEstimate:0,camera:{...camera},finished:false,strokes:0,painted:0,activeStroke:null,progress:0,frontier:null,nib:null,visibleSeconds:6,wetTrail:null,projection:null,settling:false,streamTime:0,streamStart:-6,paperOffsetX:0,anchorX:0,visibleIntervals:[],morphProgress:0,revealSamples:[],emergence:{updates:0,stage:0,sourceSeconds:0,strokeCount:0,sourceEnd:null,animating:false,fade:0,target:0,beatDriven:false,beatsRevealed:0,beatCount:0,lastBeatTime:null,snapshotRequests:0,opacity:0,caption:'',captionVisible:false,clearTop:0,clearBottom:1,pixelBudget:ambientSide*ambientSide*2+INK_SIDE*INK_SIDE}};
-    stats.rendererVersion='live-paper-2026-10-27-bounded';stats.frameIntervalMs=null;
+    stats.rendererVersion='live-paper-2026-10-27-frame-paced';stats.frameIntervalMs=null;
     stats.rasterBackend='main-thread';stats.workerFrameMs=0;stats.workerRequests=0;
     stats.queuedSeconds=0;stats.playbackRate=0;stats.awaitingSource=false;stats.liveRecords=0;stats.liveSourcePoints=0;
     // Numeric payload accounting is separate from canvas backing pixels. At
@@ -1646,7 +1646,12 @@
     function tick(now){
       frame=0;if(disposed||paused||doc.hidden||finished){last=0;return;}
       const begin=performance.now();stats.frameIntervalMs=last?Math.max(0,now-last):null;
-      const delta=last?clamp(now-last,0,64):1000/60;last=now;stats.frames++;stats.active=true;
+      const elapsed=last?Math.max(0,now-last):1000/60;
+      const delta=Math.min(elapsed,64);
+      // Honor ordinary slow display frames at real-time speed. Long suspension
+      // gaps restart gently rather than rushing through buffered source.
+      const brushDelta=elapsed<=250?elapsed:1000/30;
+      last=now;stats.frames++;stats.active=true;
       if(revealing){
         if(!cacheReady)prepareRaster();
         revealElapsed+=delta;revealFrame();if(revealElapsed>=5800&&cacheReady)settle();
@@ -1654,11 +1659,11 @@
         // Preserve a steady brush speed even after delayed frames or source
         // windows. Never rush through buffered pulse data to catch up.
         if(turning){
-          turnElapsed=Math.min(turnDuration,turnElapsed+Math.min(delta,1000/30));
+          turnElapsed=Math.min(turnDuration,turnElapsed+brushDelta);
           if(turnElapsed===turnDuration){writingLine++;turning=false;turnElapsed=0;}
         }else{
           const lineEnd=(writingLine+1)*lineSeconds;
-          cursor=Math.min(total,lineEnd,cursor+Math.min(delta,1000/30)/1000);
+          cursor=Math.min(total,lineEnd,cursor+brushDelta/1000);
           if(cursor>=lineEnd&&total>lineEnd+1e-8){turning=true;turnElapsed=0;}
         }
         emergenceFrame(delta);captureFrame();stats.rasterSkipped++;if(cursor>=total&&!ambientNeedsFrame()&&captionElapsed>=6000){stats.active=false;last=0;}

@@ -180,6 +180,20 @@ try {
           if (streamDuration() <= 10) throw Error('Initial backlog must exercise the former catch-up threshold');
           stepTiming(1000 / 60); // Start the presentation clock before exact 16 ms checks.
           const steady = sequence16();
+          // Slow display cadence must not slow source-time playback. Stay
+          // inside the first row so deliberate brush returns are separate.
+          const lowCadence = [];
+          for (const hz of [15, 20, 25]) {
+            const before = __pulseLandscapeStats.streamTime;
+            for (let i = 0; i < 12; i++) stepTiming(1000 / hz);
+            const advanced = __pulseLandscapeStats.streamTime - before;
+            if (Math.abs(advanced - 12 / hz) > 1e-7) throw Error(`${hz}fps accumulated playback lag: ${advanced}`);
+            lowCadence.push({ hz, advanced });
+          }
+          for (const dt of [40, 59, 100, 200]) {
+            const measured = stepTiming(dt);
+            if (Math.abs(measured.advance - dt / 1000) > 1e-7) throw Error(`Uneven ${dt}ms frame accumulated lag`);
+          }
           const stall = stepTiming(2000, 1 / 30);
           const afterStall = sequence16();
           for (let i = 0; i < 3000 && !__pulseLandscapeStats.awaitingSource; i++) stepTiming(64, .064);
@@ -205,7 +219,7 @@ try {
           if (__pulseLandscapeStats.activeStroke === null) throw Error('Late accepted source never resumed measured ink');
           const afterLateDelivery = sequence16();
           verifyAcceptedKnots([...segments.slice(0, 3), segments[4]]);
-          return { family: scene.family, steady, stall, afterStall, exhausted, deliveryDelay, restart, afterLateDelivery, checks: { ...observedChecks }, strokes: scene.strokes.length, terrainPreparations: __liveTerrainPreparations || 0 };
+          return { family: scene.family, steady, lowCadence, stall, afterStall, exhausted, deliveryDelay, restart, afterLateDelivery, checks: { ...observedChecks }, strokes: scene.strokes.length, terrainPreparations: __liveTerrainPreparations || 0 };
         }, segments);
         // Finish warming the newly accepted record before disposal, so a worker
         // error cannot be hidden by immediately terminating its last request.
