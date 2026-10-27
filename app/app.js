@@ -1,5 +1,37 @@
 // Resolve from this script, including hosted URLs without a trailing slash.
 const paintBundleURL = new URL('./paint-gpu.js', document.currentScript?.src || location.href);
+// Optional, local-only diagnostics never gate camera permission or capture.
+let capturePerformanceModule = null, capturePerformanceSession = null;
+import(new URL('./capture-performance.js', paintBundleURL).href).then(module => {
+  capturePerformanceModule = module;
+  ensureCapturePerformance(capturePerformanceSession);
+}).catch(() => {});
+function ensureCapturePerformance(session) {
+  if (!session || session.stopped || session.failed || session.collector || session.readyAt === null || !session.monitor || !capturePerformanceModule) return;
+  try {
+    const collector = capturePerformanceModule.createCapturePerformance({
+      startedAt: session.readyAt, collectionStartedAt: performance.now(),
+      visible: !document.hidden, modelVersion: window.PulseLandscape?.VERSION ?? null,
+    });
+    capturePerformanceModule.attachCapturePerformanceLog(session.monitor, collector);
+    session.collector = collector;
+  } catch { session.failed = true; /* Never retry a failed optional helper on every camera frame. */ }
+}
+function readyCapturePerformance(session) {
+  if (!session || session.stopped) return;
+  session.readyAt ??= performance.now();
+  ensureCapturePerformance(session);
+}
+function stopCapturePerformance() {
+  const session = capturePerformanceSession;
+  if (!session) return;
+  session.stopped = true;
+  try { session.collector?.stop(performance.now()); } catch {}
+  capturePerformanceSession = null;
+}
+function setCapturePerformanceVisible(visible) {
+  try { capturePerformanceSession?.collector?.setVisible(visible, performance.now()); } catch {}
+}
 let paintGPU = null, paintPageActive = true, paintWarmGeneration = 0;
 function warmPaintGPU() {
   if (matchMedia('(prefers-reduced-motion: reduce)').matches) return;
@@ -9,12 +41,13 @@ function warmPaintGPU() {
 if ('requestIdleCallback' in window) requestIdleCallback(warmPaintGPU, { timeout: 1600 });
 else setTimeout(warmPaintGPU, 300);
 addEventListener('pagehide', () => {
+  setCapturePerformanceVisible(false);
   clearEntryTransition('pagehide'); paintPageActive = false; paintWarmGeneration++; paintGPU?.dispose(); paintGPU = null;
   if (sessionFinishing) { cancelLandscapeReveal(); completeSessionReport(); }
   try { landscapeView?.pause(true); } catch { useManuscriptFallback(); }
 });
 addEventListener('paintgpulost', () => { if (!landscapeView) paintManuscript(document.getElementById('manuscript')); });
-addEventListener('pageshow', event => { if (event.persisted) { paintPageActive = true; warmPaintGPU(); syncLandscapeView(); } });
+addEventListener('pageshow', event => { if (event.persisted) { setCapturePerformanceVisible(!document.hidden); paintPageActive = true; warmPaintGPU(); syncLandscapeView(); } });
 
 // Pulse Painting stores only accepted, measured waveform segments in memory.
 // A window is painted after its quality decision, never speculatively.
@@ -56,8 +89,9 @@ function recoverLandscapeCoverage() {
 function syncLandscapeView() {
   if (!landscapeView) return;
   try {
-    landscapeView.pause(!sessionFinishing && (manuscript.paused || document.hidden || document.getElementById('screen-measuring').hidden));
-    landscapeView.sync();
+    const paused = !sessionFinishing && (manuscript.paused || document.hidden || document.getElementById('screen-measuring').hidden);
+    landscapeView.pause(paused); // Resuming already synchronizes accepted source.
+    if (paused) landscapeView.sync(); // Retain newly accepted records while paused.
   } catch { useManuscriptFallback(); }
 }
 function resetLandscape() {
@@ -69,7 +103,10 @@ function resetLandscape() {
   document.getElementById('manuscript').hidden = true;
   try {
     landscape = window.PulseLandscape.create();
-    landscapeView = window.PulseLandscape.createView(host, landscape, { reducedMotion: matchMedia('(prefers-reduced-motion: reduce)').matches });
+    landscapeView = window.PulseLandscape.createView(host, landscape, {
+      reducedMotion: matchMedia('(prefers-reduced-motion: reduce)').matches,
+      onFrame: (now, stats) => { capturePerformanceSession?.collector?.recordFrame(now, stats); },
+    });
     syncLandscapeView();
   } catch { useManuscriptFallback(); }
 }
@@ -425,6 +462,7 @@ function handleCameraFailure(err, generation) {
   measuringStartedAt = null;
   clearEntryTransition('camera-help');
   sessionStarting = false;
+  stopCapturePerformance();
   if (monitor) {
     monitor.stop();
     if (!pendingMonitorStarts.has(monitor)) monitor.destroy();
@@ -894,6 +932,7 @@ function advanceSessionClock(time, isProcessing) {
 }
 document.addEventListener('visibilitychange', () => {
   lastMeasuringFrame = null;
+  setCapturePerformanceVisible(!document.hidden);
   if (document.hidden) clearLiveSignal();
 });
 function tickSessionCountdown() {
@@ -1609,7 +1648,10 @@ function startSession() {
   sessionTimerId = setInterval(tickSessionCountdown, 1000);
 
   lastMetrics = null;
+  stopCapturePerformance();
   if (monitor) { monitor.destroy(); monitor = null; }
+  const performanceSession = { monitor: null, collector: null, readyAt: null, stopped: false };
+  capturePerformanceSession = performanceSession;
   monitor = new PPGMonitor(null, {
     ui: { enabled: false },
     // Recompute accepted HR and rolling 60-second HRV once a second; the
@@ -1620,6 +1662,7 @@ function startSession() {
     motion: true, // accelerometer motion gate (asks permission on iOS)
     onReady: ({ torchSupported }) => {
       if (generation !== sessionGeneration) return;
+      readyCapturePerformance(performanceSession);
       setCameraPending(false);
       if (cameraHelpContext === 'pending') {
         window.PulseCameraHelp.close(); cameraHelpContext = null;
@@ -1646,6 +1689,8 @@ function startSession() {
     },
     onSignalUpdate: ({ time, value, isProcessing }) => {
       if (generation !== sessionGeneration) return;
+      readyCapturePerformance(performanceSession);
+      try { performanceSession.collector?.recordCamera(performance.now(), time); } catch {}
       advanceSessionClock(time, isProcessing);
       if (!isProcessing) clearLiveSignal();
       if (isProcessing && Number.isFinite(value)) manuscript.pending.push({ t:time, v:value });
@@ -1663,6 +1708,8 @@ function startSession() {
   });
 
   const currentMonitor = monitor;
+  performanceSession.monitor = currentMonitor;
+  ensureCapturePerformance(performanceSession);
   pendingMonitorStarts.add(currentMonitor);
   currentMonitor.start().then(() => {
     pendingMonitorStarts.delete(currentMonitor);
@@ -1694,6 +1741,7 @@ function stopSession() {
   lastMeasuringFrame = null;
   if (sessionTimerId) { clearInterval(sessionTimerId); sessionTimerId = null; }
   measuringStartedAt = null;
+  stopCapturePerformance();
   if (monitor) {
     monitor.stop();
   }
@@ -1762,6 +1810,7 @@ function cancelSession() {
   lastMeasuringFrame = null;
   clearEntryTransition();
   if (sessionTimerId) { clearInterval(sessionTimerId); sessionTimerId=null; }
+  stopCapturePerformance();
   if (monitor) {
     monitor.stop();
     // Pending getUserMedia still needs its video element to adopt a late stream.
