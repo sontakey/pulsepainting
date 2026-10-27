@@ -7,8 +7,11 @@ breathing tile. Signal uses the existing engine's measured 0–100 quality score
 with one-second updates and a small CSS-eased fill. The duplicate bars beneath
 LIVE are removed; only brief issue coaching remains there. Scores clear on
 interruption or stale data and need a newer source window to recover. The
-breathing estimator, report, painting renderer and original measurements remain
-unchanged.
+breathing estimator, report calculations, painting renderer and original
+measurements remain unchanged. Release testing also exposed and fixed a Linux
+font-rounding edge case: cursive scene titles now re-fit only if their measured
+ink still exceeds the allotted box. All sixteen titles have exact-bounds checks;
+macOS card pixels and all gallery images are unchanged.
 
 Chromium/WebKit app checks, four phone layouts, accessibility/reduced-motion
 cases and full WebKit interruption replay pass. Replay completed 180.434 active

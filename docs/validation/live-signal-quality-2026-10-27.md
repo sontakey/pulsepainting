@@ -11,7 +11,7 @@ There is one quality meter in the metrics row. The duplicate bars beneath LIVE
 are removed; that area shows brief issue guidance only when needed. About your
 readings explains Signal as recording clarity, not health. Supported breathing
 estimates remain in the detailed final report. The estimator, camera pipeline,
-quality acceptance, original samples, renderer and artwork exports are unchanged.
+quality acceptance, original samples and landscape renderer are unchanged.
 
 Finite scores are clamped to 0–100. Rejected quality displays zero and clears the
 fill immediately; missing or invalid scores show `--`. Gaps, hidden visibility
@@ -45,6 +45,24 @@ clearing callbacks do not repeatedly mutate the DOM.
 - The public fixture audit yields 168 accepted windows among 185 windows, with
   scores ranging from 89 to 100 and 11 distinct rounded values. Fifty-one
   accepted windows score 100. Strong signal can legitimately remain steady.
+
+## Linux font-fit correction discovered during release
+
+The first Linux CI run, `40526153097`, failed the existing exact scene-title
+ink-bounds assertion. A deterministic probe using the same official Linux/amd64
+Playwright image reproduced six of sixteen titles extending 0.5–1px outside
+their 76px band. The one-pass proportional font fit did not account for Linux
+rasterizer quantization after resizing. This was not a Signal-meter failure.
+
+The card compositor now rechecks the measured bounds after fitting, with a
+bounded correction only when ink still exceeds its box. Exact test bounds are
+unchanged; the app suite now checks every authored title instead of relying on
+the randomly chosen scene. All sixteen pass the Linux probe. Before/after
+macOS Chromium and WebKit probes confirm identical text measurements and
+whole-card PNG hashes for all sixteen cards. Regenerating the gallery changes
+only its compositor hash; every image stays byte-identical. The final WebKit
+app/report suite passes after this correction. The timed capture above predates
+only this static text-fitting fix; its capture runtime is unchanged.
 
 Evidence lives in ignored `.dream-loop/live-signal-quality/` and
 `.dream-loop/immersive-capture/verification/`. No private recordings are used.
