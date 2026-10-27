@@ -6,7 +6,8 @@ Your pulse, made into a place.
 > watercolor landscapes, crisp measured pulse strokes, a pointed brush and soft
 > pigment fixed to the paper, a gradually emerging background, and shareable artwork.
 > Browser replay and deployed-asset checks passed; physical-phone validation remains separate.
-> See [current immersive capture and keepsake verification](docs/validation/immersive-capture-2026-10-25.md).
+> See [Signal meter verification](docs/validation/live-signal-quality-2026-10-27.md) and
+> [immersive capture and keepsake verification](docs/validation/immersive-capture-2026-10-25.md).
 > Earlier [live readings](docs/validation/live-readings-2026-10-24.md) and
 > [drawing performance checks](docs/validation/mobile-drawing-performance-2026-10-24.md)
 > document the preceding releases.
@@ -24,11 +25,12 @@ verified window boundaries connect smoothly. Missing samples, rejected windows
 and explicit breaks remain pen lifts; decorative connections never add accepted
 data or recording time. The original waveform manuscript remains available.
 
-The live strip shows Pulse, HRV (RMSSD), and estimated Breathing, with short
-definitions under **About your readings** and optional signal charts.
-Breathing needs at least 40 seconds of usable signal and appears only when the
-existing estimator has a fresh supported result; uncertain values stay hidden.
-SDNN remains in the final report.
+The live strip shows Pulse, HRV (RMSSD), and Signal: the engine’s measured
+recording-quality score out of 100, refreshed once a second after signal detection.
+A small continuous meter eases between real updates; interruptions clear it.
+There is one quality meter, with brief placement guidance by LIVE only when needed.
+**About your readings** provides short definitions and optional signal charts.
+SDNN and supported breathing estimates remain in the detailed final report.
 
 Recording fills the viewport, with live measurements overlaid above the central
 pulse trace and floating controls below. The background eases in subtly as real
@@ -62,7 +64,7 @@ it is not a screenshot or validation of the phone's native permission controls.
 
 <p align="center">
   <img src="docs/media/pulse-painting-ready.jpg" width="230" alt="Pulse Painting phone capture instructions">
-  <img src="docs/media/pulse-painting-capture.jpg" width="230" alt="Edge-to-edge recording with a central pulse brush, overlaid Pulse, HRV and Breathing readings, and floating capture controls">
+  <img src="docs/media/pulse-painting-capture.jpg" width="230" alt="Edge-to-edge recording with a central pulse brush, overlaid Pulse, HRV and Signal readings, and floating capture controls">
   <img src="docs/media/pulse-painting-report.jpg" width="230" alt="Framed Quiet Lake keepsake with a larger landscape, padded cursive title, pulse and HRV metrics, and a date and website footer">
 </p>
 
@@ -195,7 +197,7 @@ private export and example gallery work without these credentials.
 - Density based on usable recorded time: sparse sessions keep open paper; longer sessions fill interleaved slots without moving earlier strokes.
 - On finish, the view pulls back along the recorded pulse paper, then reconstructs those same measured strokes into the complete landscape at full pigment strength. A local worker prepares cached watercolor layers and reveal geometry, with a main-thread fallback.
 - Optional WebGPU/WebGL2 painted entry transitions and an independent Canvas2D landscape compositor.
-- Placement coaching, a small live finger preview, live Pulse, HRV (RMSSD) and supported Breathing estimates, and floating mobile controls. SDNN stays in the final report.
+- Placement coaching, a small live finger preview, live Pulse, HRV (RMSSD) and measured Signal quality, and floating mobile controls. SDNN stays in the final report.
 - Report charts, a 1080 × 1350 shareable artwork, native file sharing with download fallback, and optional metrics on the artwork.
 - A full-screen desktop introduction and an on-demand mobile collection of sixteen public-fixture examples, with filters, swipe and keyboard navigation, user-initiated image sharing and scene deep links.
 - An artwork-first social share screen and optional public community gallery, with reviewed image/metrics consent, personal preview links, removal and reporting.

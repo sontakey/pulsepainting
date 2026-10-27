@@ -177,13 +177,13 @@
         </div>
         <div class="capture-monitor">
           <figure class="capture-camera"><div id="capture-camera-preview" class="camera-feed" aria-label="Live rear camera preview"></div><figcaption><span aria-hidden="true"></span>Live</figcaption></figure>
-          <div class="quality-pill" id="quality-pill"><span id="signal-meter" class="signal-meter" role="meter" aria-label="Signal quality" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" aria-valuetext="Signal quality unavailable"><i aria-hidden="true"></i><i aria-hidden="true"></i><i aria-hidden="true"></i><i aria-hidden="true"></i><i aria-hidden="true"></i></span><span id="quality-text" role="status" aria-live="polite" aria-atomic="true">Finding signal</span></div>
+          <div class="quality-pill" id="quality-pill"><span id="quality-text" role="status" aria-live="polite" aria-atomic="true">Finding signal</span></div>
         </div>
       </div>
       <div class="live-metrics" aria-label="Live measurements">
         <div class="live-metric"><span class="metric-label">Pulse</span><p><span id="hr-value" class="metric-number">--</span><span class="metric-unit">bpm</span></p></div>
         <div class="live-metric"><span class="metric-label">HRV</span><p><span id="rmssd-value" class="metric-number">--</span><span class="metric-unit">ms</span></p></div>
-        <div class="live-metric"><span class="metric-label">Breathing</span><p><span id="resp-value" class="metric-number">--</span><span class="metric-unit" aria-label="breaths per minute">/min</span></p><span id="resp-status" class="metric-status">Estimating</span></div>
+        <div class="live-metric"><span class="metric-label">Signal</span><p><span id="signal-value" class="metric-number">--</span><span class="metric-unit" aria-label="out of 100">/100</span></p><span id="signal-quality-track" class="signal-quality-track unavailable" role="meter" aria-label="Signal quality score" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" aria-valuetext="Signal quality unavailable"><span id="signal-quality-fill" aria-hidden="true"></span></span></div>
       </div>
       </div>
       <div class="manuscript-frame"><div id="landscape-view" aria-label="A close-up of your accepted pulse strokes painting a landscape"></div><canvas id="manuscript" width="1000" height="840" aria-label="Your pulse manuscript. Deeper pigment represents clearer measured recording quality." hidden></canvas><p id="manuscript-empty">Your first brushstroke is on its way.<br><span>Hold still while we check the signal.</span></p></div>
@@ -192,7 +192,7 @@
           <dl class="reading-guide">
             <div><dt>Pulse</dt><dd>Your heartbeats per minute.</dd></div>
             <div><dt>HRV</dt><dd>Variation between beats, measured as RMSSD.</dd></div>
-            <div><dt>Breathing</dt><dd>Estimated from your pulse once enough clear signal is available.</dd></div>
+            <div><dt>Signal</dt><dd>How clearly your camera sees your pulse. Recording quality, not health.</dd></div>
           </dl>
           <div class="reading-actions"><button id="btn-signal-preview" class="signal-preview-toggle" type="button" aria-controls="signal-preview" aria-expanded="false">View signal</button><div id="capture-detail-tools" class="capture-detail-tools"></div></div>
           <div id="signal-preview" hidden>

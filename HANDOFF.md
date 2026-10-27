@@ -1,5 +1,21 @@
 # Pulse Painting handoff
 
+## Candidate: one live Signal meter
+
+The recording strip shows Pulse, HRV (RMSSD), and Signal, replacing the sparse
+breathing tile. Signal uses the existing engine's measured 0–100 quality score
+with one-second updates and a small CSS-eased fill. The duplicate bars beneath
+LIVE are removed; only brief issue coaching remains there. Scores clear on
+interruption or stale data and need a newer source window to recover. The
+breathing estimator, report, painting renderer and original measurements remain
+unchanged.
+
+Chromium/WebKit app checks, four phone layouts, accessibility/reduced-motion
+cases and full WebKit interruption replay pass. Replay completed 180.434 active
+seconds and averaged 59.06fps live painting, with a retained 267ms maximum;
+this is not physical-phone performance validation. GitHub/production release
+verification is pending. See `docs/validation/live-signal-quality-2026-10-27.md`.
+
 ## Current production release: immersive, beat-led painting
 
 Recording is now edge-to-edge with the continuous measured pulse centered and

@@ -672,50 +672,45 @@ let measuringStartedAt = null; // Date.now() ms when MEASURING was first reached
 let portraitStartedAt = null;
 let sessionTimerId = null;
 let lastMetrics = null; // last per-window metrics object (for the report's floor/respiration)
-let latestBreathingTime = null;
-let breathingMeasuredAt = null;
-const BREATHING_FRESH_MS = 2500;
+let latestSignalTime = null;
+let signalMeasuredAt = null;
+let signalDisplayKey = null;
+const SIGNAL_FRESH_MS = 2500;
 
-function clearLiveBreathing(status = 'Estimating') {
-  breathingMeasuredAt = null;
-  const value = document.getElementById('resp-value');
-  const hint = document.getElementById('resp-status');
-  if (value.textContent !== '--') value.textContent = '--';
-  if (hint.textContent !== status) hint.textContent = status;
+function clearLiveSignal() {
+  signalMeasuredAt = null;
+  updateCaptureSignal({});
 }
 
-function resetLiveBreathing() {
-  latestBreathingTime = null;
-  clearLiveBreathing();
+function resetLiveSignal() {
+  latestSignalTime = null;
+  signalDisplayKey = null;
+  clearLiveSignal();
 }
 
-function expireLiveBreathing() {
-  if (breathingMeasuredAt != null && performance.now() - breathingMeasuredAt > BREATHING_FRESH_MS) {
-    clearLiveBreathing('Finding signal');
+function expireLiveSignal() {
+  if (signalMeasuredAt != null && performance.now() - signalMeasuredAt > SIGNAL_FRESH_MS) {
+    clearLiveSignal();
   }
 }
 
-function updateLiveBreathing(metrics) {
+function updateLiveSignal(metrics) {
   const time = metrics.t;
-  const fresh = Number.isFinite(time) && (latestBreathingTime == null || time > latestBreathingTime);
-  if (fresh) latestBreathingTime = time;
-  if (metrics.quality?.good !== true || metrics.gap || document.hidden) {
-    clearLiveBreathing('Finding signal');
+  const fresh = Number.isFinite(time) && (latestSignalTime == null || time > latestSignalTime);
+  if (fresh) latestSignalTime = time;
+  if (!Number.isFinite(time) || metrics.gap || document.hidden) {
+    clearLiveSignal();
     return;
   }
-  if (!Number.isFinite(time)) { clearLiveBreathing(); return; }
   // Camera recovery can re-emit the old metrics object. Only a newer source
-  // window can replace a number or restore one cleared by a signal interruption.
-  if (!fresh) { expireLiveBreathing(); return; }
-  const r = metrics.respiration;
-  if (!r || !Number.isFinite(r.rateBpm) || r.rateBpm <= 0 || r.basis !== 'agreement' ||
-      !Number.isFinite(r.confidence) || r.confidence < 0.5 || r.confidence > 1) {
-    clearLiveBreathing();
+  // window can replace a score or restore one cleared by an interruption.
+  if (!fresh) {
+    if (metrics.quality?.good !== true) clearLiveSignal();
+    else expireLiveSignal();
     return;
   }
-  breathingMeasuredAt = performance.now();
-  document.getElementById('resp-value').textContent = String(Math.round(r.rateBpm));
-  document.getElementById('resp-status').textContent = 'Estimated';
+  signalMeasuredAt = Number.isFinite(metrics.qualityScore) ? performance.now() : null;
+  updateCaptureSignal(metrics);
 }
 
 function settleSec() {
@@ -837,15 +832,21 @@ function updateCaptureSignal(metrics) {
   const good = metrics.quality?.good === true;
   const known = Number.isFinite(metrics.qualityScore);
   const score = good && known ? Math.round(Math.max(0, Math.min(100, metrics.qualityScore))) : 0;
-  const meter = document.getElementById('signal-meter');
-  meter.setAttribute('aria-valuenow', String(score));
-  meter.setAttribute('aria-valuetext', known ? `${score} out of 100` : 'Signal quality unavailable');
-  const strength = Math.ceil(score / 20);
-  Array.from(meter.children).forEach((bar, i) => bar.classList.toggle('filled', i < strength));
+  const hint = good && known ? '' : CAPTURE_SIGNAL_HINTS[metrics.quality?.code] || 'Finding signal';
+  const key = `${known}:${good}:${score}:${hint}`;
+  // A nonprocessing camera can call this each frame. Only changed readings
+  // touch the DOM; the small bar eases with a CSS transform, not a draw loop.
+  if (key === signalDisplayKey) return;
+  signalDisplayKey = key;
+  const track = document.getElementById('signal-quality-track');
+  track.setAttribute('aria-valuenow', String(score));
+  track.setAttribute('aria-valuetext', known ? `${score} out of 100` : 'Signal quality unavailable');
+  document.getElementById('signal-value').textContent = known ? String(score) : '--';
+  track.classList.toggle('unavailable', !good || !known);
+  document.getElementById('signal-quality-fill').style.transform = `scaleX(${score / 100})`;
   const pill = document.getElementById('quality-pill');
-  pill.classList.toggle('good', good);
-  pill.classList.toggle('bad', !good);
-  const hint = good ? '' : CAPTURE_SIGNAL_HINTS[metrics.quality?.code] || 'Finding signal';
+  pill.classList.toggle('good', good && known);
+  pill.classList.toggle('bad', !good || !known);
   const status = document.getElementById('quality-text');
   if (status.textContent !== hint) status.textContent = hint;
 }
@@ -854,9 +855,7 @@ function updateMeasuringScreen(metrics) {
   const good = metrics.quality && metrics.quality.good;
   document.getElementById('hr-value').textContent = good && Number.isFinite(metrics.heartRate) ? Math.round(metrics.heartRate) : '--';
   document.getElementById('rmssd-value').textContent = good && Number.isFinite(metrics.rmssd) ? Math.round(metrics.rmssd) : '--';
-  updateLiveBreathing(metrics);
-
-  updateCaptureSignal(metrics);
+  updateLiveSignal(metrics);
   const state = manuscript.paused ? 'Artwork paused' : good ? 'Painting' : 'Waiting';
   const stateEl = document.getElementById('painting-state');
   if (stateEl.textContent !== state) stateEl.textContent = state;
@@ -895,10 +894,10 @@ function advanceSessionClock(time, isProcessing) {
 }
 document.addEventListener('visibilitychange', () => {
   lastMeasuringFrame = null;
-  if (document.hidden) clearLiveBreathing('Finding signal');
+  if (document.hidden) clearLiveSignal();
 });
 function tickSessionCountdown() {
-  expireLiveBreathing();
+  expireLiveSignal();
   const el = document.getElementById('session-countdown');
   if (measuringStartedAt == null) {
     el.textContent = fmtCountdown(SESSION_SEC);
@@ -1599,7 +1598,7 @@ function startSession() {
   setCameraPending(true);
   resetWaveBuffer();
   resetManuscript();
-  resetLiveBreathing();
+  resetLiveSignal();
   document.querySelector('.live-details').open = false;
   setSignalPreview(false);
   elapsedMeasuringMs = 0; lastMeasuringFrame = null;
@@ -1637,7 +1636,7 @@ function startSession() {
         if (screens.measuring.hidden) showScreen('measuring');
         updateMeasuringScreen(metrics);
       } else {
-        clearLiveBreathing('Finding signal');
+        clearLiveSignal();
         if (screens.placement.hidden && screens.measuring.hidden === false) {
           // dropped back out of MEASURING (lift/drift) — show placement coaching again
           showScreen('placement');
@@ -1648,7 +1647,7 @@ function startSession() {
     onSignalUpdate: ({ time, value, isProcessing }) => {
       if (generation !== sessionGeneration) return;
       advanceSessionClock(time, isProcessing);
-      if (!isProcessing) clearLiveBreathing('Finding signal');
+      if (!isProcessing) clearLiveSignal();
       if (isProcessing && Number.isFinite(value)) manuscript.pending.push({ t:time, v:value });
       if (manuscript.pending.length > 1800) manuscript.pending.shift();
       waveBuf.push(value);
@@ -1778,7 +1777,7 @@ function cancelSession() {
   manuscript.pending = []; manuscript.segments = []; manuscript.raster = null; manuscript.scroll = null;
   manuscript.lastWindow = -1; manuscript.paused = false;
   resetWaveBuffer();
-  resetLiveBreathing();
+  resetLiveSignal();
   elapsedMeasuringMs = 0; measuringStartedAt = null; portraitStartedAt = null; lastMetrics = null;
   showScreen('ready');
   document.getElementById('btn-start').focus({ preventScroll: true });
