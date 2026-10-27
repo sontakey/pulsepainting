@@ -10,6 +10,29 @@ import { chromium, webkit } from 'playwright';
 import sharp from 'sharp';
 import { replayPublicFixture } from '../landscape-fixture.mjs';
 
+// Software Chromium can change edge coverage when adding an otherwise opaque
+// SVG compositing surface. Interior pixels retain the one-level rounding gate;
+// larger differences must be within one physical pixel of contrast, bounded by
+// 1/8 of that channel's local contrast (+1 rounding level), never above 16.
+// Geometry below separately proves no paint touches the mask feather or clip.
+function compareMaskRaster(plain,forced){
+ const {width,height}=plain.info;let max=0,sum=0,changedChannels=0,edgeChannels=0,edgeViolations=0,maxContrastExcess=0;
+ for(let y=0;y<height;y++)for(let x=0;x<width;x++)for(let channel=0;channel<4;channel++){
+  const i=(y*width+x)*4+channel,difference=Math.abs(plain.data[i]-forced.data[i]);
+  max=Math.max(max,difference);sum+=difference;if(difference)changedChannels++;
+  if(difference<=1)continue;
+  edgeChannels++;let pmin=255,pmax=0,fmin=255,fmax=0;
+  for(let yy=Math.max(0,y-1);yy<=Math.min(height-1,y+1);yy++)for(let xx=Math.max(0,x-1);xx<=Math.min(width-1,x+1);xx++){
+   const j=(yy*width+xx)*4+channel;
+   pmin=Math.min(pmin,plain.data[j]);pmax=Math.max(pmax,plain.data[j]);fmin=Math.min(fmin,forced.data[j]);fmax=Math.max(fmax,forced.data[j]);
+  }
+  const contrast=Math.max(pmax-pmin,fmax-fmin),excess=difference-1-contrast/8;
+  maxContrastExcess=Math.max(maxContrastExcess,excess);
+  if(difference>16||excess>1e-9)edgeViolations++;
+ }
+ return {max,mean:sum/plain.data.length,changedChannels,edgeChannels,edgeViolations,maxContrastExcess};
+}
+
 const root=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'../..');
 const out=path.resolve(root,process.env.PPG_BRUSH_ARTIFACTS||'.dream-loop/crisp-brush/verification');
 mkdirSync(out,{recursive:true});
@@ -430,7 +453,28 @@ for(const engine of engines){
     // The stepped clock remains fixed; pause also cancels asynchronous warming
     // so both screenshots show exactly the same deposited source and pigment.
     view.pause(true);
-    return {projection:structuredClone(stats.projection),streamTime:stats.streamTime,visibleLines:stats.visibleLines};
+    const mask=document.querySelector('.landscape-ink mask[id$="-paper-window"]'),maskRect=mask.querySelector('rect'),paper=document.querySelector('main').getBoundingClientRect();
+    const reference=node=>document.getElementById(node.match(/#([^)'"\s]+)/)?.[1]);
+    const attributes=node=>Object.fromEntries(['x','y','width','height'].map(key=>[key,Number(node.getAttribute(key))]));
+    const windowRect=attributes(maskRect),fade=reference(maskRect.getAttribute('fill'));
+    if(mask.getAttribute('maskUnits')!=='userSpaceOnUse'||fade.getAttribute('gradientUnits')!=='userSpaceOnUse'||fade.querySelector('stop:last-child').getAttribute('stop-color')!=='white')throw Error('Parent mask no longer has an inspectable fully opaque paper region');
+    const opaque={left:windowRect.x,top:Number(fade.getAttribute('y2')),right:windowRect.x+windowRect.width,bottom:windowRect.y+windowRect.height};
+    const footprints=[];
+    for(const fragment of document.querySelectorAll('.landscape-line-fragment')){
+     const record=document.getElementById(fragment.getAttribute('href').slice(1)),row=fragment.parentElement;
+     const bounds=fragment.getBBox(),recordClip=attributes(reference(record.getAttribute('clip-path')).querySelector('rect')),rowClip=attributes(reference(row.getAttribute('clip-path')).querySelector('rect'));
+     const left=Math.max(bounds.x,recordClip.x,rowClip.x),top=Math.max(bounds.y,recordClip.y,rowClip.y),right=Math.min(bounds.x+bounds.width,recordClip.x+recordClip.width,rowClip.x+rowClip.width),bottom=Math.min(bounds.y+bounds.height,recordClip.y+recordClip.height,rowClip.y+rowClip.height);
+     if(right<=left||bottom<=top)continue;
+     const matrix=fragment.getScreenCTM(),a=new DOMPoint(left,top).matrixTransform(matrix),b=new DOMPoint(right,bottom).matrixTransform(matrix);
+     // getBBox includes the wash/body/blooms. Include the full 4px non-scaling
+     // edge stroke too, even where record/line clipping would trim its radius.
+     const footprint={record:Number(fragment.dataset.recordIndex),line:Number(row.dataset.lineIndex),left:a.x-paper.x-2,top:a.y-paper.y-2,right:b.x-paper.x+2,bottom:b.y-paper.y+2};
+     footprint.whiteMargin=Math.min(footprint.left-opaque.left,footprint.top-opaque.top,opaque.right-footprint.right,opaque.bottom-footprint.bottom);
+     if(footprint.whiteMargin<.5)throw Error(`Settled pigment touches the parent's feather/clip region: ${JSON.stringify({footprint,opaque})}`);
+     footprints.push(footprint);
+    }
+    if(![1,2,3].every(line=>footprints.some(item=>item.line===line)))throw Error('Mask geometry proof does not cover each settled source row');
+    return {projection:structuredClone(stats.projection),streamTime:stats.streamTime,visibleLines:stats.visibleLines,pixelRatio:devicePixelRatio,opaqueMask:opaque,footprints};
    },{segments:recording.segments,paperHeight:size.paperHeight});
    const prefix=`${engine}-${size.width}x${size.height}-settled`;
    const unmasked=await page.locator('main').screenshot({path:path.join(out,`${prefix}-unmasked.png`)});
@@ -444,21 +488,34 @@ for(const engine of engines){
    const [plain,forced,again]=await Promise.all([unmasked,masked,restored].map(buffer=>sharp(buffer).ensureAlpha().raw().toBuffer({resolveWithObject:true})));
    assert.deepEqual(forced.info,plain.info,'forcing the parent mask cannot resize the settled screenshot');
    assert.deepEqual(again.info,plain.info);
-   let max=0,sum=0,changed=0,inkPixels=0,restoredMax=0;
-   for(let i=0;i<plain.data.length;i++){
-    const difference=Math.abs(plain.data[i]-forced.data[i]);max=Math.max(max,difference);sum+=difference;if(difference)changed++;
-    restoredMax=Math.max(restoredMax,Math.abs(plain.data[i]-again.data[i]));
-   }
+   const difference=compareMaskRaster(plain,forced);
+   let inkPixels=0,restoredMax=0;
+   for(let i=0;i<plain.data.length;i++)restoredMax=Math.max(restoredMax,Math.abs(plain.data[i]-again.data[i]));
    for(let i=0;i<plain.data.length;i+=4)if(plain.data[i+2]-plain.data[i]>15)inkPixels++;
-   const parity={size,...state,width:plain.info.width,height:plain.info.height,max,mean:sum/plain.data.length,changedChannels:changed,inkPixels,restoredMax};
+   const parity={size,...state,width:plain.info.width,height:plain.info.height,...difference,inkPixels,restoredMax};
    result.settledMaskParity.push(parity);
    await page.evaluate(()=>{if(JSON.stringify(scene)!==maskParitySource)throw Error('Parent-mask comparison changed accepted source');view.dispose();});
    assert.ok(inkPixels>100,'the compared screenshots contain visible measured blue pigment');
    assert.equal(restoredMax,0,'restoring the unmasked parent produces the exact same settled screenshot');
-   // Toggling an SVG offscreen layer can round alpha compositing by one
-   // 8-bit channel level. Bound every channel, not just an average error that
-   // could hide a clipped or displaced line; the restored rendering is exact.
-   assert.ok(max<=1,`${engine}/${size.width}: removing the settled parent mask changes visible pigment (max ${max}, mean ${parity.mean})`);
+   assert.equal(difference.edgeViolations,0,`${engine}/${size.width}: removing the settled parent mask changes interior pigment or exceeds bounded edge coverage (${JSON.stringify(difference)})`);
+   if(size.width===390){
+    // Demonstrate that edge tolerance cannot bless visibly displaced, erased,
+    // or faded ink. These controls mutate only temporary screenshot bytes.
+    parity.regressionControls=[];
+    for(const mutation of ['shift-one-css-pixel','erase-oldest-row','fade-five-percent']){
+     const altered={info:plain.info,data:Buffer.from(plain.data)},shift=Math.round(state.pixelRatio),firstRow=state.footprints.filter(item=>item.line===1);
+     const top=Math.floor(Math.min(...firstRow.map(item=>item.top))*state.pixelRatio),bottom=Math.ceil(Math.max(...firstRow.map(item=>item.bottom))*state.pixelRatio);
+     for(let y=0;y<plain.info.height;y++)for(let x=0;x<plain.info.width;x++)for(let c=0;c<3;c++){
+      const i=(y*plain.info.width+x)*4+c;
+      if(mutation==='shift-one-css-pixel')altered.data[i]=x<shift?plain.data[c]:plain.data[(y*plain.info.width+x-shift)*4+c];
+      else if(mutation==='erase-oldest-row'&&y>=top&&y<=bottom)altered.data[i]=plain.data[c];
+      else if(mutation==='fade-five-percent')altered.data[i]=Math.round(plain.data[i]*.95+plain.data[c]*.05);
+     }
+     const diagnostic=compareMaskRaster(plain,altered);
+     assert.ok(diagnostic.edgeViolations>0,`${engine}: the mask parity gate accepted ${mutation}`);
+     parity.regressionControls.push({mutation,...diagnostic});
+    }
+   }
   }
   assert.deepEqual(result.errors,[]);
   assert.deepEqual(result.failures,[],'all scene families preserve measured ink, smooth line returns and immutable pigment on scrolling paper');
