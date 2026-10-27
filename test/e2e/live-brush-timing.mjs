@@ -74,7 +74,7 @@ try {
           segments.forEach(segment => PulseLandscape.append(scene, segment));
           window.acceptedBefore = JSON.stringify(scene);
           window.pathCache = new Map(); window.materialCache = new Map();
-          window.observedChecks = { frontiers: 0, knots: 0, paths: 0, materials: 0, transitions: 0, previousStroke: null };
+          window.observedChecks = { frontiers: 0, knots: 0, paths: 0, materials: 0, transitions: 0, previousStroke: null, lineTurns: 0, returning: 0, intervals: 0, maxRows: 0, previousProjection: null };
           window.view = PulseLandscape.createView(document.querySelector('main'), scene);
         };
         window.streamDuration = () => scene.strokes.reduce((sum, stroke, index) => sum + stroke.sourceEnd - stroke.sourceStart + (index ? Math.min(.45, Math.max(0, stroke.sourceStart - scene.strokes[index - 1].sourceEnd)) : 0), 0);
@@ -86,6 +86,41 @@ try {
           expect(Number.isFinite(stats.queuedSeconds) && Math.abs(stats.queuedSeconds - (streamDuration() - stats.streamTime)) < 1e-7, 'queued time disagrees with accepted source coverage');
           expect(Number.isFinite(stats.playbackRate) && stats.playbackRate >= 0 && stats.playbackRate <= 1, 'recording accelerates to catch up');
           expect(typeof stats.awaitingSource === 'boolean', 'source waiting state is inspectable');
+          const projection = stats.projection, turn = stats.lineTurn;
+          expect(projection?.kind === 'wrapped-source-time-value' && projection.lineSeconds === 6, 'live source is not a six-second wrapped manuscript');
+          expect(Number.isInteger(projection.lineIndex) && projection.lineIndex >= 0 && projection.lineProgress >= 0 && projection.lineProgress <= 1, 'paper row metadata is invalid');
+          expect(Number.isFinite(stats.paperOffsetY) && stats.paperOffsetY <= .01 && projection.lineSpacing > 0, 'upward paper placement is invalid');
+          const previous = observedChecks.previousProjection;
+          if (previous) {
+            const rowStep = projection.lineIndex - previous.line;
+            expect(rowStep >= 0 && rowStep <= 1, 'paper skipped or repeated a writing row');
+            observedChecks.lineTurns += rowStep;
+            expect(stats.paperOffsetY <= previous.y + .01, 'finished ink scrolled backward');
+            if (turn?.active && previous.turn) expect(Math.abs(stats.streamTime - previous.cursor) < 1e-8, 'a lifted brush consumed accepted source');
+          }
+          if (turn?.active) {
+            expect(turn.toLine === turn.fromLine + 1 && turn.progress >= 0 && turn.progress <= 1, 'invalid brush return bounds');
+            expect(!stats.nib?.drawing, 'brush return painted an invented connector across the page');
+            observedChecks.returning++;
+          }
+          observedChecks.previousProjection = { line: projection.lineIndex, y: stats.paperOffsetY, turn: !!turn?.active, cursor: stats.streamTime };
+          const rows = [...document.querySelectorAll('.landscape-line')];
+          observedChecks.maxRows = Math.max(observedChecks.maxRows, rows.length);
+          expect(rows.length <= 3, 'live row DOM grows with the recording');
+          const bySource = new Map();
+          for (const interval of stats.visibleIntervals) {
+            const stroke = scene.strokes[interval.index];
+            expect(stroke && Number.isInteger(interval.line) && interval.sourceStart >= stroke.sourceStart - 1e-8 && interval.sourceEnd <= stroke.sourceEnd + 1e-8 && interval.sourceEnd >= interval.sourceStart, 'row invents or loses accepted-source ownership');
+            const fragment = document.querySelector(`.landscape-line[data-line-index="${interval.line}"] .landscape-line-fragment[data-record-index="${interval.index}"]`);
+            expect(fragment, 'visible source interval has no row fragment');
+            if (!bySource.has(interval.index)) bySource.set(interval.index, []);
+            bySource.get(interval.index).push(interval);
+            observedChecks.intervals++;
+          }
+          for (const intervals of bySource.values()) {
+            intervals.sort((a, b) => a.sourceStart - b.sourceStart);
+            for (let i = 1; i < intervals.length; i++) expect(intervals[i].sourceStart >= intervals[i - 1].sourceEnd - 1e-8, 'neighboring rows duplicate source time');
+          }
           for (const node of document.querySelectorAll('.landscape-live-core,.landscape-source-wash,.landscape-source-join,.landscape-source-blooms,.landscape-source-body,.landscape-source-edge')) {
             const geometry = node.getAttribute('d');
             expect(!pathCache.has(node) || pathCache.get(node) === geometry, 'deposited pulse ink changed when delivery stalled');
@@ -96,13 +131,13 @@ try {
             expect(!materialCache.has(node) || materialCache.get(node) === geometry, 'deposited pigment texture shifted');
             materialCache.set(node, geometry); observedChecks.materials++;
           }
-          if (stats.nib && stats.activeStroke !== null && !stats.bridging) {
+          if (stats.nib?.drawing && stats.activeStroke !== null && !stats.bridging) {
             const stroke = scene.strokes[stats.activeStroke];
             // sampleStroke has no terrain/material preparation. Its prefix is
             // independently timestamp-clipped to the original bounded path.
             const expected = PulseLandscape.sampleStroke(stroke, stats.progress).at(-1);
             expect(expected && Math.abs(expected.t - stats.frontier.t) < 1e-8 && Math.abs(expected.v - stats.frontier.v) < 1e-8, 'brush does not follow the measured time/value frontier');
-            expect(Number.isFinite(stats.nib.x) && Number.isFinite(stats.nib.y), 'source frontier produced an invalid brush position');
+            expect(Number.isFinite(stats.nib.x) && Number.isFinite(stats.nib.y) && Math.abs(stats.nib.x - stats.anchorX) < .04, 'source frontier produced an invalid brush contact');
             if (observedChecks.previousStroke !== null && observedChecks.previousStroke !== stats.activeStroke) observedChecks.transitions++;
             observedChecks.previousStroke = stats.activeStroke; observedChecks.frontiers++;
           }
@@ -139,9 +174,9 @@ try {
           const steady = sequence16();
           const stall = stepTiming(2000, 1 / 30);
           const afterStall = sequence16();
-          for (let i = 0; i < 3000 && __pulseLandscapeStats.streamTime < streamDuration() - 1e-8; i++) stepTiming(64, .064);
+          for (let i = 0; i < 3000 && !__pulseLandscapeStats.awaitingSource; i++) stepTiming(64, .064);
           const exhausted = inspectTiming();
-          if (exhausted.queuedSeconds > 1e-8 || !exhausted.awaitingSource) throw Error('Exhausted source did not enter its waiting state');
+          if (exhausted.queuedSeconds > 1e-8 || !exhausted.awaitingSource) throw Error(`Exhausted source did not enter its waiting state: ${JSON.stringify({family:scene.family,...exhausted,turn:__pulseLandscapeStats.lineTurn})}`);
           for (let i = 0; i < 120; i++) stepTiming(64, .064); // Settle any ambient/caption animation.
           const idle = inspectTiming();
           const deliveryDelay = stepTiming(15000, 0);
@@ -171,12 +206,13 @@ try {
         assert.equal(final.pending, 0, `${family}: disposal cancels animation`);
         assert.equal(final.elements, 0, `${family}: disposal removes painting surfaces`);
         assert.ok(item.checks.frontiers > 100 && item.checks.transitions >= 2 && item.checks.knots > 100, `${family}: checks cross real source windows and preserve measured knots`);
+        assert.ok(item.checks.lineTurns >= 2 && item.checks.returning > 10 && item.checks.intervals > 100 && item.checks.maxRows > 1 && item.checks.maxRows <= 3, `${family}: source crosses multiple bounded paper rows through non-drawing returns`);
         result.families.push(item);
       }
       assert.equal(result.families.length, 16, 'all landscape families share the source-only live path');
       assert.deepEqual(result.errors, [], 'no browser errors during delayed source delivery');
       result.passed = true;
-      console.log(`${engine}: all 16 scenes preserve source and fixed pigment, prepare no live terrain on the main thread, and resume without catch-up`);
+      console.log(`${engine}: all 16 scenes preserve source and fixed pigment across wrapped lines, prepare no live terrain on the main thread, and resume without catch-up`);
     } catch (error) {
       result.failure = String(error?.stack || error);
       throw error;

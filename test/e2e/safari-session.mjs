@@ -81,7 +81,7 @@ try {
   await page.evaluate(({ log, originalLength }) => {
     window.__sessionMetrics = { intervals: [], uninterruptedIntervals: [], paintIntervals: [], interruptions: [], checkpointAt: 60,
       stopCalls: 0, originalLength, extensionUsed: false, droppedSamples: 0,
-      flow: { samples:0, advances:0, paperChanges:0, regressions:0, invalid:0, futureFrontiers:0, nibSamples:0, maxNibXError:0, maxScenicRasters:0, emergenceUpdates:0, emergenceFadeSamples:0, futureBackgrounds:0 },
+      flow: { samples:0, advances:0, paperChanges:0, regressions:0, invalid:0, futureFrontiers:0, nibSamples:0, maxNibContactError:0, lineTurns:0, returnSamples:0, returnSourceAdvance:0, paperRegressions:0, maxVisibleLines:0, maxScenicRasters:0, emergenceUpdates:0, emergenceFadeSamples:0, futureBackgrounds:0 },
       camera: { samples: 0, changes: 0, invalid: 0, maxCachedPixels: 0, pixelBudget: 0, maxScale: 1, maxContinuousStep: 0, examples: [] } };
     window.PPGMonitor = class extends PPG.PPGMonitor {
       constructor(host, options) {
@@ -97,7 +97,7 @@ try {
         const metrics = window.__sessionMetrics;
         let previous = 0, previousPaint = 0, previousPaintFrames = 0, previousPaintWasActive = false;
         let previousCamera = null;
-        let previousStreamTime,previousPaperTransform;
+        let previousStreamTime,previousPaperTransform,previousLine,previousPaperOffsetY,previousTurn;
         let captureWidth = 0;
         let framePauseDone = false, stalled = false, hidden = false;
         let activeFeedPause = null, activeHidden = null, pendingResume = null, restoreVisibility = null;
@@ -144,6 +144,22 @@ try {
             if (surface.emergence.animating) flow.emergenceFadeSamples++;
             if (surface.emergence.strokeCount > (surface.warmStrokes || 0) || surface.emergence.sourceEnd > landscape.strokes.at(-1)?.sourceEnd + 1e-9) flow.futureBackgrounds++;
           }
+          const line = surface.projection?.lineIndex;
+          if (Number.isInteger(line)) {
+            if (previousLine !== undefined && line > previousLine) flow.lineTurns += line - previousLine;
+            if (previousLine !== undefined && line < previousLine) flow.invalid++;
+            previousLine = line;
+          }
+          if (Number.isFinite(surface.paperOffsetY)) {
+            if (previousPaperOffsetY !== undefined && surface.paperOffsetY > previousPaperOffsetY + .01) flow.paperRegressions++;
+            previousPaperOffsetY = surface.paperOffsetY;
+          }
+          if (surface.lineTurn?.active) {
+            flow.returnSamples++;
+            if (previousTurn && previousStreamTime !== undefined) flow.returnSourceAdvance += Math.abs(surface.streamTime - previousStreamTime);
+          }
+          previousTurn = !!surface.lineTurn?.active;
+          flow.maxVisibleLines = Math.max(flow.maxVisibleLines, surface.visibleLines || 0);
           if (Number.isFinite(surface.streamTime)) {
             flow.samples++;
             if (previousStreamTime !== undefined) {
@@ -159,7 +175,8 @@ try {
             if (!captureWidth) captureWidth=document.getElementById('landscape-view').getBoundingClientRect().width;
             flow.nibSamples++;
             if (![surface.nib.x,surface.nib.y].every(Number.isFinite)) flow.invalid++;
-            flow.maxNibXError = Math.max(flow.maxNibXError,Math.abs(surface.nib.x-captureWidth*.78));
+            if (surface.nib.drawing) flow.maxNibContactError = Math.max(flow.maxNibContactError,Math.abs(surface.nib.x-surface.anchorX));
+            if (surface.nib.x < -1 || surface.nib.x > captureWidth + 1) flow.invalid++;
           }
           // Scalar diagnostics avoid GPU readback/layout during timing samples.
           const camera = surface.camera, tracking = metrics.camera;
@@ -304,9 +321,12 @@ try {
   assert.ok(evidence.session.droppedSamples > 0, 'interruption stimuli actually removed camera frames');
   const camera = evidence.session.camera;
   const flow = evidence.session.flow;
-  assert.ok(flow.samples>100&&flow.advances>20&&flow.paperChanges>20&&flow.nibSamples>20,'full recording advances accepted source and actual paper translation under the continuous brush');
+  assert.ok(flow.samples>100&&flow.advances>20&&flow.paperChanges>20&&flow.nibSamples>20,'full recording advances accepted source and actual paper translation through the manuscript');
   assert.equal(flow.regressions+flow.invalid+flow.futureFrontiers,0,'recording flow stays finite, forward and within accepted data across interruptions');
-  assert.ok(flow.maxNibXError<1,'paper moves beneath the fixed horizontal brush anchor');
+  assert.ok(flow.maxNibContactError<1,'the writing brush contacts the measured waveform on each row');
+  assert.ok(flow.lineTurns>=10&&flow.returnSamples>20,'the full recording exercises repeated brush lifts and new lines');
+  assert.ok(flow.returnSourceAdvance<1e-7&&flow.paperRegressions===0,'line returns consume no source time and the paper never scrolls backward');
+  assert.ok(flow.maxVisibleLines>1&&flow.maxVisibleLines<=3,'only a bounded set of manuscript rows stays in the live SVG');
   assert.equal(flow.maxScenicRasters,0,'recording never composes the full-contrast final landscape');
   assert.ok(flow.emergenceUpdates >= 4 && flow.emergenceFadeSamples > 0,'the full recording exercises several actual background discoveries');
   assert.equal(flow.futureBackgrounds,0,'the background uses only the warmed accepted source prefix');

@@ -152,8 +152,8 @@ try {
       const initialWarmStrokes = window.__pulseLandscapeStats.warmStrokes || 0;
       const initialSegments = manuscript.segments.length, initialSamples = monitor.i;
       const width = document.getElementById('landscape-view').getBoundingClientRect().width;
-      const flow = { samples:0, advances:0, paperChanges:0, regressions:0, invalid:0, futureFrontiers:0, nibSamples:0, maxNibXError:0, emergenceUpdates:0, emergenceFadeSamples:0, futureBackgrounds:0 };
-      let previousStreamTime,previousPaperTransform,previousWarmStrokes=initialWarmStrokes;
+      const flow = { samples:0, advances:0, paperChanges:0, regressions:0, invalid:0, futureFrontiers:0, nibSamples:0, maxNibContactError:0, lineTurns:0, returnSamples:0, returnSourceAdvance:0, paperRegressions:0, maxVisibleLines:0, emergenceUpdates:0, emergenceFadeSamples:0, futureBackgrounds:0 };
+      let previousStreamTime,previousPaperTransform,previousLine,previousPaperOffsetY,previousTurn,previousWarmStrokes=initialWarmStrokes;
       let previous = 0, previousDraw = 0, previousFrames = initialFrames, previousDrawWasActive = false;
       function frame(now) {
         if (previous) intervals.push(now - previous);
@@ -170,6 +170,22 @@ try {
           previousWarmStrokes = surface.warmStrokes;
         }
         if (surface.mode !== 'recording') flow.invalid++;
+        const line = surface.projection?.lineIndex;
+        if (Number.isInteger(line)) {
+          if (previousLine !== undefined && line > previousLine) flow.lineTurns += line - previousLine;
+          if (previousLine !== undefined && line < previousLine) flow.invalid++;
+          previousLine = line;
+        }
+        if (Number.isFinite(surface.paperOffsetY)) {
+          if (previousPaperOffsetY !== undefined && surface.paperOffsetY > previousPaperOffsetY + .01) flow.paperRegressions++;
+          previousPaperOffsetY = surface.paperOffsetY;
+        }
+        if (surface.lineTurn?.active) {
+          flow.returnSamples++;
+          if (previousTurn && previousStreamTime !== undefined) flow.returnSourceAdvance += Math.abs(surface.streamTime - previousStreamTime);
+        }
+        previousTurn = !!surface.lineTurn?.active;
+        flow.maxVisibleLines = Math.max(flow.maxVisibleLines, surface.visibleLines || 0);
         if (Number.isFinite(surface.streamTime)) {
           flow.samples++;
           if (previousStreamTime !== undefined) {
@@ -184,7 +200,8 @@ try {
         if (surface.nib) {
           flow.nibSamples++;
           if (![surface.nib.x,surface.nib.y].every(Number.isFinite)) flow.invalid++;
-          flow.maxNibXError = Math.max(flow.maxNibXError,Math.abs(surface.nib.x-width*.78));
+          if (surface.nib.drawing) flow.maxNibContactError = Math.max(flow.maxNibContactError,Math.abs(surface.nib.x-surface.anchorX));
+          if (surface.nib.x < -1 || surface.nib.x > width + 1) flow.invalid++;
         }
         if (surface.frames > previousFrames) {
           // Use actual renderer state to exclude idle windows. Keep long active
@@ -200,9 +217,12 @@ try {
     }), { seconds: duration, preload: preloadSeconds });
     writeFileSync(path.join(output,`${name}-checkpoint.json`),JSON.stringify({stage:'capture',nodeVersion:process.version,replay},null,2)+'\n');
     assert.ok(replay.frames > duration * 10, `${name}: continuous accepted-source brush receives presentation frames`);
-    assert.ok(replay.flow.samples > 20 && replay.flow.advances > 10 && replay.flow.paperChanges > 10 && replay.flow.nibSamples > 10, `${name}: recorded source and actual paper translation advance under a visible brush`);
+    assert.ok(replay.flow.samples > 20 && replay.flow.advances > 10 && replay.flow.paperChanges > 10 && replay.flow.nibSamples > 10, `${name}: recorded source and manuscript scrolling advance under a visible brush`);
     assert.equal(replay.flow.regressions + replay.flow.invalid + replay.flow.futureFrontiers, 0, `${name}: recording presentation stays finite, forward and within accepted data`);
-    assert.ok(replay.flow.maxNibXError < 1, `${name}: the brush stays at its horizontal anchor while paper advances`);
+    assert.ok(replay.flow.maxNibContactError < 1, `${name}: the brush contacts the measured waveform while writing each row`);
+    if (duration >= 10) assert.ok(replay.flow.lineTurns > 0 && replay.flow.returnSamples > 0, `${name}: the run exercises a smooth brush return and next line`);
+    assert.ok(replay.flow.returnSourceAdvance < 1e-7 && replay.flow.paperRegressions === 0, `${name}: returning consumes no source and paper only advances upward`);
+    assert.ok(replay.flow.maxVisibleLines <= 3, `${name}: live manuscript DOM remains bounded`);
     assert.equal(replay.rasterFrames, 0, `${name}: capture does not compose the full-contrast final landscape`);
     assert.equal(replay.flow.futureBackgrounds, 0, `${name}: ambient discoveries use only the warmed accepted source prefix`);
     if (duration >= 10) assert.ok(replay.flow.emergenceUpdates > 0 && replay.flow.emergenceFadeSamples > 0, `${name}: measured capture includes actual background discoveries and their fades`);

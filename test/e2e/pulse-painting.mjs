@@ -172,7 +172,7 @@ try {
     {value:'0',description:'Signal quality unavailable',fill:'scaleX(0)',text:'Finding signal'},
   ], 'signal display gates rejected data, keeps issue prompts brief, and never invents a missing score');
   await checkLiveReadings(page);
-  // Accepted source advances on moving paper under a fixed brush. Presentation
+  // Accepted source writes through a scrolling manuscript. Presentation
   // must preserve earlier source strokes and save the final landscape for finish.
   await page.emulateMedia({ reducedMotion: 'no-preference' });
   await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
@@ -180,13 +180,14 @@ try {
     const paper = document.querySelector('.landscape-paper-trace');
     return { frames: __pulseLandscapeStats.frames, streamTime: __pulseLandscapeStats.streamTime,
       paperTransform: paper.getAttribute('transform') || paper.style.transform,
+      nib: __pulseLandscapeStats.nib && { ...__pulseLandscapeStats.nib },
       strokes: JSON.stringify(landscape.strokes) };
   });
   await page.evaluate(() => monitor.feedUntil(75));
   await page.waitForFunction(previous => {
-    const state = __pulseLandscapeStats, paper = document.querySelector('.landscape-paper-trace');
-    return state.frames > previous.frames && state.streamTime > previous.streamTime && state.nib
-      && (paper.getAttribute('transform') || paper.style.transform) !== previous.paperTransform;
+    const state = __pulseLandscapeStats;
+    return state.frames > previous.frames && state.streamTime > previous.streamTime && state.nib?.drawing
+      && (!previous.nib || Math.hypot(state.nib.x - previous.nib.x, state.nib.y - previous.nib.y) > .01);
   }, beforeFlow);
   const flow = await page.evaluate(previous => ({
     stats: __pulseLandscapeStats,
@@ -197,8 +198,9 @@ try {
   }), beforeFlow.strokes);
   assert.equal(flow.stable, true, 'new accepted strokes preserve all earlier placements and materials');
   assert.equal(flow.stats.mode, 'recording');
-  assert.equal(flow.stats.projection.kind, 'continuous-source-time-value');
-  assert.ok(Math.abs(flow.stats.nib.x - flow.width * .78) < 1, 'the brush keeps its horizontal anchor as real source paper advances');
+  assert.equal(flow.stats.projection.kind, 'wrapped-source-time-value');
+  assert.ok(flow.stats.nib.drawing && Math.abs(flow.stats.nib.x - flow.stats.anchorX) < 1, 'the brush contacts the measured waveform while writing across the current line');
+  assert.ok(flow.stats.nib.x >= 0 && flow.stats.nib.x <= flow.width && flow.stats.projection.lineIndex >= 0, 'the current writing row and brush remain inside the paper');
   assert.ok(flow.stats.frontier.t <= flow.acceptedEnd + 1e-9, 'the brush cannot paint beyond accepted source');
   assert.equal(flow.finalScenicHidden, true, 'recording keeps the full-contrast final painting for the finish reveal');
   assert.ok(flow.stats.cachedPixels <= flow.stats.pixelBudget, 'live landscape cache stays within its pixel budget');
