@@ -23,3 +23,15 @@ jobs:
       - run: npm ci --no-audit --no-fund --fetch-timeout=30000 --fetch-retries=1
         timeout-minutes: 3
       - run: npm test
+      - name: Preserve pulse rendering failure evidence
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: pulse-rendering-failure
+          # Only public-fixture screenshots and test results, never local env files.
+          path: |
+            .dream-loop/crisp-brush/verification/*.json
+            .dream-loop/crisp-brush/verification/*settled*.png
+          include-hidden-files: true
+          if-no-files-found: ignore
+          retention-days: 3
