@@ -10,52 +10,76 @@ the separately tested October 23 build; it was captured locally before the
 release was verified on the public site.
 See [HANDOFF.md](../../HANDOFF.md) for deployment status.
 
-## Current immersive capture and balanced keepsake
+## Current scrolling capture — October 27
 
-`pulse-painting-capture.jpg` comes from the actual app at **60.012 seconds of
+`pulse-painting-capture.jpg` comes from the actual app at **60.001 seconds of
 wall time** in the October 27 full WebKit replay, with an emulated iPhone 13
-viewport. It shows the new single Signal meter: **2:20** remaining, **72 bpm**,
-**40 ms HRV** and **98/100 Signal**. At that checkpoint, 41.105 seconds of active
-measurement had accrued, six segments were accepted, and 29.75 accepted seconds
-had reached the background cache. The camera thumbnail is empty because camera
-I/O is mocked. This screenshot is from the unchanged landscape/portrait renderer
-with the new live-signal display; see [Signal verification](../validation/live-signal-quality-2026-10-27.md).
-Its source PNG is in ignored `.dream-loop/live-signal-quality/safari/capture-390.png`.
+viewport. It shows a pointed brush writing the accepted PPG in six-second lines,
+with the previous line retained above. During line returns the paper moves up
+and the brush lifts without drawing a connector. At most three rows are mounted
+while turning; settled ink and its pigment remain fixed to the paper.
+
+The screenshot displays **2:20** remaining, **72 bpm**, **40 ms HRV** and
+**98/100 Signal**. At that checkpoint, 41.084 seconds of active measurement had
+accrued, six segments were accepted, and 29.75 accepted seconds had reached the
+background cache. Camera I/O is mocked, so the camera thumbnail is empty.
+The source PNG is 1170 × 1992 pixels at
+`.dream-loop/scrolling-pulse-lines/session-release/capture-390.png`.
+
+The public `test/fixtures/iphone-200s.json` was replayed through the real signal
+engine and app callbacks at **1× wall-clock speed**, including camera-frame,
+main-thread and simulated-visibility interruptions. The session reached 180.404
+active measuring seconds in 209.864 wall seconds, then completed the reveal.
+Its original 199.452-second fixture required a repeat of the final 60 seconds
+with monotonically shifted timestamps to cover acquisition and interruption
+overhead. This is an explicit test-input extension, not another real recording.
+Expired samples were dropped during interruptions instead of replayed as a
+catch-up backlog.
+
+Tested source: `92adb250`.
+Landscape renderer SHA-256:
+`2b2d060e7e30fdbeb9dc7471daffa4ab04f1538379c4442bbda2874b2b397e44`.
+Source capture PNG SHA-256:
+`8954cd3ed03bd19d0791b72a8dea353ecfa2ae0bee53f6c9a8863583e9590c35`.
+Public fixture SHA-256:
+`5f09524bc151460d1a1a1fa58c30681dd84eaf30d989f4637edf6183e4a03b66`.
+
+The capture JPEG is resized to **780 × 1328** from that PNG. No interface text,
+countdown, measurements, paint strokes or other content is altered. Session
+evidence is in ignored `.dream-loop/scrolling-pulse-lines/session-release/result.json`;
+see [scrolling-line verification](../validation/scrolling-pulse-lines-2026-10-27.md).
+
+## Retained balanced keepsake — October 25
 
 `pulse-painting-report.jpg` shows the actual final **Quiet Lake** keepsake from
-the October 25 session, rendered by the final portrait compositor. Seed 39293 contains
+the October 25 session, rendered by that release's portrait compositor. This is
+a separate session from the current scrolling-capture image. Seed 39293 contains
 **65 strokes and 157.2667 usable seconds**. The completed measurement has 193
 accepted beats; report values of 71 bpm, 54.6 ms RMSSD and 51.9 ms SDNN round to
 **71 bpm, 55 ms and 52 ms** in the artwork. Metrics remain on by default. The
 larger painting, cursive name, complete golden frame and date/website footer
 are part of the exported artwork, not added to the screenshot.
 
-Both delivery files were resized to **780 pixels wide** and encoded as JPEG
-from the actual session capture PNG and final portrait PNG. No interface text,
-countdown, metric values, paint strokes or other content was altered. The prepared
-JPEGs were copied byte-for-byte into this folder. The capture is 780 × 1328;
-the keepsake is 780 × 975, preserving the original 1080 × 1350 export ratio.
+The keepsake JPEG is **780 × 975**, resized from the original **1080 × 1350**
+portrait PNG without changing its content or proportions. The prepared JPEG was
+copied byte-for-byte into this folder and is unchanged by the scrolling update.
 
-In the October 25 session, the public `test/fixtures/iphone-200s.json` was replayed through the real signal
-engine and app callbacks at **1× wall-clock speed**. Camera-frame interruption,
-a main-thread stall and simulated visibility interruption were exercised. The
-session reached 180.404 active measuring seconds in 209.86 wall seconds, then
-completed the reveal. To cover acquisition and interruption overhead beyond the
-fixture's original 199.452 seconds, the replay repeated its final 60 seconds once
-with monotonically shifted timestamps; that extension was used. This is an
-explicit test input extension, not an additional real recording. Expired samples
-were dropped during interruptions instead of replayed as a catch-up backlog.
+In this October 25 session, the same public fixture was replayed through the
+real signal engine and app callbacks at **1× wall-clock speed**. Camera-frame
+interruption, a main-thread stall and simulated visibility interruption were
+exercised. The session reached 180.404 active measuring seconds in 209.86 wall
+seconds, then completed the reveal. It also used the explicit final-60-second
+fixture extension described above, with monotonically shifted timestamps.
 
-Public fixture SHA-256:
-`5f09524bc151460d1a1a1fa58c30681dd84eaf30d989f4637edf6183e4a03b66`.
-Final landscape renderer SHA-256:
+October 25 landscape renderer SHA-256:
 `277a3163b8d797944e264e2775f9232645f3f1c9cbcaead4865ce72d78802849`.
-Final portrait compositor SHA-256:
+October 25 portrait compositor SHA-256:
 `ea232aab358b7cdf9b0ecdb89f9a3aeb8656c7db9e8723ca432eafa67f4f877e`.
 
-Session evidence is in ignored `.dream-loop/immersive-capture/session/result.json`;
-the prepared images are `capture-readme.jpg` and `report-readme.jpg` in the parent
-folder. See [current verification](../validation/immersive-capture-2026-10-25.md).
+Session evidence remains in ignored
+`.dream-loop/immersive-capture/session/result.json`; the prepared keepsake is
+`report-readme.jpg` in its parent folder. See
+[October 25 verification](../validation/immersive-capture-2026-10-25.md).
 These images illustrate browser replay and artwork presentation. They do not
 establish physical iPhone camera, thermal, physiological-accuracy, native-sharing
 or sustained phone frame-rate performance.
@@ -281,7 +305,7 @@ social-post delivery or sustained frame-rate evidence.
 | `pulse-painting-desktop-candidate.jpg` | 188941 | `71f997d63b0146af03e7cebbaea9b092c927ffd8c044959c591d36365a01fd4f` |
 | `pulse-painting-qr.jpg` | 81054 | `56374f21d8c42f2edc94165adb7b06a762b95fae80e95c147e157f7038c52898` |
 | `pulse-painting-ready.jpg` | 51933 | `1da91b18ec49b70eebb09af1fcea4dff9f87078637b8ffcc70adf00e375a1ddf` |
-| `pulse-painting-capture.jpg` | 105141 | `afe7bc706b42c96b58db31b1bd2e6108cb2e35d6a323c8f618771cd8b5a77c36` |
+| `pulse-painting-capture.jpg` | 107977 | `1778fc6b664a313380b64b37bf87acfb355e9168c51546e34d5b4811eb87bffa` |
 | `pulse-painting-report.jpg` | 102898 | `90e30ef4166ccaa0a4e2e55e28c720055b64a6d579f3353a8d9f45c4a807f9bc` |
 | `pulse-painting-mobile-gallery.png` | 469347 | `2f7f07374fb73399156555da8a86281d6b982db7714efe9a7bd2b4d4caa1889b` |
 | `pulse-painting-sharing.png` | 112629 | `2108b3314600dcda8a89d8e1aa0fe9b19e550fece694c7abfca10ec26ff664d3` |

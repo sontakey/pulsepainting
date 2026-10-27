@@ -1,6 +1,41 @@
 # Pulse Painting handoff
 
-## Current production release: one live Signal meter
+## Current production release: scrolling pulse lines
+
+The live brush now writes left to right across six-second rows. At the edge,
+it lifts for a short return while the paper scrolls upward, keeping the active
+line centered and the previous line visible. Deposited ink and pigment stay
+fixed to the paper. Returns hold the presentation cursor and draw no connector;
+acquisition continues independently. Missing or rejected data still creates
+real pen lifts, never invented connecting samples.
+
+Only the current and previous row are mounted, with at most three during a
+return. Immutable source paths are reused; the original waveform, all sixteen
+scene mappings and all 49 gallery images are unchanged. Finish matches the
+visible ink even mid-return, then reconstructs the landscape. The reveal mask
+is limited to its opening 180ms to reduce WebKit offscreen raster work.
+
+Chromium/WebKit app, four phone layouts, all sixteen scenes, source/pigment
+checks, background growth, worker/fallback and reduced-motion cases pass.
+The full WebKit interruption replay completed 180.404 active seconds, 25 line
+returns and report/export, with 58.19fps active painting and 59.09fps reveal.
+The retained capture maximum was 197ms, including screenshot overhead. Isolated
+4×/6× desktop CPU stress measured 60fps live drawing; physical-phone camera,
+thermal and sustained performance validation remain separate.
+
+PR #18 merged as `979f37507706796485f7bfdbced9d20edb32f2be` after full Linux
+CI `40547258159` passed feature head `92adb2503fbc53660d3892e4bdf69180ebaec8a6`.
+Production `dpl_BfBHFCXFzen45YhXWJDF5QLu2h4U` is READY at
+https://www.pulsepainting.com/ on the exact merge commit. All 110 files matched
+the tested build at `2026-10-27T17:23:43.097Z`. Anonymous Chromium/WebKit mobile
+and desktop checks and all four production phone layouts in both engines passed.
+The Git integration deployed the merge automatically; later documentation-only
+deployments may have different IDs with the same runtime bytes.
+
+See `docs/validation/scrolling-pulse-lines-2026-10-27.md`. npm publication remains
+pending. The simple PPG-JS reference demo is separate and unchanged.
+
+## Previous production release: one live Signal meter
 
 The recording strip shows Pulse, HRV (RMSSD), and Signal, replacing the sparse
 breathing tile. Signal uses the existing engine's measured 0–100 quality score
