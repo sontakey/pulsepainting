@@ -152,7 +152,7 @@ try {
       const initialWarmStrokes = window.__pulseLandscapeStats.warmStrokes || 0;
       const initialSegments = manuscript.segments.length, initialSamples = monitor.i;
       const width = document.getElementById('landscape-view').getBoundingClientRect().width;
-      const flow = { samples:0, advances:0, paperChanges:0, regressions:0, invalid:0, futureFrontiers:0, nibSamples:0, maxNibContactError:0, lineTurns:0, returnSamples:0, returnSourceAdvance:0, paperRegressions:0, maxVisibleLines:0, emergenceUpdates:0, emergenceFadeSamples:0, futureBackgrounds:0 };
+      const flow = { samples:0, advances:0, paperChanges:0, regressions:0, invalid:0, futureFrontiers:0, nibSamples:0, maxNibContactError:0, lineTurns:0, returnSamples:0, returnSourceAdvance:0, paperRegressions:0, maxVisibleLines:0, threeRowSamples:0, invalidRowWindows:0, emergenceUpdates:0, emergenceFadeSamples:0, futureBackgrounds:0 };
       let previousStreamTime,previousPaperTransform,previousLine,previousPaperOffsetY,previousTurn,previousWarmStrokes=initialWarmStrokes;
       let previous = 0, previousDraw = 0, previousFrames = initialFrames, previousDrawWasActive = false;
       function frame(now) {
@@ -186,6 +186,11 @@ try {
         }
         previousTurn = !!surface.lineTurn?.active;
         flow.maxVisibleLines = Math.max(flow.maxVisibleLines, surface.visibleLines || 0);
+        if (surface.visibleLines > (surface.lineTurn?.active ? 4 : 3)) flow.invalidRowWindows++;
+        if (Number.isInteger(line) && line >= 2 && !surface.lineTurn?.active && surface.projection.lineProgress > .02) {
+          if (surface.visibleLines === 3 && surface.projection.retainedLines === 3) flow.threeRowSamples++;
+          else flow.invalidRowWindows++;
+        }
         if (Number.isFinite(surface.streamTime)) {
           flow.samples++;
           if (previousStreamTime !== undefined) {
@@ -222,7 +227,8 @@ try {
     assert.ok(replay.flow.maxNibContactError < 1, `${name}: the brush contacts the measured waveform while writing each row`);
     if (duration >= 10) assert.ok(replay.flow.lineTurns > 0 && replay.flow.returnSamples > 0, `${name}: the run exercises a smooth brush return and next line`);
     assert.ok(replay.flow.returnSourceAdvance < 1e-7 && replay.flow.paperRegressions === 0, `${name}: returning consumes no source and paper only advances upward`);
-    assert.ok(replay.flow.maxVisibleLines <= 3, `${name}: live manuscript DOM remains bounded`);
+    assert.ok(replay.flow.maxVisibleLines <= 4 && replay.flow.invalidRowWindows === 0, `${name}: only three settled manuscript rows and a returning row stay mounted`);
+    if (duration >= 15) assert.ok(replay.flow.threeRowSamples > 0, `${name}: the measured run actually exercises all three settled rows`);
     assert.equal(replay.rasterFrames, 0, `${name}: capture does not compose the full-contrast final landscape`);
     assert.equal(replay.flow.futureBackgrounds, 0, `${name}: ambient discoveries use only the warmed accepted source prefix`);
     if (duration >= 10) assert.ok(replay.flow.emergenceUpdates > 0 && replay.flow.emergenceFadeSamples > 0, `${name}: measured capture includes actual background discoveries and their fades`);

@@ -7,7 +7,31 @@ import { readFileSync, mkdirSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { chromium, webkit } from 'playwright';
+import sharp from 'sharp';
 import { replayPublicFixture } from '../landscape-fixture.mjs';
+
+// Software Chromium can change edge coverage when adding an otherwise opaque
+// SVG compositing surface. Interior pixels retain the one-level rounding gate;
+// larger differences must be within one physical pixel of contrast, bounded by
+// 1/8 of that channel's local contrast (+1 rounding level), never above 16.
+// Geometry below separately proves no paint touches the mask feather or clip.
+function compareMaskRaster(plain,forced){
+ const {width,height}=plain.info;let max=0,sum=0,changedChannels=0,edgeChannels=0,edgeViolations=0,maxContrastExcess=0;
+ for(let y=0;y<height;y++)for(let x=0;x<width;x++)for(let channel=0;channel<4;channel++){
+  const i=(y*width+x)*4+channel,difference=Math.abs(plain.data[i]-forced.data[i]);
+  max=Math.max(max,difference);sum+=difference;if(difference)changedChannels++;
+  if(difference<=1)continue;
+  edgeChannels++;let pmin=255,pmax=0,fmin=255,fmax=0;
+  for(let yy=Math.max(0,y-1);yy<=Math.min(height-1,y+1);yy++)for(let xx=Math.max(0,x-1);xx<=Math.min(width-1,x+1);xx++){
+   const j=(yy*width+xx)*4+channel;
+   pmin=Math.min(pmin,plain.data[j]);pmax=Math.max(pmax,plain.data[j]);fmin=Math.min(fmin,forced.data[j]);fmax=Math.max(fmax,forced.data[j]);
+  }
+  const contrast=Math.max(pmax-pmin,fmax-fmin),excess=difference-1-contrast/8;
+  maxContrastExcess=Math.max(maxContrastExcess,excess);
+  if(difference>16||excess>1e-9)edgeViolations++;
+ }
+ return {max,mean:sum/plain.data.length,changedChannels,edgeChannels,edgeViolations,maxContrastExcess};
+}
 
 const root=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'../..');
 const out=path.resolve(root,process.env.PPG_BRUSH_ARTIFACTS||'.dream-loop/crisp-brush/verification');
@@ -142,7 +166,7 @@ for(const engine of engines){
     segments.slice(0,7).forEach(segment=>PulseLandscape.append(scene,segment));
     const before=JSON.stringify(scene);window.view=PulseLandscape.createView(document.querySelector('main'),scene);
     const target=scene.strokes.length-1,frames=[],cache=new Map(),textureCache=new Map(),transitions=[];
-    let previous=null,immutableChecks=0,maxContactStep=0,maxPaperStep=0,bridgeFrames=0,maxBridgeError=0,returnFrames=0,lineTurns=0,maxVisibleLines=0;
+    let previous=null,immutableChecks=0,maxContactStep=0,maxPaperStep=0,bridgeFrames=0,maxBridgeError=0,returnFrames=0,lineTurns=0,maxVisibleLines=0,threeRowChecks=0;
     for(let i=0;i<16000;i++){
      const snapshot=inspectRecording(scene,view),state=snapshot.state;
      if(snapshot.mode!=='recording')throw Error('Final reconstruction started before the explicit finish action');
@@ -153,7 +177,20 @@ for(const engine of engines){
      }
      if(snapshot.bridging&&snapshot.nib?.drawing){const join=inspectJoin(scene,__pulseLandscapeStats);bridgeFrames++;maxBridgeError=Math.max(maxBridgeError,join.endpointError);}
      if(snapshot.lineTurn?.active){returnFrames++;if(snapshot.nib?.drawing)throw Error('The returning brush left ink across the paper');}
-     maxVisibleLines=Math.max(maxVisibleLines,document.querySelectorAll('.landscape-line').length);
+     const paperViewport=document.querySelector('.landscape-paper-trace').parentElement,paperMask=document.querySelector('.landscape-ink mask[id$="-paper-window"]');
+     if(snapshot.lineTurn?.active){if(!paperMask||paperViewport.getAttribute('mask')!==`url(#${paperMask.id})`)throw Error('The exiting oldest row has no paper-window mask during its return');}
+     else if(paperViewport.hasAttribute('mask'))throw Error('Settled manuscript rows retain an unnecessary parent raster mask');
+     const rows=[...document.querySelectorAll('.landscape-line')],lineIndex=snapshot.projection.lineIndex;
+     if(snapshot.projection.retainedLines!==3)throw Error('The live manuscript no longer retains three rows');
+     if(rows.length>(snapshot.lineTurn?.active?4:3))throw Error('The manuscript mounted more than its three retained rows and return destination');
+     if(!snapshot.lineTurn?.active&&lineIndex>=2&&snapshot.projection.lineProgress>.02){
+      const expected=[lineIndex-2,lineIndex-1,lineIndex];
+      if(JSON.stringify(rows.map(row=>Number(row.dataset.lineIndex)))!==JSON.stringify(expected))throw Error('Three consecutive settled rows are not mounted');
+      if(rows.some(row=>!row.querySelector('.landscape-line-fragment')||Number(getComputedStyle(row).opacity)!==1))throw Error('A settled retained row has no visible accepted ink');
+      if(expected.some(index=>!snapshot.visibleIntervals.some(interval=>interval.line===index)))throw Error('A settled visible row has no measured source coverage');
+      threeRowChecks++;
+     }
+     maxVisibleLines=Math.max(maxVisibleLines,rows.length);
      for(const material of document.querySelectorAll('.landscape-ink pattern,.landscape-ink mask')){
       const placement=['x','y','width','height','patternTransform','patternUnits','maskUnits','maskContentUnits'].map(name=>material.getAttribute(name)).join('|');
       if(textureCache.has(material)&&textureCache.get(material)!==placement)throw Error('Paper texture shifted relative to its deposited waveform');
@@ -176,7 +213,7 @@ for(const engine of engines){
      if(!advancePaint())throw Error('The continuous source cursor stopped before the active checkpoint');
     }
     if(frames.length<8)throw Error('No sustained active measured source was observed');
-    return{family:family.id,sourceStable:before===JSON.stringify(scene),frames,transitions,immutableChecks,maxContactStep,maxPaperStep,bridgeFrames,maxBridgeError,returnFrames,lineTurns,maxVisibleLines,state:view.captureState};
+    return{family:family.id,sourceStable:before===JSON.stringify(scene),frames,transitions,immutableChecks,maxContactStep,maxPaperStep,bridgeFrames,maxBridgeError,returnFrames,lineTurns,maxVisibleLines,threeRowChecks,state:view.captureState};
    },{family,segments:recording.segments});
    assert.equal(item.sourceStable,true);
    const issues=new Set(),check=(condition,message)=>{if(!condition)issues.add(message)};
@@ -184,7 +221,7 @@ for(const engine of engines){
    check(item.bridgeFrames>0&&item.maxBridgeError<.04,`${family.id}: clean accepted-window handoffs retain a continuously attached brush without changing source coverage`);
    check(item.maxContactStep<8&&item.maxPaperStep<12,`${family.id}: drawing and upward paper scrolling advance in bounded steps`);
    check(item.lineTurns>=3&&item.returnFrames>30,`${family.id}: the measured manuscript crosses several rows with a visible brush lift`);
-   check(item.maxVisibleLines>1&&item.maxVisibleLines<=3,`${family.id}: only a bounded set of paper rows remains mounted`);
+   check(item.maxVisibleLines===4&&item.threeRowChecks>100,`${family.id}: three populated settled rows remain visible with at most the fourth return destination`);
    for(const frame of item.frames){
     check(frame.nib&&frame.core,`${family.id}: measured writing has a visible attached brush`);
     check(frame.core.sourceError<1e-7,`${family.id}: presentation retains the exact canonical source frontier`);
@@ -324,7 +361,7 @@ for(const engine of engines){
      advancePaint(17.173);
      const stats=__pulseLandscapeStats;
      if(label==='sub-sample'&&stats.streamTime>1.731&&stats.nib?.drawing){advancePaint(.319);break;}
-     if(label==='mid-return'&&stats.lineTurn?.active&&stats.lineTurn.toLine===2&&stats.lineTurn.progress>.4&&stats.lineTurn.progress<.6)break;
+     if(label==='mid-return'&&stats.lineTurn?.active&&stats.lineTurn.toLine===3&&stats.lineTurn.progress>.4&&stats.lineTurn.progress<.6)break;
     }
     const before=structuredClone(__pulseLandscapeStats),stroke=scene.strokes[before.painted];
     if(label==='mid-return'&&(!before.lineTurn?.active||before.nib?.drawing))throw Error('Finish-mid-return case never reached a lifted brush');
@@ -335,20 +372,21 @@ for(const engine of engines){
     if(!fragment)throw Error('The live endpoint has no manuscript row');
     const box=document.querySelector('main').getBoundingClientRect(),point=new DOMPoint(before.frontier.t*fitT.slope+fitT.offset,before.frontier.v*fitV.slope+fitV.offset).matrixTransform(fragment.getScreenCTM());
     const expected={x:point.x-box.x,y:point.y-box.y};
-    const oldRow=document.querySelector(`.landscape-line[data-line-index="${before.projection.lineIndex-1}"]`),oldOpacity=oldRow?Number(getComputedStyle(oldRow).opacity):null;
+    const oldRow=document.querySelector(`.landscape-line[data-line-index="${before.projection.lineIndex-2}"]`),oldOpacity=oldRow?Number(getComputedStyle(oldRow).opacity):null;
+    if(label==='mid-return'&&!(oldOpacity>0&&oldOpacity<1))throw Error('Finish case did not reach a fading oldest retained row');
     const completion=view.finish();
     if(__pulseLandscapeStats.mode!=='pullback'||__pulseLandscapeStats.streamTime!==before.streamTime)throw Error('Finish advanced source before its first reveal frame');
     const activePaths=[...document.querySelectorAll(`.landscape-reveal-core[data-stroke-index="${before.painted}"][data-line-index="${before.projection.lineIndex}"]`)].filter(path=>Number(path.style.opacity)>0);
     const endpointError=Math.min(...activePaths.map(path=>{const p=inkVertices(path).at(-1);return Math.hypot(p.x-expected.x,p.y-expected.y);}));
     if(!(endpointError<.025))throw Error(`${label}: first reveal frame shifted the exact live source endpoint by ${endpointError}px`);
     let opacityChecks=0;
-    if(label==='mid-return')for(const path of document.querySelectorAll(`.landscape-reveal-core[data-line-index="${before.projection.lineIndex-1}"]`)){
-     if(Math.abs(Number(path.style.opacity)-oldOpacity)>1e-6)throw Error('Finish resurrected the fading previous row');
+    if(label==='mid-return')for(const path of document.querySelectorAll(`.landscape-reveal-core[data-line-index="${before.projection.lineIndex-2}"]`)){
+     if(Math.abs(Number(path.style.opacity)-oldOpacity)>1e-6)throw Error('Finish resurrected the fading oldest retained row');
      opacityChecks++;
     }
     view.cancelFinish();await completion;
     if(JSON.stringify(scene)!==sourceBefore)throw Error('Finish seam changed accepted source');
-    results.push({label,endpointError,opacityChecks,frontier:before.frontier,turn:before.lineTurn,sourceStable:true});view.dispose();
+    results.push({label,endpointError,opacityChecks,oldestLine:before.projection.lineIndex-2,oldOpacity,frontier:before.frontier,turn:before.lineTurn,sourceStable:true});view.dispose();
    }
    return results;
   },recording.segments);
@@ -395,6 +433,89 @@ for(const engine of engines){
   assert.ok(reconstructed.morphs.length>12&&reconstructed.checkedColors>50&&reconstructed.morphs.some(point=>point.progress>.3&&point.progress<.7&&point.travel>10),`${family.id}: valid visible pulse vertices pass through intermediate terrain geometry`);
   assert.ok(reconstructed.morphs.every(point=>point.sourceError<1e-7&&point.interpolationError<1e-6),`${family.id}: morphing keeps source t/v and interpolates the same point between manuscript and terrain`);
   assert.ok(reconstructed.morphs.every(point=>point.domError<.002&&point.targetError<1e-6&&point.manuscriptError<1e-6),`${family.id}: actual DOM vertices follow measured manuscript locations into canonical pulseCore terrain coordinates`);
+  }
+  // The settled three-row footprint fits the opaque region of the old parent
+  // mask. Compare actual browser pixels, not only geometry/stat metadata, before
+  // and after forcing that mask back on at normal and short/narrow phone sizes.
+  result.settledMaskParity=[];
+  for(const size of [{width:390,height:844,paperHeight:520},{width:320,height:568,paperHeight:320}]){
+   await page.setViewportSize({width:size.width,height:size.height});
+   const state=await page.evaluate(({segments,paperHeight})=>{
+    document.querySelector('main').style.height=`${paperHeight}px`;
+    window.scene=PulseLandscape.create({family:'quiet-lake',seed:39293});segments.slice(0,7).forEach(segment=>PulseLandscape.append(scene,segment));
+    window.maskParitySource=JSON.stringify(scene);window.view=PulseLandscape.createView(document.querySelector('main'),scene);
+    for(let i=0;i<2400;i++){
+     advancePaint();const p=__pulseLandscapeStats.projection;
+     if(p.lineIndex===3&&p.lineProgress>.45&&!__pulseLandscapeStats.lineTurn.active)break;
+    }
+    const stats=__pulseLandscapeStats,viewport=document.querySelector('.landscape-paper-trace').parentElement;
+    if(stats.projection.lineIndex!==3||stats.visibleLines!==3||stats.lineTurn.active||viewport.hasAttribute('mask'))throw Error('Pixel parity did not reach three settled unmasked rows');
+    // The stepped clock remains fixed; pause also cancels asynchronous warming
+    // so both screenshots show exactly the same deposited source and pigment.
+    view.pause(true);
+    const mask=document.querySelector('.landscape-ink mask[id$="-paper-window"]'),maskRect=mask.querySelector('rect'),paper=document.querySelector('main').getBoundingClientRect();
+    const reference=node=>document.getElementById(node.match(/#([^)'"\s]+)/)?.[1]);
+    const attributes=node=>Object.fromEntries(['x','y','width','height'].map(key=>[key,Number(node.getAttribute(key))]));
+    const windowRect=attributes(maskRect),fade=reference(maskRect.getAttribute('fill'));
+    if(mask.getAttribute('maskUnits')!=='userSpaceOnUse'||fade.getAttribute('gradientUnits')!=='userSpaceOnUse'||fade.querySelector('stop:last-child').getAttribute('stop-color')!=='white')throw Error('Parent mask no longer has an inspectable fully opaque paper region');
+    const opaque={left:windowRect.x,top:Number(fade.getAttribute('y2')),right:windowRect.x+windowRect.width,bottom:windowRect.y+windowRect.height};
+    const footprints=[];
+    for(const fragment of document.querySelectorAll('.landscape-line-fragment')){
+     const record=document.getElementById(fragment.getAttribute('href').slice(1)),row=fragment.parentElement;
+     const bounds=fragment.getBBox(),recordClip=attributes(reference(record.getAttribute('clip-path')).querySelector('rect')),rowClip=attributes(reference(row.getAttribute('clip-path')).querySelector('rect'));
+     const left=Math.max(bounds.x,recordClip.x,rowClip.x),top=Math.max(bounds.y,recordClip.y,rowClip.y),right=Math.min(bounds.x+bounds.width,recordClip.x+recordClip.width,rowClip.x+rowClip.width),bottom=Math.min(bounds.y+bounds.height,recordClip.y+recordClip.height,rowClip.y+rowClip.height);
+     if(right<=left||bottom<=top)continue;
+     const matrix=fragment.getScreenCTM(),a=new DOMPoint(left,top).matrixTransform(matrix),b=new DOMPoint(right,bottom).matrixTransform(matrix);
+     // getBBox includes the wash/body/blooms. Include the full 4px non-scaling
+     // edge stroke too, even where record/line clipping would trim its radius.
+     const footprint={record:Number(fragment.dataset.recordIndex),line:Number(row.dataset.lineIndex),left:a.x-paper.x-2,top:a.y-paper.y-2,right:b.x-paper.x+2,bottom:b.y-paper.y+2};
+     footprint.whiteMargin=Math.min(footprint.left-opaque.left,footprint.top-opaque.top,opaque.right-footprint.right,opaque.bottom-footprint.bottom);
+     if(footprint.whiteMargin<.5)throw Error(`Settled pigment touches the parent's feather/clip region: ${JSON.stringify({footprint,opaque})}`);
+     footprints.push(footprint);
+    }
+    if(![1,2,3].every(line=>footprints.some(item=>item.line===line)))throw Error('Mask geometry proof does not cover each settled source row');
+    return {projection:structuredClone(stats.projection),streamTime:stats.streamTime,visibleLines:stats.visibleLines,pixelRatio:devicePixelRatio,opaqueMask:opaque,footprints};
+   },{segments:recording.segments,paperHeight:size.paperHeight});
+   const prefix=`${engine}-${size.width}x${size.height}-settled`;
+   const unmasked=await page.locator('main').screenshot({path:path.join(out,`${prefix}-unmasked.png`)});
+   await page.evaluate(()=>{
+    const mask=document.querySelector('.landscape-ink mask[id$="-paper-window"]');
+    document.querySelector('.landscape-paper-trace').parentElement.setAttribute('mask',`url(#${mask.id})`);
+   });
+   const masked=await page.locator('main').screenshot({path:path.join(out,`${prefix}-forced-mask.png`)});
+   await page.evaluate(()=>document.querySelector('.landscape-paper-trace').parentElement.removeAttribute('mask'));
+   const restored=await page.locator('main').screenshot({path:path.join(out,`${prefix}-restored.png`)});
+   const [plain,forced,again]=await Promise.all([unmasked,masked,restored].map(buffer=>sharp(buffer).ensureAlpha().raw().toBuffer({resolveWithObject:true})));
+   assert.deepEqual(forced.info,plain.info,'forcing the parent mask cannot resize the settled screenshot');
+   assert.deepEqual(again.info,plain.info);
+   const difference=compareMaskRaster(plain,forced);
+   let inkPixels=0,restoredMax=0;
+   for(let i=0;i<plain.data.length;i++)restoredMax=Math.max(restoredMax,Math.abs(plain.data[i]-again.data[i]));
+   for(let i=0;i<plain.data.length;i+=4)if(plain.data[i+2]-plain.data[i]>15)inkPixels++;
+   const parity={size,...state,width:plain.info.width,height:plain.info.height,...difference,inkPixels,restoredMax};
+   result.settledMaskParity.push(parity);
+   await page.evaluate(()=>{if(JSON.stringify(scene)!==maskParitySource)throw Error('Parent-mask comparison changed accepted source');view.dispose();});
+   assert.ok(inkPixels>100,'the compared screenshots contain visible measured blue pigment');
+   assert.equal(restoredMax,0,'restoring the unmasked parent produces the exact same settled screenshot');
+   assert.equal(difference.edgeViolations,0,`${engine}/${size.width}: removing the settled parent mask changes interior pigment or exceeds bounded edge coverage (${JSON.stringify(difference)})`);
+   if(size.width===390){
+    // Demonstrate that edge tolerance cannot bless visibly displaced, erased,
+    // or faded ink. These controls mutate only temporary screenshot bytes.
+    parity.regressionControls=[];
+    for(const mutation of ['shift-one-css-pixel','erase-oldest-row','fade-five-percent']){
+     const altered={info:plain.info,data:Buffer.from(plain.data)},shift=Math.round(state.pixelRatio),firstRow=state.footprints.filter(item=>item.line===1);
+     const top=Math.floor(Math.min(...firstRow.map(item=>item.top))*state.pixelRatio),bottom=Math.ceil(Math.max(...firstRow.map(item=>item.bottom))*state.pixelRatio);
+     for(let y=0;y<plain.info.height;y++)for(let x=0;x<plain.info.width;x++)for(let c=0;c<3;c++){
+      const i=(y*plain.info.width+x)*4+c;
+      if(mutation==='shift-one-css-pixel')altered.data[i]=x<shift?plain.data[c]:plain.data[(y*plain.info.width+x-shift)*4+c];
+      else if(mutation==='erase-oldest-row'&&y>=top&&y<=bottom)altered.data[i]=plain.data[c];
+      else if(mutation==='fade-five-percent')altered.data[i]=Math.round(plain.data[i]*.95+plain.data[c]*.05);
+     }
+     const diagnostic=compareMaskRaster(plain,altered);
+     assert.ok(diagnostic.edgeViolations>0,`${engine}: the mask parity gate accepted ${mutation}`);
+     parity.regressionControls.push({mutation,...diagnostic});
+    }
+   }
   }
   assert.deepEqual(result.errors,[]);
   assert.deepEqual(result.failures,[],'all scene families preserve measured ink, smooth line returns and immutable pigment on scrolling paper');

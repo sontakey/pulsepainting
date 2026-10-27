@@ -1165,7 +1165,7 @@
   function createView(container,scene,options={}) {
     if(!container)throw new Error('A landscape view container is required.');
     const doc=container.ownerDocument,win=doc.defaultView||global,svgNode=name=>doc.createElementNS('http://www.w3.org/2000/svg',name);
-    const uid=`pulse-stream-${++brushSequence}`,side=800,records=[],lines=new Map(),lineSeconds=6,turnDuration=560;
+    const uid=`pulse-stream-${++brushSequence}`,side=800,records=[],lines=new Map(),lineSeconds=6,retainedLines=3,turnDuration=560;
     const stage=doc.createElement('div');stage.className='landscape-stage';stage.dataset.scene=scene.family;stage.style.opacity='0';
     const canvas=doc.createElement('canvas'),caches=Array.from({length:3},()=>rasterCanvas(side,side,doc));
     canvas.className='landscape-canvas';canvas.setAttribute('role','img');canvas.setAttribute('aria-label','Your finished landscape, composed from accepted pulse waveforms');
@@ -1199,7 +1199,8 @@
     let captureFirst=0,captureViewBox='',captureTransform='',writingLine=0,turnElapsed=0,turning=false;
     let warmedSeconds=0,ambientFront=0,ambientElapsed=0,ambientStage=0,ambientPreparedStage=0,ambientThrough=0,ambientAnimating=false,ambientTask=0,ambientCandidate=null,activeAmbient=null,ambientFade=0,ambientTarget=0,captionElapsed=6000,captionIndex=-1;
     const ambientOpacity=.58,ambientDuration=3200,ambientSettleMs=1200,ambientStepSeconds=5,captionStages=[1,9,17,25],captions=['Your first colors are appearing.','A landscape is taking shape.','Your pulse is adding the details.','A place that is yours alone.'];
-    let box={width:1,height:1},camera={x:540,y:540,scale:1};
+    const captureHost=container.closest('.capture-screen'),readouts=captureHost?.querySelector('.live-metrics'),controls=captureHost?[...captureHost.querySelectorAll('.live-details > summary,.painting-actions')]:[];
+    let box={width:1,height:1,writingTop:0,writingBottom:1},camera={x:540,y:540,scale:1};
     const motion=win.matchMedia?.('(prefers-reduced-motion: reduce)');
     let reduced=options.reducedMotion===true||options.reducedMotion==='reduce'||!!motion?.matches;
     const atlas=pigmentAtlas(doc,true);atlas.svgMaskUrl ||= atlas.tile.toDataURL('image/png');
@@ -1286,7 +1287,14 @@
     }
     const path=nodes=>nodes.map((p,i)=>`${i?'L':'M'}${p.x.toFixed(3)} ${p.y.toFixed(3)}`).join('');
     const liveColor=t=>{const a=[[36,82,194],[103,73,157],[31,121,134],[36,82,194]],q=(t/11+.15*Math.sin(t/19))%3,i=Math.floor(q),u=smooth(q-i);return a[i].map((v,j)=>mix(v,a[i+1][j],u));};
-    const settings=()=>({left:Math.min(22,box.width*.055),baseline:box.height*.50,sx:Math.max(1,box.width-Math.min(22,box.width*.055)-58)/(lineSeconds*100),sy:clamp(box.height*.16,52,72)/100,lineSpacing:clamp(box.height*.145,78,116),fadeTop:Math.min(198,box.height*.31)});
+    const settings=()=>{
+      // Center the three-row manuscript in the free paper. UI bounds are read
+      // only on resize, never during drawing or a brush return.
+      const available=box.writingBottom-box.writingTop,center=clamp(box.height*.5,box.writingTop+Math.min(72,available*.4),box.writingBottom-Math.min(100,available*.55));
+      const spacing=Math.max(1,Math.min(116,(center-box.writingTop)/1.4,(box.writingBottom-center)/1.9));
+      const amplitude=Math.min(68,spacing*.68),left=Math.min(22,box.width*.055);
+      return {left,baseline:center+spacing,sx:Math.max(1,box.width-left-58)/(lineSeconds*100),sy:amplitude/100,lineSpacing:spacing,fadeTop:Math.max(0,center-spacing-amplitude*.5-36)};
+    };
     const pageRow=()=>writingLine+(turning?smooth(turnElapsed/turnDuration):0);
     function paperPoint(r,p,line=Math.floor((r.start+p.t-r.stroke.sourceStart)/lineSeconds)){
       const s=settings(),q=sourcePoint(r,p);
@@ -1300,13 +1308,15 @@
     }
     const sourcePoint=(r,p)=>({x:(r.start+p.t-r.stroke.sourceStart)*100,y:(.5-normalized(p.v,r.stroke.transform.domain.min,r.stroke.transform.domain.max))*100});
     function placeEmergence(){
-      const s=settings(),width=box.width*1.12,height=box.height*1.6,top=clamp((s.baseline-s.sy*50-26)/box.height,0,1),bottom=clamp((s.baseline+s.sy*50+32)/box.height,0,1),feather=28/box.height;
-      // Spread the accepted landscape vertically around the quiet writing
-      // corridor, retaining its banks and full contour density at phone width.
-      // This fixed atmospheric projection never follows or pans with the nib.
+      const s=settings(),width=box.width*1.12,height=box.height*1.6;
+      // Keep pigment visible through the manuscript with a wide, continuous
+      // veil. No transparent center or abrupt white band behind the live ink.
+      const center=(s.baseline-s.lineSpacing)/box.height,radius=Math.min(.34,Math.max(.23,s.lineSpacing*1.65/box.height));
+      const stops=[[0,0],[.1,1],[Math.max(.1,center-radius),1],[center-radius*.55,.72],[center,.5],[center+radius*.55,.72],[Math.min(.92,center+radius),1],[.92,1],[1,0]];
       emergencePaper.style.width=`${width}px`;emergencePaper.style.height=`${height}px`;emergencePaper.style.transform=`translate3d(${(box.width-width)/2}px,${(box.height-height)/2-box.height*.07}px,0)`;
-      const mask=`linear-gradient(to bottom,transparent,black 10%,black ${Math.max(.1,top-feather)*100}%,transparent ${top*100}%,transparent ${bottom*100}%,black ${Math.min(.92,bottom+feather)*100}%,black 92%,transparent)`;
-      emergence.style.maskImage=mask;emergence.style.webkitMaskImage=mask;stats.emergence.clearTop=top;stats.emergence.clearBottom=bottom;
+      const mask=`linear-gradient(to bottom,${stops.map(([at,alpha])=>`rgba(0,0,0,${alpha}) ${at*100}%`).join(',')})`;
+      emergence.style.maskImage=mask;emergence.style.webkitMaskImage=mask;
+      stats.emergence.clearTop=center-radius;stats.emergence.clearBottom=center+radius;stats.emergence.maskStops=stops;
     }
     const ambientStageFor=seconds=>seconds<3?0:Math.floor((seconds-3)/ambientStepSeconds)+1;
     function ambientMetadata(count){
@@ -1462,7 +1472,11 @@
       return {t,v:mix(a.v,b.v,u)};
     }
     function captureFrame(){
-      const s=settings(),row=pageRow(),firstLine=Math.max(0,writingLine-1),lastLine=writingLine+(turning?1:0);
+      const s=settings(),row=pageRow(),firstLine=Math.max(0,writingLine-retainedLines+1),lastLine=writingLine+(turning?1:0);
+      // Settled rows fit entirely within the opaque paper window. Mask only
+      // while the oldest row exits; otherwise WebKit repaints an unnecessary
+      // offscreen layer around all three rows for every new brush segment.
+      if(turning){if(!paperViewport.hasAttribute('mask'))paperViewport.setAttribute('mask',`url(#${paperMask.id})`);}else paperViewport.removeAttribute('mask');
       const viewBox=`0 0 ${box.width} ${box.height}`,transform=`translate(0 ${s.baseline-row*s.lineSpacing})`;
       if(captureViewBox!==viewBox){ink.setAttribute('viewBox',viewBox);captureViewBox=viewBox;}
       if(trace.style.display!=='')trace.style.display='';
@@ -1487,7 +1501,7 @@
         }
         const lineTransform=`translate(${s.left-index*lineSeconds*100*s.sx} ${index*s.lineSpacing}) scale(${s.sx} ${s.sy})`;
         if(line.transform!==lineTransform){line.group.setAttribute('transform',lineTransform);line.transform=lineTransform;}
-        const opacity=index===writingLine-1&&turning?1-smooth(turnElapsed/turnDuration):1;
+        const opacity=index===writingLine-retainedLines+1&&turning?1-smooth(turnElapsed/turnDuration):1;
         if(line.opacity!==opacity){line.group.style.opacity=`${opacity}`;line.opacity=opacity;}
         const begin=index*lineSeconds,end=begin+lineSeconds;
         for(let i=captureFirst;i<records.length;i++){
@@ -1508,9 +1522,9 @@
       stats.queuedSeconds=Math.max(0,total-cursor);stats.awaitingSource=cursor>=total&&!paused&&!doc.hidden&&!finished;
       stats.playbackRate=paused||doc.hidden||reduced||turning||stats.awaitingSource?0:1;
       stats.lineTurn={active:turning,progress:turning?turnElapsed/turnDuration:0,fromLine:writingLine,toLine:writingLine+1};
-      stats.projection={kind:'wrapped-source-time-value',windowSeconds:lineSeconds,lineSeconds,lineIndex:writingLine,lineProgress,lineSpacing:s.lineSpacing,paperOffsetY:stats.paperOffsetY,start:writingLine*lineSeconds,baseline:s.baseline+(writingLine-row)*s.lineSpacing,amplitude:s.sy*100,settle:0};
+      stats.projection={kind:'wrapped-source-time-value',windowSeconds:lineSeconds,lineSeconds,lineIndex:writingLine,lineProgress,lineSpacing:s.lineSpacing,retainedLines,writingTop:box.writingTop,writingBottom:box.writingBottom,paperOffsetY:stats.paperOffsetY,start:writingLine*lineSeconds,baseline:s.baseline+(writingLine-row)*s.lineSpacing,amplitude:s.sy*100,settle:0};
       stats.visibleLines=lines.size;stats.visibleFragments=instances;stats.visibleSeconds=(lastLine-firstLine+1)*lineSeconds;
-      stats.liveMaskPixelEstimate=Math.ceil(box.width*(win.devicePixelRatio||1))*Math.ceil((90*instances+s.baseline+s.sy*100+8-s.fadeTop)*(win.devicePixelRatio||1));
+      stats.liveMaskPixelEstimate=Math.ceil(box.width*(win.devicePixelRatio||1))*Math.ceil((90*instances+(turning?s.baseline+s.sy*100+8-s.fadeTop:0))*(win.devicePixelRatio||1));
       const bridging=r?.join&&cursor>=r.displayStart&&cursor<r.start;stats.bridging=!!bridging;
       if(!r||cursor<r.start&&!bridging||paused||reduced||doc.hidden){hideBrush();return;}
       const u=bridging?(cursor-r.displayStart)/(r.start-r.displayStart):0;
@@ -1570,11 +1584,11 @@
           const start=cuts[i-1],end=cuts[i];if(end-start<1e-8)continue;
           const line=Math.floor((start+end)/2/lineSeconds),a=r.stroke.sourceStart+start-r.start,b=r.stroke.sourceStart+end-r.start;
           const nodes=[at(a),...knots.filter(p=>p.t>a+1e-8&&p.t<b-1e-8),at(b)].map(p=>projected(p,line));
-          const wasVisible=end<=cursor+1e-8&&line>=writingLine-1&&line<=writingLine;
+          const wasVisible=end<=cursor+1e-8&&line>=writingLine-retainedLines+1&&line<=writingLine;
           const core=svgNode('path'),wash=svgNode('path');
           core.setAttribute('class','landscape-reveal-core');core.dataset.strokeIndex=r.index;core.dataset.lineIndex=line;core.dataset.fragmentIndex=r.fragments.length;core.setAttribute('fill','none');core.setAttribute('stroke',color(r.liveColor));
           wash.setAttribute('class','landscape-reveal-wash');wash.setAttribute('fill',color(r.liveColor,.16));reconstruction.append(wash,core);
-          r.fragments.push({nodes,wasVisible,initialOpacity:line===writingLine-1&&turning?1-smooth(turnElapsed/turnDuration):1,core,wash,widths:nodes.map(p=>2+3*materialField(r.stroke.material.grainSeed,p.t*12,53101))});
+          r.fragments.push({nodes,wasVisible,initialOpacity:line===writingLine-retainedLines+1&&turning?1-smooth(turnElapsed/turnDuration):1,core,wash,widths:nodes.map(p=>2+3*materialField(r.stroke.material.grainSeed,p.t*12,53101))});
         }
       }
     }
@@ -1635,7 +1649,10 @@
     }
     function resize(){
       const rect=container.getBoundingClientRect(),previous=box,next={width:Math.max(1,rect.width),height:Math.max(1,rect.height)};
-      if(Math.abs(next.width-previous.width)<.01&&Math.abs(next.height-previous.height)<.01)return;
+      const readoutBounds=readouts?.getBoundingClientRect(),controlBounds=controls.map(node=>node.getBoundingClientRect()).filter(bounds=>bounds.height>0);
+      next.writingTop=readoutBounds?.height?clamp(readoutBounds.bottom-rect.top+16,0,next.height):next.height*.22;
+      next.writingBottom=controlBounds.length?clamp(Math.min(...controlBounds.map(bounds=>bounds.top))-rect.top-16,next.writingTop,next.height):next.height*.82;
+      if(Object.keys(next).every(key=>Math.abs(next[key]-previous[key])<.01))return;
       box=next;
       const size=Math.min(box.width,box.height);stage.style.width=stage.style.height=`${size}px`;stage.style.transform=`translate3d(${(box.width-size)/2}px,${(box.height-size)/2}px,0)`;stats.camera={...camera};
       placeEmergence();placePaperWindow();
@@ -1652,7 +1669,7 @@
       }
       if(!finished)captureFrame();
     }
-    const observer=typeof win.ResizeObserver==='function'?new win.ResizeObserver(resize):null;observer?.observe(container);
+    const observer=typeof win.ResizeObserver==='function'?new win.ResizeObserver(resize):null;observer?.observe(container);if(readouts)observer?.observe(readouts);for(const node of controls)observer?.observe(node);
     function sync(){
       if(disposed||finished)return;refreshRecords();if(paused)return;
       warmNext();

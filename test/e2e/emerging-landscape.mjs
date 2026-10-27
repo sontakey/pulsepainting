@@ -70,33 +70,48 @@ for (const engine of engines) {
           cachedPixels: __pulseLandscapeStats.cachedPixels, pixelBudget: __pulseLandscapeStats.pixelBudget,
         };
       };
+      window.maskAlphaAt = (position, stops = __pulseLandscapeStats.emergence.maskStops) => {
+        if (position <= stops[0][0]) return stops[0][1];
+        for (let i = 1; i < stops.length; i++) {
+          const [right, alpha] = stops[i], [left, previous] = stops[i - 1];
+          if (position <= right) return right === left ? alpha : previous + (alpha - previous) * (position - left) / (right - left);
+        }
+        return stops.at(-1)[1];
+      };
       window.visibleDiscoveryDelta = () => {
         const wrapper = document.querySelector('.landscape-emergence').getBoundingClientRect(), paper = document.querySelector('.landscape-emergence-paper').getBoundingClientRect();
         const canvas = [...document.querySelectorAll('.landscape-emergence canvas')].find(item => item.style.zIndex === '1');
         const pixels = canvas.getContext('2d').getImageData(0, 0, 480, 480).data;
-        // Compare visible color, not transparent mask holes. Empty pigment
-        // masks must composite back to paper and cannot count as a discovery.
-        const composite = new Float32Array(pixels.length);
-        for (let i = 0; i < pixels.length; i += 4) {
-          const alpha = pixels[i + 3] / 255 * __pulseLandscapeStats.emergence.opacity;
-          for (let channel = 0; channel < 3; channel++) composite[i + channel] = pixels[i + channel] * alpha + emptyAmbientPixels[i + channel] * (1 - alpha);
-          composite[i + 3] = 255;
-        }
-        const { clearTop, clearBottom } = __pulseLandscapeStats.emergence;
-        let changed = 0, changedAnywhere = 0;
-        for (let i = 0; i < composite.length; i += 4) if (Math.abs(composite[i] - previousAmbientPixels[i]) + Math.abs(composite[i + 1] - previousAmbientPixels[i + 1]) + Math.abs(composite[i + 2] - previousAmbientPixels[i + 2]) > 2) changedAnywhere++;
+        // Compare the new snapshot's eventual visible pigment against the prior
+        // snapshot, at the actual fixed screen projection. The CSS mask and
+        // container opacity multiply every pixel, including the quiet middle;
+        // transparent or out-of-viewport paper cannot count as a discovery.
+        // Fade timing itself is checked separately against accepted beats.
+        const composite = new Float32Array(pixels.length), unmasked = new Float32Array(pixels.length);
+        let changed = 0, changedAnywhere = 0, visibleColorDelta = 0;
         for (let y = 0; y < 480; y++) {
           const screenY = paper.top - wrapper.top + (y + .5) / 480 * paper.height;
-          if (screenY < wrapper.height * .1 || screenY > wrapper.height * .92 || (screenY >= wrapper.height * clearTop && screenY <= wrapper.height * clearBottom)) continue;
-          for (let x = 58; x < 422; x++) {
+          const verticalAlpha = screenY < 0 || screenY > wrapper.height ? 0 : maskAlphaAt(screenY / wrapper.height);
+          for (let x = 0; x < 480; x++) {
             const screenX = paper.left - wrapper.left + (x + .5) / 480 * paper.width;
-            if (screenX < 0 || screenX > wrapper.width) continue;
-            const i = (y * 480 + x) * 4;
-            if (Math.abs(composite[i] - previousAmbientPixels[i]) + Math.abs(composite[i + 1] - previousAmbientPixels[i + 1]) + Math.abs(composite[i + 2] - previousAmbientPixels[i + 2]) > 2) changed++;
+            const mask = screenX < 0 || screenX > wrapper.width ? 0 : verticalAlpha;
+            const i = (y * 480 + x) * 4, alpha = pixels[i + 3] / 255 * __pulseLandscapeStats.emergence.opacity;
+            let difference = 0, unmaskedDifference = 0;
+            for (let channel = 0; channel < 3; channel++) {
+              unmasked[i + channel] = pixels[i + channel] * alpha + emptyAmbientPixels[i + channel] * (1 - alpha);
+              composite[i + channel] = pixels[i + channel] * alpha * mask + emptyAmbientPixels[i + channel] * (1 - alpha * mask);
+              difference += Math.abs(composite[i + channel] - previousAmbientPixels[i + channel]);
+              unmaskedDifference += Math.abs(unmasked[i + channel] - previousAmbientUnmaskedPixels[i + channel]);
+            }
+            composite[i + 3] = unmasked[i + 3] = 255;
+            if (difference > 2) changed++;
+            if (unmaskedDifference > 2) changedAnywhere++;
+            visibleColorDelta += difference;
           }
         }
-        window.lastAmbientDifference = { changed, changedAnywhere };
+        window.lastAmbientDifference = { changed, changedAnywhere, visibleColorDelta };
         window.previousAmbientPixels = composite;
+        window.previousAmbientUnmaskedPixels = unmasked;
         return changed;
       };
     });
@@ -111,6 +126,7 @@ for (const engine of engines) {
         window.emptyAmbientHash = canvasFingerprint(snapshot).hash;
         window.emptyAmbientPixels = snapshot.getContext('2d').getImageData(0, 0, 480, 480).data;
         window.previousAmbientPixels = emptyAmbientPixels;
+        window.previousAmbientUnmaskedPixels = emptyAmbientPixels;
         paper.width = paper.height = snapshot.width = snapshot.height = 1;
         window.view = PulseLandscape.createView(document.querySelector('main'), scene, { reducedMotion });
       };
@@ -212,18 +228,27 @@ for (const engine of engines) {
               snapshot.changedPixels = lastAmbientDifference.changedAnywhere;
               check(snapshot.changedPixels > 0, `${family.id}: snapshot ${ambient.stage} has a stale pigment buffer`);
               groupVisiblePixels += snapshot.visibleNewPixels;
-              // Five-second additions may land wholly in the intentionally
-              // clear foreground corridor. The prior twenty-second discovery
-              // contract still requires actual visible background growth.
+              // Keep the twenty-second discovery contract after accounting
+              // for the actual continuous mask, rather than treating its soft
+              // middle as an invisible band.
               if (ambient.sourceSeconds - groupStartSeconds >= 20) {
-                check(groupVisiblePixels > 0, `${family.id}: twenty seconds of accepted source adds no pigment outside the foreground quiet mask`);
+                check(groupVisiblePixels > 0, `${family.id}: twenty seconds of accepted source adds no visible pigment through the continuous mask`);
                 visibleGroups.push({ fromSeconds: groupStartSeconds, toSeconds: ambient.sourceSeconds, changedPixels: groupVisiblePixels });
                 groupStartSeconds = ambient.sourceSeconds; groupVisiblePixels = 0;
               }
               check(snapshot.opacity <= .6, `${family.id}: background competes with foreground contrast`);
               check(snapshot.finalOpacity === 0, `${family.id}: full-strength final landscape appeared during capture`);
-              check(snapshot.mask && snapshot.mask !== 'none', `${family.id}: the live waveform has no quiet masked corridor`);
-              check(ambient.clearTop < .45 && ambient.clearBottom > .60, `${family.id}: the clear corridor does not contain the live waveform amplitude and brush margin`);
+              check(snapshot.mask && snapshot.mask !== 'none', `${family.id}: the live waveform has no quiet continuous veil`);
+              const stops = ambient.maskStops, center = (ambient.clearTop + ambient.clearBottom) / 2;
+              check(Array.isArray(stops) && stops.length >= 7 && stops.every(([position, alpha], index) => Number.isFinite(position) && Number.isFinite(alpha) && position >= 0 && position <= 1 && alpha >= 0 && alpha <= 1 && (!index || position >= stops[index - 1][0])), `${family.id}: mask stops are not finite, ordered CSS gradient values`);
+              const renderedStops = [...snapshot.mask.matchAll(/rgba?\(([^)]+)\)\s+([\d.]+)%/g)].map(match => { const color = match[1].split(',').map(Number); return [Number(match[2]) / 100, color.length === 4 ? color[3] : 1]; });
+              check(renderedStops.length === stops.length && stops.every((stop, i) => stop.every((value, j) => Math.abs(value - renderedStops[i][j]) < .00001)), `${family.id}: measured mask metadata differs from the rendered CSS gradient`);
+              check(maskAlphaAt(center) >= .5 && maskAlphaAt(center) <= .6, `${family.id}: center pigment should remain visible but quiet`);
+              for (let position = .1; position <= .92; position += .01) check(maskAlphaAt(position) >= .5 - 1e-8, `${family.id}: a transparent central band hides the forming scene`);
+              for (const direction of [-1, 1]) {
+                const shoulder = maskAlphaAt(center + direction * .12), outer = maskAlphaAt(center + direction * .24);
+                check(shoulder >= .65 && shoulder <= .85 && outer >= .9, `${family.id}: the background veil lacks broad gradual shoulders`);
+              }
               if (placement) check(JSON.stringify(snapshot.placement) === JSON.stringify(placement), `${family.id}: the background translated or changed its fixed framing`);
               placement ||= snapshot.placement;
               updates.push(snapshot); previousUpdate = ambient.updates;
@@ -252,7 +277,7 @@ for (const engine of engines) {
       return { scenes: results, fragmented: { ...snapshot, usableSeconds: scene.usableSeconds, strokes: scene.strokes.length } };
     }, { segments: recording.segments, fragmented: fragmented.segments });
     assert.equal(result.families.scenes.length, 16);
-    assert.ok(result.families.scenes.every(scene => scene.updates.length > 0), 'all sixteen scenes develop real ambient pigment');
+    assert.ok(result.families.scenes.every(scene => scene.updates.length > 0 && scene.visibleGroups.length > 0 && scene.visibleGroups.every(group => group.changedPixels > 0)), 'all sixteen scenes add mask-weighted visible pigment over every tested twenty-second source interval');
     assert.ok(result.families.scenes[0].updates.length > 0);
     const lake = result.families.scenes.find(scene => scene.family === 'quiet-lake');
     assert.ok(lake.updates.length >= 5, 'a long usable session yields several distinct discoveries');

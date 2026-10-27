@@ -62,7 +62,7 @@ async function inspect(page) {
       detailsBody: document.querySelector('.live-details').open ? rect('.live-details-body') : null,
       signalOpen: !document.querySelector('#signal-preview').hidden,
       signalText: document.querySelector('#quality-text').textContent,
-      projection: stats?.projection && { kind: stats.projection.kind, baseline: stats.projection.baseline, amplitude: stats.projection.amplitude, windowSeconds: stats.projection.windowSeconds, lineSeconds: stats.projection.lineSeconds, lineSpacing: stats.projection.lineSpacing }, lineTurn: stats?.lineTurn && { ...stats.lineTurn }, strokes: stats?.strokes, frontier: stats?.frontier && { t: stats.frontier.t, v: stats.frontier.v },
+      projection: stats?.projection && { kind: stats.projection.kind, baseline: stats.projection.baseline, amplitude: stats.projection.amplitude, windowSeconds: stats.projection.windowSeconds, lineSeconds: stats.projection.lineSeconds, lineSpacing: stats.projection.lineSpacing, retainedLines: stats.projection.retainedLines, lineIndex: stats.projection.lineIndex, writingTop: stats.projection.writingTop, writingBottom: stats.projection.writingBottom }, rows: [...document.querySelectorAll('.landscape-line')].map(row => ({ index: Number(row.dataset.lineIndex), baseline: row.getScreenCTM().f, opacity: Number(getComputedStyle(row).opacity), fragments: row.querySelectorAll('.landscape-line-fragment').length })), lineTurn: stats?.lineTurn && { ...stats.lineTurn }, strokes: stats?.strokes, frontier: stats?.frontier && { t: stats.frontier.t, v: stats.frontier.v },
     };
   });
 }
@@ -78,12 +78,29 @@ function checkLayout(layout, label) {
   assert.equal(layout.scrollX, 0, `${label}: viewport never shifts horizontally`);
   assert.equal(layout.scrollY, 0, `${label}: recording remains at its viewport origin`);
   assert.ok(layout.projection?.kind === 'wrapped-source-time-value' && layout.strokes > 0, `${label}: actual accepted waveform is mounted`);
-  const baseline = layout.art.top + layout.projection.baseline;
-  if (layout.lineTurn?.active) assert.ok(baseline <= layout.height / 2 + 1 && baseline >= layout.height / 2 - layout.projection.lineSpacing - 1, `${label}: finished row scrolls upward by at most one line`);
-  else near(baseline, layout.height / 2, 'the current writing row remains centered');
-  const waveTop = layout.height / 2 - layout.projection.amplitude / 2;
-  assert.ok(layout.metrics.bottom <= waveTop - 8, `${label}: overlaid metrics leave space above the central pulse`);
-  assert.ok(layout.title.bottom <= waveTop - 8 && layout.camera.bottom <= waveTop - 8, `${label}: header stays above the pulse corridor`);
+  const { baseline, amplitude, lineSpacing, lineIndex, retainedLines, writingTop, writingBottom } = layout.projection;
+  assert.equal(retainedLines, 3, `${label}: capture retains three readable manuscript rows`);
+  assert.ok(lineSpacing > 0 && amplitude > 0 && amplitude <= Math.min(68, lineSpacing * .68) + .01, `${label}: waveform amplitude adapts to available paper`);
+  const smooth = value => value * value * (3 - 2 * value);
+  const turnOffset = layout.lineTurn?.active ? smooth(layout.lineTurn.progress) * lineSpacing : 0;
+  const groupCenter = baseline - lineSpacing + turnOffset;
+  const idealCenter = layout.height / 2;
+  const available = writingBottom - writingTop;
+  const clampedCenter = Math.max(writingTop + Math.min(72, available * .4), Math.min(idealCenter, writingBottom - Math.min(100, available * .55)));
+  near(groupCenter, clampedCenter, 'the middle manuscript row is centered in the usable paper');
+  assert.ok(layout.rows.length <= (layout.lineTurn?.active ? 4 : 3), `${label}: only the three retained rows and returning row are mounted`);
+  if (!layout.lineTurn?.active && lineIndex >= 2) {
+    assert.deepEqual(layout.rows.map(row => row.index), [lineIndex - 2, lineIndex - 1, lineIndex], `${label}: all three consecutive settled rows are actually mounted`);
+    assert.ok(layout.rows.every(row => row.fragments > 0 && row.opacity === 1), `${label}: all three settled rows contain visible measured ink`);
+    const top = Math.min(...layout.rows.map(row => row.baseline)) - amplitude / 2;
+    const bottom = Math.max(...layout.rows.map(row => row.baseline)) + amplitude / 2;
+    assert.ok(top >= layout.art.top + writingTop - 1 && bottom <= layout.art.top + writingBottom + 1, `${label}: all three complete pulse rows fit the available writing corridor`);
+    assert.ok(top >= layout.metrics.bottom + 8 && top >= layout.title.bottom + 8 && top >= layout.camera.bottom + 8, `${label}: every row clears the overlaid readouts and header`);
+    assert.ok(bottom <= Math.min(layout.summary.top, layout.dock.top) - 8, `${label}: all three rows clear the readings control and floating actions`);
+    const pigmentBottom = Math.max(...layout.rows.map(row => row.baseline)) + amplitude * .92;
+    assert.ok(pigmentBottom <= Math.min(layout.summary.top, layout.dock.top) - 8, `${label}: deposited pigment tails also clear the readings control and floating actions`);
+    near(layout.rows[1].baseline, layout.art.top + groupCenter, 'the middle visible row follows the group center');
+  }
   assert.ok(layout.signalHint.top >= layout.camera.bottom - 1, `${label}: brief signal coaching remains beneath the camera preview`);
   assert.deepEqual(layout.labels, ['Pulse', 'HRV', 'Signal'], `${label}: compact live readouts remain available`);
   assert.ok(layout.dock.bottom <= layout.height - layout.safeArea.bottom - 8, `${label}: actions clear the bottom safe area`);
@@ -128,9 +145,10 @@ try {
       landscapeView = PulseLandscape.createView(document.getElementById('landscape-view'), landscape);
       document.getElementById('manuscript-empty').hidden = true;
     }, segments.slice(0, 12));
-    await page.waitForFunction(() => __pulseLandscapeStats.streamTime >= 3 && __pulseLandscapeStats.nib && __pulseLandscapeStats.warmStrokes > 0, null, { timeout: 30000 });
+    await page.waitForFunction(() => __pulseLandscapeStats.streamTime >= 13 && !__pulseLandscapeStats.lineTurn?.active && __pulseLandscapeStats.visibleLines === 3 && __pulseLandscapeStats.nib && __pulseLandscapeStats.warmStrokes > 0, null, { timeout: 30000 });
     for (const viewport of viewports) {
       await page.setViewportSize(viewport); await settle(page);
+      await page.waitForFunction(() => !__pulseLandscapeStats.lineTurn?.active && __pulseLandscapeStats.visibleLines === 3 && [...document.querySelectorAll('.landscape-line')].every(row => row.querySelector('.landscape-line-fragment')), null, { timeout: 3000 });
       const id = `${engine}-${viewport.width}x${viewport.height}`;
       let closed;
       for (const state of ['ready', 'estimating', 'bad']) {
@@ -160,7 +178,7 @@ try {
       await page.locator('.live-details > summary').click(); await settle(page);
       const expanded = await inspect(page); checkLayout(expanded, `${id}/details`);
       assert.deepEqual(expanded.art, closed.art, `${id}: opening readings does not resize or move the art`);
-      const geometry = ({ kind, amplitude, windowSeconds, lineSeconds, lineSpacing }) => ({ kind, amplitude, windowSeconds, lineSeconds, lineSpacing });
+      const geometry = ({ kind, amplitude, windowSeconds, lineSeconds, lineSpacing, retainedLines, writingTop, writingBottom }) => ({ kind, amplitude, windowSeconds, lineSeconds, lineSpacing, retainedLines, writingTop, writingBottom });
       assert.deepEqual(geometry(expanded.projection), geometry(closed.projection), `${id}: opening readings keeps the waveform scale and paper geometry while the brush may continue its return`);
       assert.equal(expanded.signalOpen, false, `${id}: raw graphs are optional`);
       await page.screenshot({ path: path.join(out, `${id}-details.png`) });
