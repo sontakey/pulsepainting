@@ -92,17 +92,19 @@ for(const engine of engines){
    window.inspectRecording=(scene,view)=>{
     const stats=__pulseLandscapeStats,state=view.captureState,box=document.querySelector('main').getBoundingClientRect();
     const stage=document.querySelector('.landscape-stage'),style=stage&&getComputedStyle(stage);
-    const snapshot={mode:stats.mode,state:{...state},bridging:!!stats.bridging,streamTime:stats.streamTime,paperOffsetX:stats.paperOffsetX,anchorX:stats.anchorX,projection:structuredClone(stats.projection),frontier:structuredClone(stats.frontier),nib:structuredClone(stats.nib),visibleIntervals:structuredClone(stats.visibleIntervals||[]),
+    const snapshot={mode:stats.mode,state:{...state},bridging:!!stats.bridging,streamTime:stats.streamTime,paperOffsetY:stats.paperOffsetY,lineTurn:structuredClone(stats.lineTurn),anchorX:stats.anchorX,projection:structuredClone(stats.projection),frontier:structuredClone(stats.frontier),nib:structuredClone(stats.nib),visibleIntervals:structuredClone(stats.visibleIntervals||[]),
      finalScenicHidden:!stage||stage.hidden||style.display==='none'||style.visibility==='hidden'||Number(style.opacity)===0,
      cachedPixels:stats.cachedPixels,materialPixels:stats.materialPixels,pixelBudget:stats.pixelBudget,materialPixelBudget:stats.materialPixelBudget,viewport:{width:box.width,height:box.height}};
     if(!stats.nib||!stats.frontier||state.painted>=scene.strokes.length)return snapshot;
-    if(stats.bridging)return snapshot;
+    if(stats.bridging||stats.nib.drawing===false)return snapshot;
     const stroke=scene.strokes[state.painted],path=document.querySelector(`.landscape-live-core[data-stroke-index="${state.painted}"]`);
     if(!path)throw Error('Active measured source has no inspectable cached core path');
     const original=PulseLandscape.sampleStroke(stroke),vertices=inkVertices(path);
     if(vertices.length!==original.length)throw Error('Cached foreground omitted original source/interpolation vertices');
     const timeFit=fitInk(original.map(point=>point.t),vertices.map(point=>point.x)),valueFit=fitInk(original.map(point=>point.v),vertices.map(point=>point.y));
-    const expected=PulseLandscape.strokeFrontier(stroke,state.progress),matrix=path.getScreenCTM();
+    const fragment=document.querySelector(`.landscape-line[data-line-index="${stats.projection.lineIndex}"] .landscape-line-fragment[data-record-index="${state.painted}"]`);
+    if(!fragment)throw Error('Active measured source has no visible row fragment');
+    const expected=PulseLandscape.strokeFrontier(stroke,state.progress),matrix=fragment.getScreenCTM();
     const point=new DOMPoint(expected.t*timeFit.slope+timeFit.offset,expected.v*valueFit.slope+valueFit.offset).matrixTransform(matrix);
     const group=path.closest('.landscape-record'),clipId=group.getAttribute('clip-path').match(/#([^)]*)/)[1],clip=document.getElementById(clipId).querySelector('rect');
     const clipRight=new DOMPoint(Number(clip.getAttribute('x'))+Number(clip.getAttribute('width')),0).matrixTransform(matrix).x-box.x;
@@ -121,7 +123,9 @@ for(const engine of engines){
     let start=0;
     for(let i=0;i<=fromIndex;i++){const stroke=scene.strokes[i];start+=(i?Math.min(.45,Math.max(0,stroke.sourceStart-scene.strokes[i-1].sourceEnd)):0)+stroke.sourceEnd-stroke.sourceStart;}
     const [a,b]=vertices,end=start+after.sourceStart-before.sourceEnd,u=(stats.streamTime-start)/(end-start);
-    const matrix=join.getScreenCTM(),q=new DOMPoint(a.x+(b.x-a.x)*u,a.y+(b.y-a.y)*u).matrixTransform(matrix),box=document.querySelector('main').getBoundingClientRect();
+    const fragment=document.querySelector(`.landscape-line[data-line-index="${stats.projection.lineIndex}"] .landscape-line-fragment[data-record-index="${toIndex}"]`);
+    if(!fragment)throw Error('Source handoff has no visible row fragment');
+    const matrix=fragment.getScreenCTM(),q=new DOMPoint(a.x+(b.x-a.x)*u,a.y+(b.y-a.y)*u).matrixTransform(matrix),box=document.querySelector('main').getBoundingClientRect();
     const group=join.closest('.landscape-record'),clipId=group.getAttribute('clip-path').match(/#([^)]*)/)[1],clip=document.getElementById(clipId).querySelector('rect');
     const clipRight=new DOMPoint(Number(clip.getAttribute('x'))+Number(clip.getAttribute('width')),0).matrixTransform(matrix).x-box.x;
     const sourceA=before.points.at(-1),sourceB=after.points[0],t=sourceA.t+(sourceB.t-sourceA.t)*u,v=sourceA.v+(sourceB.v-sourceA.v)*u;
@@ -138,7 +142,7 @@ for(const engine of engines){
     segments.slice(0,7).forEach(segment=>PulseLandscape.append(scene,segment));
     const before=JSON.stringify(scene);window.view=PulseLandscape.createView(document.querySelector('main'),scene);
     const target=scene.strokes.length-1,frames=[],cache=new Map(),textureCache=new Map(),transitions=[];
-    let previous=null,immutableChecks=0,maxAnchorStep=0,maxPaperStep=0,bridgeFrames=0,maxBridgeError=0;
+    let previous=null,immutableChecks=0,maxContactStep=0,maxPaperStep=0,bridgeFrames=0,maxBridgeError=0,returnFrames=0,lineTurns=0,maxVisibleLines=0;
     for(let i=0;i<16000;i++){
      const snapshot=inspectRecording(scene,view),state=snapshot.state;
      if(snapshot.mode!=='recording')throw Error('Final reconstruction started before the explicit finish action');
@@ -147,7 +151,9 @@ for(const engine of engines){
       const d=path.getAttribute('d');if(cache.has(path)&&cache.get(path)!==d)throw Error('Previously deposited source ink or pigment changed shape while paper moved');
       if(cache.has(path))immutableChecks++;else cache.set(path,d);
      }
-     if(snapshot.bridging){const join=inspectJoin(scene,__pulseLandscapeStats);bridgeFrames++;maxBridgeError=Math.max(maxBridgeError,join.endpointError);}
+     if(snapshot.bridging&&snapshot.nib?.drawing){const join=inspectJoin(scene,__pulseLandscapeStats);bridgeFrames++;maxBridgeError=Math.max(maxBridgeError,join.endpointError);}
+     if(snapshot.lineTurn?.active){returnFrames++;if(snapshot.nib?.drawing)throw Error('The returning brush left ink across the paper');}
+     maxVisibleLines=Math.max(maxVisibleLines,document.querySelectorAll('.landscape-line').length);
      for(const material of document.querySelectorAll('.landscape-ink pattern,.landscape-ink mask')){
       const placement=['x','y','width','height','patternTransform','patternUnits','maskUnits','maskContentUnits'].map(name=>material.getAttribute(name)).join('|');
       if(textureCache.has(material)&&textureCache.get(material)!==placement)throw Error('Paper texture shifted relative to its deposited waveform');
@@ -155,24 +161,30 @@ for(const engine of engines){
      }
      if(previous){
       if(snapshot.streamTime<previous.streamTime-1e-9)throw Error('The session-wide cursor restarted at an accepted-window boundary');
-      if(snapshot.paperOffsetX>previous.paperOffsetX+.01)throw Error('Paper moved backwards during forward source recording');
-      maxPaperStep=Math.max(maxPaperStep,Math.abs(snapshot.paperOffsetX-previous.paperOffsetX));
-      if(snapshot.nib&&previous.nib)maxAnchorStep=Math.max(maxAnchorStep,Math.abs(snapshot.nib.x-previous.nib.x));
+      if(snapshot.paperOffsetY>previous.paperOffsetY+.01)throw Error('Paper moved downwards during forward source recording');
+      maxPaperStep=Math.max(maxPaperStep,Math.abs(snapshot.paperOffsetY-previous.paperOffsetY));
+      if(snapshot.lineTurn?.active&&previous.lineTurn?.active&&Math.abs(snapshot.streamTime-previous.streamTime)>1e-8)throw Error('Brush return consumed accepted source time');
+      const lineStep=snapshot.projection.lineIndex-previous.projection.lineIndex;
+      if(lineStep<0||lineStep>1)throw Error('The manuscript skipped or repeated a row');
+      lineTurns+=lineStep;
+      if(snapshot.nib?.drawing&&previous.nib?.drawing&&lineStep===0)maxContactStep=Math.max(maxContactStep,Math.abs(snapshot.nib.x-previous.nib.x));
       if(state.painted!==previous.state.painted)transitions.push({from:previous.state.painted,to:state.painted,streamBefore:previous.streamTime,streamAfter:snapshot.streamTime,anchorBefore:previous.nib?.x,anchorAfter:snapshot.nib?.x});
      }
-     if(snapshot.core&&state.progress>=.12&&state.progress<=.88&&(state.painted===target||transitions.length<2))frames.push(snapshot);
+     if(snapshot.core&&snapshot.nib?.drawing&&state.progress>=.12&&state.progress<=.88&&(state.painted===target||transitions.length<2))frames.push(snapshot);
      previous=snapshot;
      if(state.painted===target&&state.progress>=.72)break;
      if(!advancePaint())throw Error('The continuous source cursor stopped before the active checkpoint');
     }
     if(frames.length<8)throw Error('No sustained active measured source was observed');
-    return{family:family.id,sourceStable:before===JSON.stringify(scene),frames,transitions,immutableChecks,maxAnchorStep,maxPaperStep,bridgeFrames,maxBridgeError,state:view.captureState};
+    return{family:family.id,sourceStable:before===JSON.stringify(scene),frames,transitions,immutableChecks,maxContactStep,maxPaperStep,bridgeFrames,maxBridgeError,returnFrames,lineTurns,maxVisibleLines,state:view.captureState};
    },{family,segments:recording.segments});
    assert.equal(item.sourceStable,true);
    const issues=new Set(),check=(condition,message)=>{if(!condition)issues.add(message)};
    check(item.transitions.length>=5&&item.immutableChecks>100,`${family.id}: one recording crosses accepted windows while reusing deposited core and wash geometry`);
    check(item.bridgeFrames>0&&item.maxBridgeError<.04,`${family.id}: clean accepted-window handoffs retain a continuously attached brush without changing source coverage`);
-   check(item.maxAnchorStep<.05&&item.maxPaperStep<8,`${family.id}: the brush stays anchored while its paper scrolls smoothly across windows`);
+   check(item.maxContactStep<8&&item.maxPaperStep<12,`${family.id}: drawing and upward paper scrolling advance in bounded steps`);
+   check(item.lineTurns>=3&&item.returnFrames>30,`${family.id}: the measured manuscript crosses several rows with a visible brush lift`);
+   check(item.maxVisibleLines>1&&item.maxVisibleLines<=3,`${family.id}: only a bounded set of paper rows remains mounted`);
    for(const frame of item.frames){
     check(frame.nib&&frame.core,`${family.id}: measured writing has a visible attached brush`);
     check(frame.core.sourceError<1e-7,`${family.id}: presentation retains the exact canonical source frontier`);
@@ -180,9 +192,9 @@ for(const engine of engines){
     check(Math.abs(frame.core.clipRight-frame.nib.x)<.05,`${family.id}: clipping reveals no future pulse ahead of the contact point`);
     check(frame.core.width>=1.2&&frame.core.width<=2.5,`${family.id}: source ink has a readable crisp width`);
     check(frame.nib.width>=32&&frame.nib.width<=52&&frame.tipBounds.width<=64&&frame.tipBounds.height<=64,`${family.id}: pointed brush is visible but bounded on mobile`);
-    check(Math.abs(frame.nib.x-frame.anchorX)<.04&&Math.abs(frame.anchorX-frame.viewport.width*.78)<.04,`${family.id}: contact stays at the fixed 78 percent horizontal anchor`);
+    check(Math.abs(frame.nib.x-frame.anchorX)<.04&&frame.nib.x>=0&&frame.nib.x<=frame.viewport.width,`${family.id}: the writing contact remains on the current paper row`);
     check(frame.nib.y>=16&&frame.nib.y<=frame.viewport.height-16,`${family.id}: source excursions remain inside the painting viewport`);
-    check(frame.projection.kind==='continuous-source-time-value'&&frame.projection.windowSeconds===6,`${family.id}: recording has one continuous source-time/value projection`);
+    check(frame.projection.kind==='wrapped-source-time-value'&&frame.projection.windowSeconds===6&&frame.projection.lineSeconds===6,`${family.id}: recording wraps six seconds of measured source per line without changing values`);
     check(frame.core.timeFit.slope>0&&frame.core.timeFit.residual<.011&&frame.core.valueFit.slope<0&&frame.core.valueFit.residual<.011,`${family.id}: every cached vertex preserves measured time and amplitude without terrain distortion`);
     check(frame.cachedPixels<=frame.pixelBudget&&frame.pixelBudget<=3086336&&frame.materialPixels<=4554752,`${family.id}: presentation keeps the bounded raster and material budgets, including ambient snapshots and their fixed mask`);
     for(const interval of frame.visibleIntervals)check(interval.sourceStart<=interval.sourceEnd&&interval.start<=interval.end,`${family.id}: visible source intervals are finite ordered pen runs`);
@@ -195,23 +207,27 @@ for(const engine of engines){
    if(process.env.PPG_BRUSH_SCREENSHOTS==='1')await page.screenshot({path:path.join(out,`${engine}-${family.id}.png`)});
   }
   result.lifecycle=await page.evaluate(segments=>{
+   view.dispose();window.scene=PulseLandscape.create({family:'quiet-lake',seed:39293});segments.slice(0,7).forEach(segment=>PulseLandscape.append(scene,segment));window.view=PulseLandscape.createView(document.querySelector('main'),scene);
+   for(let i=0;i<2000;i++){advancePaint();if(__pulseLandscapeStats.lineTurn?.active&&__pulseLandscapeStats.lineTurn.progress>=.25&&__pulseLandscapeStats.lineTurn.progress<=.6)break;}
+   if(!__pulseLandscapeStats.lineTurn?.active)throw Error('Lifecycle check did not reach a visible brush return');
+   const heldTurn=JSON.stringify(__pulseLandscapeStats.lineTurn),heldPaper=__pulseLandscapeStats.paperOffsetY;
    const before=JSON.stringify(scene);view.pause(true);
    const pausedImage=view.canvas.toDataURL(),frames=__pulseLandscapeStats.frames,cursor=__pulseLandscapeStats.streamTime;
    PulseLandscape.append(scene,segments[7]);view.sync();
    for(let i=0;i<20;i++)advancePaint();
-   const paused={sameImage:pausedImage===view.canvas.toDataURL(),sameFrames:frames===__pulseLandscapeStats.frames,sameCursor:cursor===__pulseLandscapeStats.streamTime,pending:pendingPaint(),sourceGrew:JSON.stringify(scene)!==before};
+   const paused={sameImage:pausedImage===view.canvas.toDataURL(),sameFrames:frames===__pulseLandscapeStats.frames,sameCursor:cursor===__pulseLandscapeStats.streamTime,sameTurn:heldTurn===JSON.stringify(__pulseLandscapeStats.lineTurn),samePaper:heldPaper===__pulseLandscapeStats.paperOffsetY,pending:pendingPaint(),sourceGrew:JSON.stringify(scene)!==before};
    view.pause(false);for(let i=0;i<5;i++)advancePaint();
    const resumed=__pulseLandscapeStats.frames>frames;
    Object.defineProperty(document,'hidden',{configurable:true,get:()=>true});document.dispatchEvent(new Event('visibilitychange'));
-   const hiddenFrames=__pulseLandscapeStats.frames,hiddenCursor=__pulseLandscapeStats.streamTime;advancePaint(5000);
-   const hidden={sameFrames:hiddenFrames===__pulseLandscapeStats.frames,sameCursor:hiddenCursor===__pulseLandscapeStats.streamTime,pending:pendingPaint()};
+   const hiddenFrames=__pulseLandscapeStats.frames,hiddenCursor=__pulseLandscapeStats.streamTime,hiddenTurn=JSON.stringify(__pulseLandscapeStats.lineTurn),hiddenPaper=__pulseLandscapeStats.paperOffsetY;advancePaint(5000);
+   const hidden={sameFrames:hiddenFrames===__pulseLandscapeStats.frames,sameCursor:hiddenCursor===__pulseLandscapeStats.streamTime,sameTurn:hiddenTurn===JSON.stringify(__pulseLandscapeStats.lineTurn),samePaper:hiddenPaper===__pulseLandscapeStats.paperOffsetY,pending:pendingPaint()};
    delete document.hidden;document.dispatchEvent(new Event('visibilitychange'));advancePaint();
    hidden.resumeAdvance=__pulseLandscapeStats.streamTime-hiddenCursor;for(let i=0;i<5;i++)advancePaint();
    return{paused,resumed,hidden,recovered:__pulseLandscapeStats.frames>hiddenFrames};
   },recording.segments);
-  assert.deepEqual(result.lifecycle.paused,{sameImage:true,sameFrames:true,sameCursor:true,pending:0,sourceGrew:true},'pause freezes presentation but retains newly accepted samples');
+  assert.deepEqual(result.lifecycle.paused,{sameImage:true,sameFrames:true,sameCursor:true,sameTurn:true,samePaper:true,pending:0,sourceGrew:true},'pause freezes the lifted brush and scrolling paper but retains newly accepted samples');
   assert.ok(result.lifecycle.resumed&&result.lifecycle.recovered,'pause and visibility interruption both recover');
-  assert.ok(result.lifecycle.hidden.sameFrames&&result.lifecycle.hidden.sameCursor&&result.lifecycle.hidden.pending===0&&result.lifecycle.hidden.resumeAdvance<=.021,'hidden time cannot create a backlog jump on resume, including bounded 1.2x stream catch-up');
+  assert.ok(result.lifecycle.hidden.sameFrames&&result.lifecycle.hidden.sameCursor&&result.lifecycle.hidden.sameTurn&&result.lifecycle.hidden.samePaper&&result.lifecycle.hidden.pending===0&&result.lifecycle.hidden.resumeAdvance<=.021,'hidden time cannot create a backlog jump on resume, without catching up through hidden source time');
   await page.emulateMedia({reducedMotion:'reduce'});
   await page.waitForFunction(()=>{
    if(!matchMedia('(prefers-reduced-motion: reduce)').matches)return false;
@@ -280,15 +296,15 @@ for(const engine of engines){
    for(let i=0;i<12000;i++){
     const stats=__pulseLandscapeStats;
     if(stats.mode!=='recording')throw Error('A delivery gap triggered premature scenic reconstruction');
-    if(stats.bridging)inspectJoin(scene,stats);
-    else if(stats.activeStroke===null&&stats.streamTime>0&&view.captureState.painted<scene.strokes.length){
+    if(stats.bridging&&stats.nib?.drawing)inspectJoin(scene,stats);
+    else if(!stats.lineTurn?.active&&stats.activeStroke===null&&stats.streamTime>0&&view.captureState.painted<scene.strokes.length){
      result.gapFrames++;if(stats.nib!==null)throw Error('Brush continued drawing through a period with no accepted source');
     }
     for(const interval of stats.visibleIntervals){
      const stroke=scene.strokes[interval.index];
-     if(!stroke||interval.sourceStart!==stroke.sourceStart||interval.sourceEnd>stroke.sourceEnd+1e-8||interval.sourceEnd<stroke.sourceStart-1e-8)throw Error('Visible paper interval invented or combined accepted source runs');
-     const group=document.querySelector(`.landscape-record[data-record-index="${interval.index}"]`);
-     if(!group||group.querySelectorAll('.landscape-live-core').length!==1)throw Error('A true pen lift was joined to a neighbouring source path');
+     if(!stroke||interval.sourceStart<stroke.sourceStart-1e-8||interval.sourceEnd>stroke.sourceEnd+1e-8||interval.sourceEnd<interval.sourceStart-1e-8)throw Error('Visible paper interval invented or combined accepted source runs');
+     const group=document.querySelector(`.landscape-record[data-record-index="${interval.index}"]`),fragment=document.querySelector(`.landscape-line[data-line-index="${interval.line}"] .landscape-line-fragment[data-record-index="${interval.index}"]`);
+     if(!group||!fragment||group.querySelectorAll('.landscape-live-core').length!==1)throw Error('A visible row lost its source owner or a true pen lift was joined');
      result.checkedIntervals++;
     }
     if(!advancePaint())break;
@@ -296,6 +312,47 @@ for(const engine of engines){
    result.sourceStable=JSON.stringify(scene)===original;result.mode=__pulseLandscapeStats.mode;view.dispose();return result;
   },fragmented.segments);
   assert.ok(result.gaps.sourceGaps>5&&result.gaps.gapFrames>10&&result.gaps.checkedIntervals>100&&result.gaps.checkedPaths===result.gaps.strokes&&result.gaps.sourceStable&&result.gaps.mode==='recording','dropped real delivery produces separate measured paths and visible pen lifts, never fabricated connecting pulses');
+  // Finish must begin at the actual sub-sample frontier, including a brush
+  // return halfway through scrolling. A rounded original knot is not enough:
+  // live interpolation can differ visibly between recorded samples.
+  result.finishSeams=await page.evaluate(async segments=>{
+   const results=[];
+   for(const label of ['sub-sample','mid-return']){
+    const scene=PulseLandscape.create({family:'quiet-lake',seed:39293});segments.slice(0,7).forEach(segment=>PulseLandscape.append(scene,segment));
+    const view=PulseLandscape.createView(document.querySelector('main'),scene),sourceBefore=JSON.stringify(scene);
+    for(let i=0;i<3000;i++){
+     advancePaint(17.173);
+     const stats=__pulseLandscapeStats;
+     if(label==='sub-sample'&&stats.streamTime>1.731&&stats.nib?.drawing){advancePaint(.319);break;}
+     if(label==='mid-return'&&stats.lineTurn?.active&&stats.lineTurn.toLine===2&&stats.lineTurn.progress>.4&&stats.lineTurn.progress<.6)break;
+    }
+    const before=structuredClone(__pulseLandscapeStats),stroke=scene.strokes[before.painted];
+    if(label==='mid-return'&&(!before.lineTurn?.active||before.nib?.drawing))throw Error('Finish-mid-return case never reached a lifted brush');
+    if(label==='sub-sample'&&stroke.points.some(p=>Math.abs(p.t-before.frontier.t)<1e-5))throw Error('Arbitrary finish happened on a recorded knot');
+    const core=document.querySelector(`.landscape-live-core[data-stroke-index="${before.painted}"]`),vertices=inkVertices(core),source=PulseLandscape.sampleStroke(stroke);
+    const fitT=fitInk(source.map(p=>p.t),vertices.map(p=>p.x)),fitV=fitInk(source.map(p=>p.v),vertices.map(p=>p.y));
+    const fragment=document.querySelector(`.landscape-line[data-line-index="${before.projection.lineIndex}"] .landscape-line-fragment[data-record-index="${before.painted}"]`);
+    if(!fragment)throw Error('The live endpoint has no manuscript row');
+    const box=document.querySelector('main').getBoundingClientRect(),point=new DOMPoint(before.frontier.t*fitT.slope+fitT.offset,before.frontier.v*fitV.slope+fitV.offset).matrixTransform(fragment.getScreenCTM());
+    const expected={x:point.x-box.x,y:point.y-box.y};
+    const oldRow=document.querySelector(`.landscape-line[data-line-index="${before.projection.lineIndex-1}"]`),oldOpacity=oldRow?Number(getComputedStyle(oldRow).opacity):null;
+    const completion=view.finish();
+    if(__pulseLandscapeStats.mode!=='pullback'||__pulseLandscapeStats.streamTime!==before.streamTime)throw Error('Finish advanced source before its first reveal frame');
+    const activePaths=[...document.querySelectorAll(`.landscape-reveal-core[data-stroke-index="${before.painted}"][data-line-index="${before.projection.lineIndex}"]`)].filter(path=>Number(path.style.opacity)>0);
+    const endpointError=Math.min(...activePaths.map(path=>{const p=inkVertices(path).at(-1);return Math.hypot(p.x-expected.x,p.y-expected.y);}));
+    if(!(endpointError<.025))throw Error(`${label}: first reveal frame shifted the exact live source endpoint by ${endpointError}px`);
+    let opacityChecks=0;
+    if(label==='mid-return')for(const path of document.querySelectorAll(`.landscape-reveal-core[data-line-index="${before.projection.lineIndex-1}"]`)){
+     if(Math.abs(Number(path.style.opacity)-oldOpacity)>1e-6)throw Error('Finish resurrected the fading previous row');
+     opacityChecks++;
+    }
+    view.cancelFinish();await completion;
+    if(JSON.stringify(scene)!==sourceBefore)throw Error('Finish seam changed accepted source');
+    results.push({label,endpointError,opacityChecks,frontier:before.frontier,turn:before.lineTurn,sourceStable:true});view.dispose();
+   }
+   return results;
+  },recording.segments);
+  assert.ok(result.finishSeams.length===2&&result.finishSeams[1].opacityChecks>0,'arbitrary-cursor and mid-return Finish preserve endpoint placement and row fade');
   result.reconstruction=[];
   for(const family of families){
   const reconstructed=await page.evaluate(async({segments,family})=>{
@@ -315,7 +372,7 @@ for(const engine of engines){
      for(const point of stats.revealSamples||[]){
       const p=stats.morphProgress,expected={x:point.from.x*(1-p)+point.to.x*p,y:point.from.y*(1-p)+point.to.y*p};
       const stroke=scene.strokes[point.strokeIndex],progress=(point.t-stroke.sourceStart)/(stroke.sourceEnd-stroke.sourceStart),source=PulseLandscape.strokeFrontier(stroke,progress);
-      const path=document.querySelector(`.landscape-reveal-core[data-stroke-index="${point.strokeIndex}"]`),vertex=path&&inkVertices(path)[point.pointIndex];
+      const path=document.querySelector(`.landscape-reveal-core[data-stroke-index="${point.strokeIndex}"][data-fragment-index="${point.fragmentIndex}"]`),vertex=path&&inkVertices(path)[point.pointIndex];
       if(!vertex)throw Error('Reconstruction sample has no corresponding rendered source vertex');
       const box=document.querySelector('main').getBoundingClientRect(),side=Math.min(box.width,box.height);
       const target={x:(box.width-side)/2+source.x/1080*side,y:(box.height-side)/2+source.y/1080*side};
@@ -340,7 +397,7 @@ for(const engine of engines){
   assert.ok(reconstructed.morphs.every(point=>point.domError<.002&&point.targetError<1e-6&&point.manuscriptError<1e-6),`${family.id}: actual DOM vertices follow measured manuscript locations into canonical pulseCore terrain coordinates`);
   }
   assert.deepEqual(result.errors,[]);
-  assert.deepEqual(result.failures,[],'all scene families preserve continuous measured ink, an anchored brush and immutable pigment on moving paper');
+  assert.deepEqual(result.failures,[],'all scene families preserve measured ink, smooth line returns and immutable pigment on scrolling paper');
   result.passed=true;
  }catch(error){result.failure=String(error.stack||error);process.exitCode=1;}
  finally{writeFileSync(path.join(out,`${engine}.json`),JSON.stringify(result,null,2));await browser?.close();console.log(JSON.stringify({engine,passed:!!result.passed,cases:result.cases.length,provenance:result.provenance?.length,failure:result.failure,out}));}

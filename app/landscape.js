@@ -1165,7 +1165,7 @@
   function createView(container,scene,options={}) {
     if(!container)throw new Error('A landscape view container is required.');
     const doc=container.ownerDocument,win=doc.defaultView||global,svgNode=name=>doc.createElementNS('http://www.w3.org/2000/svg',name);
-    const uid=`pulse-stream-${++brushSequence}`,side=800,records=[];
+    const uid=`pulse-stream-${++brushSequence}`,side=800,records=[],lines=new Map(),lineSeconds=6,turnDuration=560;
     const stage=doc.createElement('div');stage.className='landscape-stage';stage.dataset.scene=scene.family;stage.style.opacity='0';
     const canvas=doc.createElement('canvas'),caches=Array.from({length:3},()=>rasterCanvas(side,side,doc));
     canvas.className='landscape-canvas';canvas.setAttribute('role','img');canvas.setAttribute('aria-label','Your finished landscape, composed from accepted pulse waveforms');
@@ -1178,7 +1178,7 @@
     const ambient=Array.from({length:2},()=>{const item=doc.createElement('canvas');item.width=item.height=ambientSide;emergencePaper.append(item);return item;});
     const ambientCtx=ambient.map(item=>item.getContext('2d'));emergence.append(emergencePaper);
     const discovery=doc.createElement('p');discovery.className='landscape-discovery';discovery.setAttribute('aria-hidden','true');
-    const ink=svgNode('svg'),defs=svgNode('defs'),trace=svgNode('g'),reconstruction=svgNode('g'),tip=svgNode('g');
+    const ink=svgNode('svg'),defs=svgNode('defs'),paperViewport=svgNode('g'),trace=svgNode('g'),reconstruction=svgNode('g'),tip=svgNode('g');
     ink.setAttribute('class','landscape-ink');ink.setAttribute('aria-hidden','true');trace.setAttribute('class','landscape-paper-trace');reconstruction.setAttribute('class','landscape-reconstruction');tip.setAttribute('class','landscape-tip');
     const gradient=(id,stops,attrs={})=>{const g=svgNode('linearGradient');g.id=id;for(const[k,v]of Object.entries(attrs))g.setAttribute(k,v);for(const[offset,c]of stops){const s=svgNode('stop');s.setAttribute('offset',offset);s.setAttribute('stop-color',c);g.append(s);}defs.append(g);return g;};
     gradient(`${uid}-bristles`,[['0%','#183e86'],['24%','#253b51'],['72%','#655743'],['100%','#b4a485']],{x1:0,y1:0,x2:29,y2:-11,gradientUnits:'userSpaceOnUse'});
@@ -1192,11 +1192,11 @@
     addTip('path',{d:'M0 0C8 -2 12 -13 23 -14L26 -7C17 -3 8 1 0 0Z',fill:`url(#${uid}-bristles)`,stroke:'#263e53','stroke-width':'.3'});
     for(let i=0;i<9;i++)addTip('path',{d:`M${23+i*.35} ${-13.7+i*.8}Q${12+i*.5} ${-6+i*.5} ${.5+i*.65} ${-.2+i*.1}`,fill:'none',stroke:i%3?'#c9b795':'#263129','stroke-width':i%3?'.25':'.38',opacity:i%3?'.5':'.65'});
     const loadedTip=addTip('path',{d:'M0 0C5 -2 7 -5 11 -7C9 -3 7 -.6 3 .2Z',fill:'#2855b8'});
-    ink.append(defs,trace,reconstruction,tip);stage.append(canvas);container.append(emergence,stage,ink,discovery);container.classList.add('landscape-view');
+    paperViewport.append(trace);ink.append(defs,paperViewport,reconstruction,tip);stage.append(canvas);container.append(emergence,stage,ink,discovery);container.classList.add('landscape-view');
     let disposed=false,paused=false,frame=0,last=0,painted=0,progress=0,finished=false,revealing=false,finishing=false;
     let cursor=0,total=0,cachePainted=0,cacheReady=false,revealElapsed=0,resolveFinish=null,finishPromise=null,warmTask=0;
     let rasterWorker=null,workerBusy=false,workerTimer=0,workerSnapshot=0,workerMaterials=0,workerStarted=false,pendingAmbient=null;
-    let captureFirst=0,captureLast=0,captureViewBox='',captureTransform='';
+    let captureFirst=0,captureViewBox='',captureTransform='',writingLine=0,turnElapsed=0,turning=false;
     let warmedSeconds=0,ambientFront=0,ambientElapsed=0,ambientStage=0,ambientPreparedStage=0,ambientThrough=0,ambientAnimating=false,ambientTask=0,ambientCandidate=null,activeAmbient=null,ambientFade=0,ambientTarget=0,captionElapsed=6000,captionIndex=-1;
     const ambientOpacity=.58,ambientDuration=3200,ambientSettleMs=1200,ambientStepSeconds=5,captionStages=[1,9,17,25],captions=['Your first colors are appearing.','A landscape is taking shape.','Your pulse is adding the details.','A place that is yours alone.'];
     let box={width:1,height:1},camera={x:540,y:540,scale:1};
@@ -1207,6 +1207,8 @@
     const grainContext=ambientGrain.getContext('2d');grainContext.drawImage(atlas.tile,0,0);grainContext.globalCompositeOperation='destination-over';grainContext.fillStyle='rgba(255,255,255,.18)';grainContext.fillRect(0,0,INK_SIDE,INK_SIDE);
     const pattern=svgNode('pattern');pattern.id=`${uid}-grain`;pattern.setAttribute('patternUnits','userSpaceOnUse');pattern.setAttribute('width','85');pattern.setAttribute('height','85');
     const texture=svgNode('image');texture.setAttribute('href',atlas.svgMaskUrl);texture.setAttribute('width','85');texture.setAttribute('height','85');pattern.append(texture);defs.append(pattern);
+    const paperFade=gradient(`${uid}-paper-fade`,[['0%','black'],['100%','white']],{gradientUnits:'userSpaceOnUse',x1:0,x2:0,y1:0,y2:1});
+    const paperMask=svgNode('mask'),paperMaskRect=svgNode('rect');paperMask.id=`${uid}-paper-window`;paperMask.setAttribute('maskUnits','userSpaceOnUse');paperMask.setAttribute('maskContentUnits','userSpaceOnUse');paperMaskRect.setAttribute('fill',`url(#${paperFade.id})`);paperMask.append(paperMaskRect);defs.append(paperMask);paperViewport.setAttribute('mask',`url(#${paperMask.id})`);
     const stats=global.__pulseLandscapeStats={frames:0,rasterFrames:0,forcedRasterFrames:0,rasterSkipped:0,rasterIntervalMs:0,rasterPainted:-1,rasterProgress:0,active:false,revealing:false,mode:'recording',frameMs:0,pixelBudget:3086336,cachedPixels:side*side*4+ambientSide*ambientSide*2+INK_SIDE*INK_SIDE,get materialPixelBudget(){return 2*INK_SIDE*INK_SIDE+2*INK_PIXEL_LIMIT+(rasterWorker?2*INK_SIDE*INK_SIDE+2*INK_PIXEL_LIMIT:0);},get materialPixels(){return 2*INK_SIDE*INK_SIDE+2*(pigmentAtlases.get(doc)?.pixels||0)+workerMaterials;},liveTexturePixels:INK_SIDE*INK_SIDE,liveMaskPixelEstimate:0,camera:{...camera},finished:false,strokes:0,painted:0,activeStroke:null,progress:0,frontier:null,nib:null,visibleSeconds:6,wetTrail:null,projection:null,settling:false,streamTime:0,streamStart:-6,paperOffsetX:0,anchorX:0,visibleIntervals:[],morphProgress:0,revealSamples:[],emergence:{updates:0,stage:0,sourceSeconds:0,strokeCount:0,sourceEnd:null,animating:false,fade:0,target:0,beatDriven:false,beatsRevealed:0,beatCount:0,lastBeatTime:null,snapshotRequests:0,opacity:0,caption:'',captionVisible:false,clearTop:0,clearBottom:1,pixelBudget:ambientSide*ambientSide*2+INK_SIDE*INK_SIDE}};
     stats.rasterBackend='main-thread';stats.workerFrameMs=0;stats.workerRequests=0;
     stats.queuedSeconds=0;stats.playbackRate=0;stats.awaitingSource=false;
@@ -1284,10 +1286,21 @@
     }
     const path=nodes=>nodes.map((p,i)=>`${i?'L':'M'}${p.x.toFixed(3)} ${p.y.toFixed(3)}`).join('');
     const liveColor=t=>{const a=[[36,82,194],[103,73,157],[31,121,134],[36,82,194]],q=(t/11+.15*Math.sin(t/19))%3,i=Math.floor(q),u=smooth(q-i);return a[i].map((v,j)=>mix(v,a[i+1][j],u));};
-    const settings=()=>({anchor:box.width*.78,baseline:box.height*.50,sx:(box.width-Math.min(30,box.width*.085)*2)/600,sy:clamp(box.height*.16,52,72)/100});
+    const settings=()=>({left:Math.min(22,box.width*.055),baseline:box.height*.50,sx:Math.max(1,box.width-Math.min(22,box.width*.055)-58)/(lineSeconds*100),sy:clamp(box.height*.16,52,72)/100,lineSpacing:clamp(box.height*.145,78,116),fadeTop:Math.min(198,box.height*.31)});
+    const pageRow=()=>writingLine+(turning?smooth(turnElapsed/turnDuration):0);
+    function paperPoint(r,p,line=Math.floor((r.start+p.t-r.stroke.sourceStart)/lineSeconds)){
+      const s=settings(),q=sourcePoint(r,p);
+      return {x:s.left+(q.x-line*lineSeconds*100)*s.sx,y:s.baseline+(line-pageRow())*s.lineSpacing+q.y*s.sy};
+    }
+    function placePaperWindow(open=0){
+      const s=settings(),top=s.fadeTop*(1-open),feather=28*(1-open)+.01;
+      const bottom=mix(s.baseline+s.sy*100+8,box.height,open);
+      for(const node of [paperMask,paperMaskRect])for(const[k,v]of Object.entries({x:0,y:top,width:box.width,height:bottom-top}))node.setAttribute(k,v);
+      paperFade.setAttribute('y1',top);paperFade.setAttribute('y2',top+feather);
+    }
     const sourcePoint=(r,p)=>({x:(r.start+p.t-r.stroke.sourceStart)*100,y:(.5-normalized(p.v,r.stroke.transform.domain.min,r.stroke.transform.domain.max))*100});
     function placeEmergence(){
-      const s=settings(),width=box.width*1.12,height=box.height*1.6,top=clamp((s.baseline-s.sy*50-26)/box.height,0,1),bottom=clamp((s.baseline+s.sy*50+32)/box.height,0,1),feather=28/box.height;
+      const s=settings(),width=box.width*1.12,height=box.height*1.6,top=clamp((s.baseline-s.lineSpacing-s.sy*50-26)/box.height,0,1),bottom=clamp((s.baseline+s.sy*50+32)/box.height,0,1),feather=28/box.height;
       // Spread the accepted landscape vertically around the quiet writing
       // corridor, retaining its banks and full contour density at phone width.
       // This fixed atmospheric projection never follows or pans with the nib.
@@ -1404,7 +1417,7 @@
           const a=sourcePoint(prior,prior.nodes.at(-1)),b=sourcePoint(r,r.nodes[0]);
           r.join={a,b,from:prior.stroke.points.at(-1),to:stroke.points[0]};r.displayStart=prior.end;
         }
-        r.group=svgNode('g');r.group.setAttribute('class','landscape-record');r.group.dataset.recordIndex=i;r.group.style.display='none';r.visible=false;r.clipWidth=-1;
+        r.group=svgNode('g');r.group.id=`${uid}-source-${i}`;r.group.setAttribute('class','landscape-record');r.group.dataset.recordIndex=i;r.visible=false;r.clipWidth=-1;
         r.clip=svgNode('clipPath');r.clip.id=`${uid}-clip-${i}`;r.clip.setAttribute('clipPathUnits','userSpaceOnUse');r.clipRect=svgNode('rect');r.clipRect.setAttribute('x',r.displayStart*100-.01);r.clipRect.setAttribute('y','-100');r.clipRect.setAttribute('height','220');r.clip.append(r.clipRect);defs.append(r.clip);r.group.setAttribute('clip-path',`url(#${r.clip.id})`);
         const g=gradient(`${uid}-color-${i}`,Array.from({length:7},(_,j)=>[`${j/6*100}%`,color(liveColor(mix(r.start,r.end,j/6)))]),{gradientUnits:'userSpaceOnUse',x1:r.start*100,y1:0,x2:r.end*100,y2:0});
         r.mask=svgNode('mask');r.mask.id=`${uid}-mask-${i}`;r.mask.setAttribute('maskUnits','userSpaceOnUse');r.mask.setAttribute('maskContentUnits','userSpaceOnUse');r.mask.setAttribute('mask-type','alpha');
@@ -1419,7 +1432,7 @@
         if(r.join){const join=svgNode('path');join.setAttribute('class','landscape-source-join');join.dataset.fromStrokeIndex=prior.index;join.dataset.strokeIndex=i;join.setAttribute('d',path([r.join.a,r.join.b]));join.setAttribute('stroke',`url(#${g.id})`);join.setAttribute('vector-effect','non-scaling-stroke');r.group.append(join);}
         // These paths, color stops, and paper texture never change during capture.
         // Only the clip edge and the whole paper's transform advance.
-        r.group.append(r.wash,blooms,edge,body,r.core);trace.append(r.group);records.push(r);stats.revealKnotLimit+=stroke.points.length;
+        r.group.append(r.wash,blooms,edge,body,r.core);defs.append(r.group);records.push(r);stats.revealKnotLimit+=stroke.points.length;
       }
       stats.strokes=records.length;
     }
@@ -1449,42 +1462,75 @@
       return {t,v:mix(a.v,b.v,u)};
     }
     function captureFrame(){
-      const s=settings(),offset=s.anchor-cursor*100*s.sx;
-      const viewBox=`0 0 ${box.width} ${box.height}`,transform=`translate(${offset} ${s.baseline}) scale(${s.sx} ${s.sy})`;
+      const s=settings(),row=pageRow(),firstLine=Math.max(0,writingLine-1),lastLine=writingLine+(turning?1:0);
+      const viewBox=`0 0 ${box.width} ${box.height}`,transform=`translate(0 ${s.baseline-row*s.lineSpacing})`;
       if(captureViewBox!==viewBox){ink.setAttribute('viewBox',viewBox);captureViewBox=viewBox;}
       if(trace.style.display!=='')trace.style.display='';
       if(reconstruction.style.display!=='none')reconstruction.style.display='none';
       if(stage.style.opacity!=='0')stage.style.opacity='0';
       if(captureTransform!==transform){trace.setAttribute('transform',transform);captureTransform=transform;}
-      // Source time only advances. Keep the six-second window with two cursors
-      // instead of touching every retained SVG record on every animation frame.
-      while(captureFirst<records.length&&records[captureFirst].end<cursor-6){
-        const r=records[captureFirst++];if(r.visible){r.group.style.display='none';r.visible=false;}
+      // Keep only the current sheet window mounted. Original paths, pigment,
+      // masks and color stops are immutable source definitions, shared by uses
+      // when a measured record crosses a line boundary.
+      for(const [index,line]of lines)if(index<firstLine||index>lastLine){line.group.remove();line.clip.remove();lines.delete(index);}
+      while(captureFirst<records.length&&records[captureFirst].end<firstLine*lineSeconds)captureFirst++;
+      const visible=[];let instances=0;
+      for(let index=firstLine;index<=lastLine;index++){
+        let line=lines.get(index);
+        if(!line){
+          const group=svgNode('g'),clip=svgNode('clipPath'),rect=svgNode('rect');
+          group.setAttribute('class','landscape-line');group.dataset.lineIndex=index;
+          clip.id=`${uid}-line-${index}`;clip.setAttribute('clipPathUnits','userSpaceOnUse');
+          for(const[k,v]of Object.entries({x:index*lineSeconds*100,y:-100,width:lineSeconds*100,height:220}))rect.setAttribute(k,v);
+          clip.append(rect);defs.append(clip);group.setAttribute('clip-path',`url(#${clip.id})`);trace.append(group);
+          line={group,clip,uses:new Map(),transform:''};lines.set(index,line);
+        }
+        const lineTransform=`translate(${s.left-index*lineSeconds*100*s.sx} ${index*s.lineSpacing}) scale(${s.sx} ${s.sy})`;
+        if(line.transform!==lineTransform){line.group.setAttribute('transform',lineTransform);line.transform=lineTransform;}
+        const opacity=index===writingLine-1&&turning?1-smooth(turnElapsed/turnDuration):1;
+        if(line.opacity!==opacity){line.group.style.opacity=`${opacity}`;line.opacity=opacity;}
+        const begin=index*lineSeconds,end=begin+lineSeconds;
+        for(let i=captureFirst;i<records.length;i++){
+          const r=records[i];if(r.displayStart>Math.min(end,cursor))break;
+          if(r.end<=begin||r.displayStart>=end)continue;
+          if(!line.uses.has(i)){
+            const use=svgNode('use');use.setAttribute('href',`#${r.group.id}`);use.setAttribute('class','landscape-line-fragment');use.dataset.recordIndex=i;line.group.append(use);line.uses.set(i,use);
+          }
+          const width=Math.max(0,Math.min(r.end,cursor)-r.displayStart)*100+.001;
+          if(r.clipWidth!==width){r.clipRect.setAttribute('width',width);r.clipWidth=width;}
+          r.visible=true;instances++;
+          const from=Math.max(r.start,begin),to=Math.min(r.end,end,cursor);
+          if(to>from)visible.push({index:r.index,line:index,sourceStart:r.stroke.sourceStart+from-r.start,sourceEnd:r.stroke.sourceStart+to-r.start,start:from,end:to});
+        }
       }
-      while(captureLast<records.length&&records[captureLast].displayStart<=cursor){
-        const r=records[captureLast++];if(r.index>=captureFirst){r.group.style.display='';r.visible=true;}
-      }
-      const visible=[];
-      for(let i=captureFirst;i<captureLast;i++){
-        const r=records[i],width=Math.max(0,Math.min(r.end,cursor)-r.displayStart)*100+.001;
-        if(r.clipWidth!==width){r.clipRect.setAttribute('width',width);r.clipWidth=width;}
-        if(cursor>=r.start)visible.push({index:r.index,sourceStart:r.stroke.sourceStart,sourceEnd:Math.min(r.stroke.sourceEnd,r.stroke.sourceStart+cursor-r.start),start:r.start,end:r.end});
-      }
-      const r=currentRecord();stats.streamTime=cursor;stats.streamStart=cursor-6;stats.paperOffsetX=offset;stats.anchorX=s.anchor;stats.visibleIntervals=visible;
+      const r=currentRecord(),lineProgress=clamp((cursor-writingLine*lineSeconds)/lineSeconds,0,1);
+      stats.streamTime=cursor;stats.streamStart=firstLine*lineSeconds;stats.paperOffsetX=s.left;stats.paperOffsetY=-row*s.lineSpacing;stats.visibleIntervals=visible;
       stats.queuedSeconds=Math.max(0,total-cursor);stats.awaitingSource=cursor>=total&&!paused&&!doc.hidden&&!finished;
-      stats.playbackRate=paused||doc.hidden||reduced||stats.awaitingSource?0:1;
-      stats.projection={kind:'continuous-source-time-value',windowSeconds:6,start:cursor-6,baseline:s.baseline,amplitude:s.sy*100,settle:0};
-      stats.liveMaskPixelEstimate=visible.length*Math.ceil(box.width*(win.devicePixelRatio||1))*Math.ceil(90*(win.devicePixelRatio||1));
+      stats.playbackRate=paused||doc.hidden||reduced||turning||stats.awaitingSource?0:1;
+      stats.lineTurn={active:turning,progress:turning?turnElapsed/turnDuration:0,fromLine:writingLine,toLine:writingLine+1};
+      stats.projection={kind:'wrapped-source-time-value',windowSeconds:lineSeconds,lineSeconds,lineIndex:writingLine,lineProgress,lineSpacing:s.lineSpacing,paperOffsetY:stats.paperOffsetY,start:writingLine*lineSeconds,baseline:s.baseline+(writingLine-row)*s.lineSpacing,amplitude:s.sy*100,settle:0};
+      stats.visibleLines=lines.size;stats.visibleFragments=instances;stats.visibleSeconds=(lastLine-firstLine+1)*lineSeconds;
+      stats.liveMaskPixelEstimate=Math.ceil(box.width*(win.devicePixelRatio||1))*Math.ceil((90*instances+s.baseline+s.sy*100+8-s.fadeTop)*(win.devicePixelRatio||1));
       const bridging=r?.join&&cursor>=r.displayStart&&cursor<r.start;stats.bridging=!!bridging;
       if(!r||cursor<r.start&&!bridging||paused||reduced||doc.hidden){hideBrush();return;}
       const u=bridging?(cursor-r.displayStart)/(r.start-r.displayStart):0;
       const frontier=bridging?{t:mix(r.join.from.t,r.join.to.t,u),v:mix(r.join.from.v,r.join.to.v,u)}:liveFrontier(r,progress);
       const q=bridging?{x:mix(r.join.a.x,r.join.b.x,u),y:mix(r.join.a.y,r.join.b.y,u)}:sourcePoint(r,frontier);
-      const x=offset+q.x*s.sx,y=s.baseline+q.y*s.sy;
+      let x=s.left+(q.x-writingLine*lineSeconds*100)*s.sx,y=s.baseline+(writingLine-row)*s.lineSpacing+q.y*s.sy;
       const earlier=bridging?r.join.from:liveFrontier(r,Math.max(0,progress-.005));
-      const dy=-(frontier.v-earlier.v)*s.sy*100,angle=clamp(Math.atan2(dy,Math.max(.001,(frontier.t-earlier.t)*100*s.sx))*180/Math.PI*.08,-8,8);
-      if(tip.style.display!=='')tip.style.display='';tip.setAttribute('transform',`translate(${x} ${y}) rotate(${angle})`);loadedTip.setAttribute('fill',color(liveColor(cursor)));
-      stats.frontier=frontier;stats.nib={x,y,angle,width:50,coreWidth:1.25};stats.wetTrail={start:Math.max(0,cursor-6),end:cursor,points:visible.length,persistent:true};
+      const dy=-(frontier.v-earlier.v)*s.sy*100;
+      let angle=clamp(Math.atan2(dy,Math.max(.001,(frontier.t-earlier.t)*100*s.sx))*180/Math.PI*.08,-8,8);
+      if(turning){
+        // The brush crosses the paper in the air. The source clock is held at
+        // the exact seam, and no return connector is deposited as pulse data.
+        const lift=smooth(turnElapsed/turnDuration),arc=Math.sin(Math.PI*lift);
+        x=mix(s.left+lineSeconds*100*s.sx,s.left,lift);
+        y=s.baseline+q.y*s.sy-24*arc;angle=-12*arc;
+      }
+      stats.anchorX=x;
+      if(tip.style.display!=='')tip.style.display='';tip.style.opacity=turning?`${1-.22*Math.sin(Math.PI*turnElapsed/turnDuration)}`:'1';
+      tip.setAttribute('transform',`translate(${x} ${y}) rotate(${angle})`);loadedTip.setAttribute('fill',color(liveColor(cursor)));
+      stats.frontier=frontier;stats.nib={x,y,angle,width:50,coreWidth:1.25,drawing:!turning};stats.wetTrail={start:firstLine*lineSeconds,end:cursor,points:visible.length,persistent:true};
     }
     function composeRaster(){ctx.setTransform(1,0,0,1,0,0);ctx.clearRect(0,0,side,side);for(const c of caches)ctx.drawImage(c,0,0);stats.rasterFrames++;stats.forcedRasterFrames++;stats.rasterPainted=records.length;stats.rasterProgress=1;cacheReady=true;}
     function prepareRaster(budget=6,publish=true){
@@ -1502,32 +1548,53 @@
     function screenTerrain(p){const size=Math.min(box.width,box.height);return {x:(box.width-size)/2+p.x/WORLD*size,y:(box.height-size)/2+p.y/WORLD*size};}
     function manuscriptPoint(r,p){const rows=Math.max(1,scene.slots.length),rowH=860/rows;return screenTerrain({x:100+880*clamp((r.stroke.slotStart+p.t-r.stroke.sourceStart)/SLOT_SECONDS,0,1),y:110+(r.stroke.slot+.5)*rowH+(.5-normalized(p.v,r.stroke.transform.domain.min,r.stroke.transform.domain.max))*Math.min(34,rowH*.72)});}
     function prepareReconstruction(){
-      const s=settings(),offset=s.anchor-cursor*100*s.sx;
       for(const r of records){
-        // Measured knots are kept; intermediate display interpolation is not
-        // needed in the smaller manuscript/reconstruction view.
-        const nodes=r.revealKnots||revealKnots(r.stroke);
-        r.revealColor=pigment(scene,r.stroke,.5);
-        r.revealNodes=nodes.map(p=>{const q=sourcePoint(r,p),from=manuscriptPoint(r,p);return {t:p.t,v:p.v,from,to:screenTerrain(p),live:{x:offset+q.x*s.sx,y:s.baseline+q.y*s.sy}};});
-        r.revealWidths=r.revealNodes.map(p=>2+3*materialField(r.stroke.material.grainSeed,p.t*12,53101));
-        r.liveColor=liveColor((r.start+r.end)/2);
-        r.wasVisible=r.end>=cursor-6&&r.start<=cursor;
-        r.revealCore=svgNode('path');r.revealCore.setAttribute('class','landscape-reveal-core');r.revealCore.dataset.strokeIndex=r.index;r.revealCore.setAttribute('fill','none');r.revealCore.setAttribute('stroke',color(liveColor((r.start+r.end)/2)));
-        r.revealWash=svgNode('path');r.revealWash.setAttribute('class','landscape-reveal-wash');r.revealWash.setAttribute('fill',color(liveColor((r.start+r.end)/2),.16));reconstruction.append(r.revealWash,r.revealCore);
+        // Reconstruction keeps every measured knot. Split only the live
+        // presentation at paper seams and the current cursor, so a turn never
+        // draws a diagonal from one row's right edge to the next row's left.
+        const knots=r.revealKnots||revealKnots(r.stroke);
+        const projected=(p,line)=>({t:p.t,v:p.v,from:manuscriptPoint(r,p),to:screenTerrain(p),live:paperPoint(r,p,line)});
+        const at=t=>{
+          let lo=0,hi=knots.length-1;
+          while(hi-lo>1){const mid=(lo+hi)>>1;if(knots[mid].t<=t)lo=mid;else hi=mid;}
+          const a=knots[lo],b=knots[hi],u=b.t>a.t?clamp((t-a.t)/(b.t-a.t),0,1):0;
+          return {t,v:liveFrontier(r,(t-r.stroke.sourceStart)/(r.stroke.sourceEnd-r.stroke.sourceStart)).v,x:mix(a.x,b.x,u),y:mix(a.y,b.y,u)};
+        };
+        r.revealColor=pigment(scene,r.stroke,.5);r.liveColor=liveColor((r.start+r.end)/2);
+        r.fragments=[];
+        const cuts=[r.start,r.end];
+        for(let line=Math.floor(r.start/lineSeconds)+1;line*lineSeconds<r.end-1e-8;line++)cuts.push(line*lineSeconds);
+        if(cursor>r.start+1e-8&&cursor<r.end-1e-8)cuts.push(cursor);
+        cuts.sort((a,b)=>a-b);
+        for(let i=1;i<cuts.length;i++){
+          const start=cuts[i-1],end=cuts[i];if(end-start<1e-8)continue;
+          const line=Math.floor((start+end)/2/lineSeconds),a=r.stroke.sourceStart+start-r.start,b=r.stroke.sourceStart+end-r.start;
+          const nodes=[at(a),...knots.filter(p=>p.t>a+1e-8&&p.t<b-1e-8),at(b)].map(p=>projected(p,line));
+          const wasVisible=end<=cursor+1e-8&&line>=writingLine-1&&line<=writingLine;
+          const core=svgNode('path'),wash=svgNode('path');
+          core.setAttribute('class','landscape-reveal-core');core.dataset.strokeIndex=r.index;core.dataset.lineIndex=line;core.dataset.fragmentIndex=r.fragments.length;core.setAttribute('fill','none');core.setAttribute('stroke',color(r.liveColor));
+          wash.setAttribute('class','landscape-reveal-wash');wash.setAttribute('fill',color(r.liveColor,.16));reconstruction.append(wash,core);
+          r.fragments.push({nodes,wasVisible,initialOpacity:line===writingLine-1&&turning?1-smooth(turnElapsed/turnDuration):1,core,wash,widths:nodes.map(p=>2+3*materialField(r.stroke.material.grainSeed,p.t*12,53101))});
+        }
       }
     }
     function revealFrame(){
       ink.setAttribute('viewBox',`0 0 ${box.width} ${box.height}`);trace.style.display='none';reconstruction.style.display='';hideBrush();
       const pull=clamp(revealElapsed/1800,0,1),morph=smooth(clamp((revealElapsed-1800)/3000,0,1)),dry=cacheReady?smooth(clamp((revealElapsed-4800)/1000,0,1)):0;
       const ease=smooth(pull);stats.mode=pull<1?'pullback':'reconstructing';stats.morphProgress=morph;stats.revealSamples=[];
+      if(pull<1){placePaperWindow(ease);reconstruction.setAttribute('mask',`url(#${paperMask.id})`);}else reconstruction.removeAttribute('mask');
       emergence.style.opacity=`${ambientOpacity*(1-ease)}`;stats.emergence.opacity=ambientOpacity*(1-ease);
+      const position=(p,visible)=>pull<1&&visible?{x:mix(p.live.x,p.from.x,ease),y:mix(p.live.y,p.from.y,ease)}:{x:mix(p.from.x,p.to.x,morph),y:mix(p.from.y,p.to.y,morph)};
       for(const r of records){
-        const nodes=r.revealNodes.map(p=>pull<1&&r.wasVisible?{x:mix(p.live.x,p.from.x,ease),y:mix(p.live.y,p.from.y,ease)}:{x:mix(p.from.x,p.to.x,morph),y:mix(p.from.y,p.to.y,morph)});
-        r.revealCore.setAttribute('d',path(nodes));r.revealCore.style.opacity=`${(r.wasVisible?1:ease)*(1-dry)}`;
-        r.revealCore.setAttribute('stroke',color(r.liveColor.map((v,i)=>mix(v,r.revealColor[i],morph))));
-        const wash=nodes.map((p,i)=>({x:p.x,y:p.y+r.revealWidths[i]})).reverse();
-        r.revealWash.setAttribute('d',path([...nodes,...wash])+'Z');r.revealWash.style.opacity=`${(r.wasVisible?1:ease)*(1-dry)}`;
-        if(stats.revealSamples.length<3&&nodes.length>3){const pointIndex=Math.floor(nodes.length/2),p=r.revealNodes[pointIndex];stats.revealSamples.push({strokeIndex:r.index,pointIndex,t:p.t,v:p.v,from:p.from,to:p.to,current:nodes[pointIndex]});}
+        for(const [fragmentIndex,fragment]of r.fragments.entries()){
+          const nodes=fragment.nodes.map(p=>position(p,fragment.wasVisible));
+          fragment.core.setAttribute('d',path(nodes));fragment.core.style.opacity=`${(fragment.wasVisible?mix(fragment.initialOpacity,1,ease):ease)*(1-dry)}`;
+          fragment.core.setAttribute('stroke',color(r.liveColor.map((v,i)=>mix(v,r.revealColor[i],morph))));
+          const wash=nodes.map((p,i)=>({x:p.x,y:p.y+fragment.widths[i]})).reverse();
+          fragment.wash.setAttribute('d',path([...nodes,...wash])+'Z');fragment.wash.style.opacity=`${(fragment.wasVisible?mix(fragment.initialOpacity,1,ease):ease)*(1-dry)}`;
+          if(stats.revealSamples.length<3&&nodes.length>3){const pointIndex=Math.floor(nodes.length/2),p=fragment.nodes[pointIndex];stats.revealSamples.push({strokeIndex:r.index,fragmentIndex,pointIndex,t:p.t,v:p.v,from:p.from,to:p.to,current:nodes[pointIndex]});}
+        }
+
       }
       stage.style.opacity=cacheReady?`${smooth(clamp((morph-.30)/.70,0,1))}`:'0';
     }
@@ -1551,7 +1618,14 @@
       }else{
         // Preserve a steady brush speed even after delayed frames or source
         // windows. Never rush through buffered pulse data to catch up.
-        cursor=Math.min(total,cursor+Math.min(delta,1000/30)/1000);
+        if(turning){
+          turnElapsed=Math.min(turnDuration,turnElapsed+Math.min(delta,1000/30));
+          if(turnElapsed===turnDuration){writingLine++;turning=false;turnElapsed=0;}
+        }else{
+          const lineEnd=(writingLine+1)*lineSeconds;
+          cursor=Math.min(total,lineEnd,cursor+Math.min(delta,1000/30)/1000);
+          if(cursor>=lineEnd&&total>lineEnd+1e-8){turning=true;turnElapsed=0;}
+        }
         emergenceFrame(delta);captureFrame();stats.rasterSkipped++;if(cursor>=total&&!ambientNeedsFrame()&&captionElapsed>=6000){stats.active=false;last=0;}
       }
       stats.frameMs=performance.now()-begin;schedule();
@@ -1561,11 +1635,11 @@
       if(Math.abs(next.width-previous.width)<.01&&Math.abs(next.height-previous.height)<.01)return;
       box=next;
       const size=Math.min(box.width,box.height);stage.style.width=stage.style.height=`${size}px`;stage.style.transform=`translate3d(${(box.width-size)/2}px,${(box.height-size)/2}px,0)`;stats.camera={...camera};
-      placeEmergence();
+      placeEmergence();placePaperWindow();
       if(revealing){
         // Browser chrome and rotation may resize the paper during the reveal.
         // Reproject its coordinates without skipping the animation.
-        for(const r of records)for(const p of r.revealNodes){
+        for(const r of records)for(const p of r.fragments.flatMap(fragment=>fragment.nodes)){
           p.live={x:p.live.x*box.width/previous.width,y:p.live.y*box.height/previous.height};
           p.from=manuscriptPoint(r,p);
           const oldSize=Math.min(previous.width,previous.height);
@@ -1579,7 +1653,7 @@
     function sync(){
       if(disposed||finished)return;refreshRecords();if(paused)return;
       warmNext();
-      if(reduced){cursor=total;if(ambientAnimating)completeEmergence();captureFrame();hideBrush();schedule();return;}
+      if(reduced){cursor=total;writingLine=Math.max(0,Math.ceil(total/lineSeconds)-1);turning=false;turnElapsed=0;if(ambientAnimating)completeEmergence();captureFrame();hideBrush();schedule();return;}
       captureFrame();schedule();
     }
     function finish(){
