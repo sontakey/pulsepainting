@@ -7,6 +7,7 @@ import { readFileSync, mkdirSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { chromium, webkit } from 'playwright';
+import sharp from 'sharp';
 import { replayPublicFixture } from '../landscape-fixture.mjs';
 
 const root=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'../..');
@@ -153,6 +154,9 @@ for(const engine of engines){
      }
      if(snapshot.bridging&&snapshot.nib?.drawing){const join=inspectJoin(scene,__pulseLandscapeStats);bridgeFrames++;maxBridgeError=Math.max(maxBridgeError,join.endpointError);}
      if(snapshot.lineTurn?.active){returnFrames++;if(snapshot.nib?.drawing)throw Error('The returning brush left ink across the paper');}
+     const paperViewport=document.querySelector('.landscape-paper-trace').parentElement,paperMask=document.querySelector('.landscape-ink mask[id$="-paper-window"]');
+     if(snapshot.lineTurn?.active){if(!paperMask||paperViewport.getAttribute('mask')!==`url(#${paperMask.id})`)throw Error('The exiting oldest row has no paper-window mask during its return');}
+     else if(paperViewport.hasAttribute('mask'))throw Error('Settled manuscript rows retain an unnecessary parent raster mask');
      const rows=[...document.querySelectorAll('.landscape-line')],lineIndex=snapshot.projection.lineIndex;
      if(snapshot.projection.retainedLines!==3)throw Error('The live manuscript no longer retains three rows');
      if(rows.length>(snapshot.lineTurn?.active?4:3))throw Error('The manuscript mounted more than its three retained rows and return destination');
@@ -406,6 +410,52 @@ for(const engine of engines){
   assert.ok(reconstructed.morphs.length>12&&reconstructed.checkedColors>50&&reconstructed.morphs.some(point=>point.progress>.3&&point.progress<.7&&point.travel>10),`${family.id}: valid visible pulse vertices pass through intermediate terrain geometry`);
   assert.ok(reconstructed.morphs.every(point=>point.sourceError<1e-7&&point.interpolationError<1e-6),`${family.id}: morphing keeps source t/v and interpolates the same point between manuscript and terrain`);
   assert.ok(reconstructed.morphs.every(point=>point.domError<.002&&point.targetError<1e-6&&point.manuscriptError<1e-6),`${family.id}: actual DOM vertices follow measured manuscript locations into canonical pulseCore terrain coordinates`);
+  }
+  // The settled three-row footprint fits the opaque region of the old parent
+  // mask. Compare actual browser pixels, not only geometry/stat metadata, before
+  // and after forcing that mask back on at normal and short/narrow phone sizes.
+  result.settledMaskParity=[];
+  for(const size of [{width:390,height:844,paperHeight:520},{width:320,height:568,paperHeight:320}]){
+   await page.setViewportSize({width:size.width,height:size.height});
+   const state=await page.evaluate(({segments,paperHeight})=>{
+    document.querySelector('main').style.height=`${paperHeight}px`;
+    window.scene=PulseLandscape.create({family:'quiet-lake',seed:39293});segments.slice(0,7).forEach(segment=>PulseLandscape.append(scene,segment));
+    window.maskParitySource=JSON.stringify(scene);window.view=PulseLandscape.createView(document.querySelector('main'),scene);
+    for(let i=0;i<2400;i++){
+     advancePaint();const p=__pulseLandscapeStats.projection;
+     if(p.lineIndex===3&&p.lineProgress>.45&&!__pulseLandscapeStats.lineTurn.active)break;
+    }
+    const stats=__pulseLandscapeStats,viewport=document.querySelector('.landscape-paper-trace').parentElement;
+    if(stats.projection.lineIndex!==3||stats.visibleLines!==3||stats.lineTurn.active||viewport.hasAttribute('mask'))throw Error('Pixel parity did not reach three settled unmasked rows');
+    // The stepped clock remains fixed; pause also cancels asynchronous warming
+    // so both screenshots show exactly the same deposited source and pigment.
+    view.pause(true);
+    return {projection:structuredClone(stats.projection),streamTime:stats.streamTime,visibleLines:stats.visibleLines};
+   },{segments:recording.segments,paperHeight:size.paperHeight});
+   const prefix=`${engine}-${size.width}x${size.height}-settled`;
+   const unmasked=await page.locator('main').screenshot({path:path.join(out,`${prefix}-unmasked.png`)});
+   await page.evaluate(()=>{
+    const mask=document.querySelector('.landscape-ink mask[id$="-paper-window"]');
+    document.querySelector('.landscape-paper-trace').parentElement.setAttribute('mask',`url(#${mask.id})`);
+   });
+   const masked=await page.locator('main').screenshot({path:path.join(out,`${prefix}-forced-mask.png`)});
+   await page.evaluate(()=>document.querySelector('.landscape-paper-trace').parentElement.removeAttribute('mask'));
+   const restored=await page.locator('main').screenshot({path:path.join(out,`${prefix}-restored.png`)});
+   const [plain,forced,again]=await Promise.all([unmasked,masked,restored].map(buffer=>sharp(buffer).ensureAlpha().raw().toBuffer({resolveWithObject:true})));
+   assert.deepEqual(forced.info,plain.info,'forcing the parent mask cannot resize the settled screenshot');
+   assert.deepEqual(again.info,plain.info);
+   let max=0,sum=0,changed=0,inkPixels=0,restoredMax=0;
+   for(let i=0;i<plain.data.length;i++){
+    const difference=Math.abs(plain.data[i]-forced.data[i]);max=Math.max(max,difference);sum+=difference;if(difference)changed++;
+    restoredMax=Math.max(restoredMax,Math.abs(plain.data[i]-again.data[i]));
+   }
+   for(let i=0;i<plain.data.length;i+=4)if(plain.data[i+2]-plain.data[i]>15)inkPixels++;
+   const parity={size,...state,width:plain.info.width,height:plain.info.height,max,mean:sum/plain.data.length,changedChannels:changed,inkPixels,restoredMax};
+   result.settledMaskParity.push(parity);
+   await page.evaluate(()=>{if(JSON.stringify(scene)!==maskParitySource)throw Error('Parent-mask comparison changed accepted source');view.dispose();});
+   assert.ok(inkPixels>100,'the compared screenshots contain visible measured blue pigment');
+   assert.equal(restoredMax,0,'restoring the unmasked parent produces the exact same settled screenshot');
+   assert.ok(max<=1&&parity.mean<.001,`${engine}/${size.width}: removing the settled parent mask changes visible pigment (max ${max}, mean ${parity.mean})`);
   }
   assert.deepEqual(result.errors,[]);
   assert.deepEqual(result.failures,[],'all scene families preserve measured ink, smooth line returns and immutable pigment on scrolling paper');

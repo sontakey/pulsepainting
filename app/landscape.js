@@ -1473,6 +1473,10 @@
     }
     function captureFrame(){
       const s=settings(),row=pageRow(),firstLine=Math.max(0,writingLine-retainedLines+1),lastLine=writingLine+(turning?1:0);
+      // Settled rows fit entirely within the opaque paper window. Mask only
+      // while the oldest row exits; otherwise WebKit repaints an unnecessary
+      // offscreen layer around all three rows for every new brush segment.
+      if(turning){if(!paperViewport.hasAttribute('mask'))paperViewport.setAttribute('mask',`url(#${paperMask.id})`);}else paperViewport.removeAttribute('mask');
       const viewBox=`0 0 ${box.width} ${box.height}`,transform=`translate(0 ${s.baseline-row*s.lineSpacing})`;
       if(captureViewBox!==viewBox){ink.setAttribute('viewBox',viewBox);captureViewBox=viewBox;}
       if(trace.style.display!=='')trace.style.display='';
@@ -1520,7 +1524,7 @@
       stats.lineTurn={active:turning,progress:turning?turnElapsed/turnDuration:0,fromLine:writingLine,toLine:writingLine+1};
       stats.projection={kind:'wrapped-source-time-value',windowSeconds:lineSeconds,lineSeconds,lineIndex:writingLine,lineProgress,lineSpacing:s.lineSpacing,retainedLines,writingTop:box.writingTop,writingBottom:box.writingBottom,paperOffsetY:stats.paperOffsetY,start:writingLine*lineSeconds,baseline:s.baseline+(writingLine-row)*s.lineSpacing,amplitude:s.sy*100,settle:0};
       stats.visibleLines=lines.size;stats.visibleFragments=instances;stats.visibleSeconds=(lastLine-firstLine+1)*lineSeconds;
-      stats.liveMaskPixelEstimate=Math.ceil(box.width*(win.devicePixelRatio||1))*Math.ceil((90*instances+s.baseline+s.sy*100+8-s.fadeTop)*(win.devicePixelRatio||1));
+      stats.liveMaskPixelEstimate=Math.ceil(box.width*(win.devicePixelRatio||1))*Math.ceil((90*instances+(turning?s.baseline+s.sy*100+8-s.fadeTop:0))*(win.devicePixelRatio||1));
       const bridging=r?.join&&cursor>=r.displayStart&&cursor<r.start;stats.bridging=!!bridging;
       if(!r||cursor<r.start&&!bridging||paused||reduced||doc.hidden){hideBrush();return;}
       const u=bridging?(cursor-r.displayStart)/(r.start-r.displayStart):0;
