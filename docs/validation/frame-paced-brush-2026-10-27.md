@@ -35,3 +35,14 @@ remain byte-identical; only the generated renderer provenance hash changes.
 This is a source playback timing correction, not proof of improved iPhone FPS.
 Browser replay does not validate phone camera, screen-recording or thermal load.
 Private debug recordings are not committed.
+
+Full Linux CI `40576734904` passed on feature
+`1249c54c4a3a86180efc6e6a7bf81d1d8c374cd2`. PR #21 merged as
+`ba7fcf397c357adbb218bd7d5a04ff3624af44e6`, with an identical source tree.
+READY production `dpl_CL7hLxHvwh5ctX9yw7RPusuwWtE2` serves that merge at
+https://www.pulsepainting.com/. All 111 runtime files matched the frozen build
+at `2026-10-27T20:34:19.990Z`; apex redirects to www. Anonymous Chromium/WebKit
+mobile and desktop checks passed without camera acquisition or public writes.
+The renderer SHA-256 is
+`ec98c976f0a767b2a5f657cf1db3e5ccb2310d737ecac35f5b99483863954ca2`.
+Subsequent documentation-only deployments retain the same runtime bytes.
