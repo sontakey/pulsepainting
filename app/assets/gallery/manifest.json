@@ -2,7 +2,7 @@
   "schema": 1,
   "kind": "public-fixture-examples",
   "rendererVersion": "landscape-2",
-  "rendererSha256": "abbe771d8b96cbc9c5df4ae6449b2d2bce7f614bbdd5fe43972bf25d1c3704f7",
+  "rendererSha256": "4d929c9450d5665c8d98b332b1542f0c2dd3580cf6b3c09497d928f5f2bb635d",
   "cardRendererSha256": "f739d2a4174aeee7cb1ac54e2d8a888b7c610909832ad8ed9d9a980129330dc2",
   "fixture": "test/fixtures/iphone-200s.json",
   "fixtureSha256": "5f09524bc151460d1a1a1fa58c30681dd84eaf30d989f4637edf6183e4a03b66",

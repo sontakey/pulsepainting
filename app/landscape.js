@@ -1582,7 +1582,10 @@
       ink.setAttribute('viewBox',`0 0 ${box.width} ${box.height}`);trace.style.display='none';reconstruction.style.display='';hideBrush();
       const pull=clamp(revealElapsed/1800,0,1),morph=smooth(clamp((revealElapsed-1800)/3000,0,1)),dry=cacheReady?smooth(clamp((revealElapsed-4800)/1000,0,1)):0;
       const ease=smooth(pull);stats.mode=pull<1?'pullback':'reconstructing';stats.morphProgress=morph;stats.revealSamples=[];
-      if(pull<1){placePaperWindow(ease);reconstruction.setAttribute('mask',`url(#${paperMask.id})`);}else reconstruction.removeAttribute('mask');
+      // Retain the exact live clipping at Finish, then open the sheet quickly.
+      // Masking every reconstructed source path for the full pullback forces
+      // WebKit to rasterize a large offscreen layer on every frame.
+      if(revealElapsed<180){placePaperWindow(smooth(revealElapsed/180));reconstruction.setAttribute('mask',`url(#${paperMask.id})`);}else reconstruction.removeAttribute('mask');
       emergence.style.opacity=`${ambientOpacity*(1-ease)}`;stats.emergence.opacity=ambientOpacity*(1-ease);
       const position=(p,visible)=>pull<1&&visible?{x:mix(p.live.x,p.from.x,ease),y:mix(p.live.y,p.from.y,ease)}:{x:mix(p.from.x,p.to.x,morph),y:mix(p.from.y,p.to.y,morph)};
       for(const r of records){
